@@ -1,0 +1,4 @@
+{
+  "credit": "Parents container/cardboard_box.json, which is not a Blockbench export target. The geometry used to live in item/empty_box/ and was destroyed by exporting a different model over it.",
+  "parent": "pocket:item/container/cardboard_box"
+}

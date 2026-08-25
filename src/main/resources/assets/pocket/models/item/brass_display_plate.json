@@ -1,0 +1,25 @@
+{
+	"format_version": "1.21.11",
+	"credit": "Made with Blockbench",
+	"parent": "create:item/package_transforms",
+	"textures": {
+		"1": "create:block/brass_casing_connected",
+		"particle": "create:block/palettes/framed_glass"
+	},
+	"elements": [
+		{
+			"name": "platform",
+			"from": [1, 0, 1],
+			"to": [15, 1, 15],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8, 7, 8]},
+			"faces": {
+				"north": {"uv": [0, 1.875, 2, 2], "texture": "#1"},
+				"east": {"uv": [0, 0, 2, 0.125], "texture": "#1"},
+				"south": {"uv": [1.875, 2, 2, 0], "rotation": 90, "texture": "#1"},
+				"west": {"uv": [0, 0, 0.125, 2], "texture": "#1"},
+				"up": {"uv": [0.125, 0.125, 1.875, 1.875], "texture": "#1"},
+				"down": {"uv": [1.875, 0.125, 0.125, 1.875], "texture": "#1"}
+			}
+		}
+	]
+}

@@ -1,0 +1,57 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="misterblusky9"
+description='''
+Experimental Alpha 0.1 — back up worlds before testing.
+Create-flavoured spatial compression and contraption logistics for Sable sublevels.
+Compress vehicles and structures through five power-of-two stages, pocket the miniature directly,
+recover wrecks, manipulate miniatures, and fire unprotected pocketed contraptions with Create machinery.
+'''
+
+[[mixins]]
+config="pocket.mixins.json"
+
+# Optional
+[[mixins]]
+config="pocket.aeronautics.mixins.json"
+
+[[dependencies.${mod_id}]]
+modId="neoforge"
+type="required"
+versionRange="[${neo_version},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="create"
+type="required"
+versionRange="[6.0.10,6.1)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="sable"
+type="required"
+versionRange="[2.0.0,2.1)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="simulated"
+type="required"
+versionRange="[1.3.0,1.4)"
+ordering="AFTER"
+side="BOTH"

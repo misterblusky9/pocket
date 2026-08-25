@@ -1,0 +1,6 @@
+{
+  "parent": "create:item/handheld_worldshaper/item",
+  "textures": {
+    "0": "pocket:item/creative_shrink_ray"
+  }
+}

@@ -1,0 +1,89 @@
+{
+    "format_version": "1.21.11",
+    "credit": "Made with Blockbench",
+    "parent": "create:item/package_transforms",
+    "textures": {
+        "1": "create:block/andesite_block",
+        "particle": "create:block/andesite_block"
+    },
+    "elements": [
+        {
+            "name": "platform",
+            "from": [
+                1,
+                0,
+                1
+            ],
+            "to": [
+                15,
+                1,
+                15
+            ],
+            "rotation": {
+                "angle": 0,
+                "axis": "y",
+                "origin": [
+                    8,
+                    7,
+                    8
+                ]
+            },
+            "faces": {
+                "north": {
+                    "uv": [
+                        1,
+                        15,
+                        15,
+                        16
+                    ],
+                    "texture": "#1"
+                },
+                "east": {
+                    "uv": [
+                        1,
+                        15,
+                        15,
+                        16
+                    ],
+                    "texture": "#1"
+                },
+                "south": {
+                    "uv": [
+                        1,
+                        15,
+                        15,
+                        16
+                    ],
+                    "texture": "#1"
+                },
+                "west": {
+                    "uv": [
+                        1,
+                        15,
+                        15,
+                        16
+                    ],
+                    "texture": "#1"
+                },
+                "up": {
+                    "uv": [
+                        1,
+                        1,
+                        15,
+                        15
+                    ],
+                    "texture": "#1"
+                },
+                "down": {
+                    "uv": [
+                        1,
+                        1,
+                        15,
+                        15
+                    ],
+                    "texture": "#1"
+                }
+            }
+        }
+    ]
+}

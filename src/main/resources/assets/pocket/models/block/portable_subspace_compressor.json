@@ -1,0 +1,8 @@
+{
+  "render_type": "minecraft:cutout_mipped",
+  "parent": "simulated:block/portable_engine/block",
+  "textures": {
+    "0": "pocket:block/portable_compressor",
+    "particle": "pocket:block/portable_compressor"
+  }
+}

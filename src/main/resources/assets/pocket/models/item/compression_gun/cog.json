@@ -1,0 +1,7 @@
+{
+  "parent": "create:item/potato_cannon/cog",
+  "textures": {
+    "1": "pocket:item/compression_gun",
+    "particle": "pocket:item/compression_gun"
+  }
+}

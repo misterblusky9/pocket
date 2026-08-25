@@ -1,0 +1,17 @@
+{
+  "itemGroup.pocket": "Create: Pocket Sized",
+  "item.pocket.creative_shrink_ray": "Creative Shrink Ray",
+  "item.pocket.pocketed_sublevel": "Pocketed Sublevel",
+  "item.pocket.empty_box": "Empty Box",
+  "item.pocket.display_case": "Display Case",
+  "item.pocket.brass_display_case": "Brass Display Case",
+  "item.pocket.brass_display_plate": "Brass Display Plate",
+  "item.pocket.andesite_display_case": "Andesite Display Case",
+  "item.pocket.andesite_display_plate": "Andesite Display Plate",
+  "item.pocket.compression_gun": "Compression Cannon",
+  "item.pocket.tweezers": "Tweezers",
+  "item.pocket.collider_wand": "Collider Wand",
+  "key.categories.pocket": "Create: Pocket Sized",
+  "key.pocket.tweezer_rotate": "Tweezers: Rotate Held Craft",
+  "block.pocket.portable_subspace_compressor": "Portable Subspace Compressor"
+}

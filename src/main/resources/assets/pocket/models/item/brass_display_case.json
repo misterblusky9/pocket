@@ -1,0 +1,5 @@
+{
+  "credit": "Wrapper. Geometry is item/export/brass_display_case.json; keep render_type here so the framed glass remains translucent in item and package rendering.",
+  "parent": "pocket:item/export/brass_display_case",
+  "render_type": "minecraft:translucent"
+}

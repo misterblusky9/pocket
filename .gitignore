@@ -1,0 +1,10 @@
+.gradle/
+build/
+run/
+run-data/
+runs/
+.idea/
+*.iml
+log.txt
+*.zip
+.claude/

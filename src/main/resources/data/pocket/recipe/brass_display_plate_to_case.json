@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "pocket:brass_display_plate" }
+  ],
+  "result": {
+    "id": "pocket:brass_display_case",
+    "count": 1
+  }
+}

@@ -1,0 +1,240 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.143'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+sourceSets.main.resources {
+    srcDir('src/generated/resources')
+    exclude("**/*.bbmodel")
+    exclude("src/generated/**/.cache")
+}
+
+repositories {
+    maven { url = "https://maven.createmod.net" }
+    maven { url = "https://maven.ithundxr.dev/snapshots" }
+
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "SableCompanion"
+                url = "https://maven.ryanhcode.dev/releases"
+            }
+        }
+        filter {
+            includeGroup "dev.ryanhcode.sable-companion"
+        }
+    }
+
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
+}
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client1 {
+            client()
+            gameDirectory = project.file("runs/client1")
+
+            programArguments = [
+                    "--username", "Player1"
+            ]
+
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        client2 {
+            client()
+            gameDirectory = project.file("runs/client2")
+
+            programArguments = [
+                    "--username", "Player2"
+            ]
+
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            gameDirectory = project.file("runs/server")
+
+            // Server GUI stays on. Do not add --nogui.
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            programArguments.addAll(
+                    '--mod', project.mod_id,
+                    '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath()
+            )
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+
+            systemProperty 'pocket.traceScale',
+                    providers.gradleProperty('pocketTrace').getOrElse('true')
+
+            systemProperty 'pocket.tracePhysics',
+                    providers.gradleProperty('pocketTracePhysics').getOrElse('false')
+
+            systemProperty 'pocket.jointPropagation',
+                    providers.gradleProperty('pocketJoints').getOrElse('true')
+
+            jvmArguments.addAll '-Xmx8G'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    // Create
+    implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") {
+        transitive = false
+    }
+    implementation "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
+    compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}"
+    runtimeOnly "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+    implementation "com.tterrag.registrate:Registrate:${registrate_version}"
+
+    // Aeronautics
+    implementation "maven.modrinth:oWaK0Q19:w7zlLnea"
+
+    // Sable
+    implementation "maven.modrinth:T9PomCSv:NGuyFOeE"
+
+    compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
+
+    // Spark, dev run only
+    localRuntime "maven.modrinth:spark:v5qtqRQi"
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version       : minecraft_version,
+            minecraft_version_range : minecraft_version_range,
+            neo_version             : neo_version,
+            loader_version_range    : loader_version_range,
+            mod_id                  : mod_id,
+            mod_name                : mod_name,
+            mod_license             : mod_license,
+            mod_version             : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/repo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.register('scaleTransitionTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs repeated scaled-collider transition sound-effect suppression checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.physics.ScaledRebuildCollisionEffectFilterTest'
+}
+
+tasks.register('colliderBudgetTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the collider complexity-budget and prism-shell checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.physics.ColliderBudgetTest'
+}
+
+tasks.register('scaleContractTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the scale-validity and compression-stage ladder checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.scale.ScaleContractTest'
+}
+
+tasks.register('expansionClearanceBudgetTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the expansion-clearance displacement allowance checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.physics.ExpansionClearanceBudgetTest'
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('scaleTransitionTest')
+    dependsOn tasks.named('colliderBudgetTest')
+    dependsOn tasks.named('scaleContractTest')
+    dependsOn tasks.named('expansionClearanceBudgetTest')
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

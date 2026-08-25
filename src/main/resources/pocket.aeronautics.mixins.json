@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pocket.mixin.aeronautics",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "BalloonEffectScaleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}
