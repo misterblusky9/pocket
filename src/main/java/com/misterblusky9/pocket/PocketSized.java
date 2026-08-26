@@ -3,6 +3,7 @@ package com.misterblusky9.pocket;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
+import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
 import com.misterblusky9.pocket.item.ModCreativeTabs;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.network.ScaleNetwork;
@@ -25,6 +26,8 @@ public final class PocketSized {
     public static final int MAX_COMPRESSED_BLOCKS = 1_048_576;
 
     public PocketSized(final IEventBus modBus) {
+        PehkuiScaleBridge.initialize();
+
         ModBlocks.BLOCKS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
         ModItems.ITEMS.register(modBus);
@@ -36,6 +39,7 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(CannonDeploymentQueue::onServerTick);
         NeoForge.EVENT_BUS.addListener(PocketPerformanceLimits::onBlockPlaced);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.CompressionSessions::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.SelfCompressionSessions::onServerTick);
     }
 
     public static double clampScale(final double scale) {

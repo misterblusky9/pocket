@@ -153,6 +153,10 @@ dependencies {
 
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
 
+    // Pehkui
+    compileOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    localRuntime "maven.modrinth:t5W7Jfwy:nKHizsl6"
+
     // Spark, dev run only
     localRuntime "maven.modrinth:spark:v5qtqRQi"
 }
@@ -225,11 +229,38 @@ tasks.register('expansionClearanceBudgetTest', JavaExec) {
     mainClass = 'com.misterblusky9.pocket.physics.ExpansionClearanceBudgetTest'
 }
 
+tasks.register('surfaceNormalTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the scaled surface-normal renormalization checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.interaction.ScaledSurfaceNormalTest'
+}
+
+tasks.register('blastReachTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the scaled-sublevel explosion mirroring reach checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.explosion.BlastReachTest'
+}
+
+tasks.register('blastSuppressionTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the explosion-suppression scope checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.explosion.BlastSuppressionTest'
+}
+
 tasks.named('check') {
     dependsOn tasks.named('scaleTransitionTest')
     dependsOn tasks.named('colliderBudgetTest')
     dependsOn tasks.named('scaleContractTest')
     dependsOn tasks.named('expansionClearanceBudgetTest')
+    dependsOn tasks.named('surfaceNormalTest')
+    dependsOn tasks.named('blastReachTest')
+    dependsOn tasks.named('blastSuppressionTest')
 }
 
 idea {

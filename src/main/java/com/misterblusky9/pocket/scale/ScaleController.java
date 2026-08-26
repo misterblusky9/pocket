@@ -53,6 +53,10 @@ public final class ScaleController {
         EXTERNAL_COMMANDS.put(subLevel.getUniqueId(), new ExternalCommand(source, validUntilTick));
     }
 
+    public static void clearExternalCommand(final UUID subLevelId) {
+        if (subLevelId != null) EXTERNAL_COMMANDS.remove(subLevelId);
+    }
+
     public static void forceStage(
             final ServerSubLevel subLevel,
             final CompressionStage stage,
@@ -67,6 +71,16 @@ public final class ScaleController {
             final long gameTime,
             final Vector3d anchorLocalPoint
     ) {
+        forceStage(subLevel, stage, gameTime, anchorLocalPoint, true);
+    }
+
+    public static void forceStage(
+            final ServerSubLevel subLevel,
+            final CompressionStage stage,
+            final long gameTime,
+            final Vector3d anchorLocalPoint,
+            final boolean propagateJoints
+    ) {
         if (subLevel == null || stage == null) return;
 
         final CompressionStage effectiveStage = stage.isCompressed()
@@ -77,7 +91,7 @@ public final class ScaleController {
         PocketTrace.scale(
                 "forceStage {} -> {} by {}", subLevel.getUniqueId(), effectiveStage, PocketTrace.caller());
 
-        JointScalePropagation.onCommanded(subLevel, effectiveStage);
+        if (propagateJoints) JointScalePropagation.onCommanded(subLevel, effectiveStage);
 
         final long expires = gameTime + 20L * 20L;
         registerExternalCommandUntil(

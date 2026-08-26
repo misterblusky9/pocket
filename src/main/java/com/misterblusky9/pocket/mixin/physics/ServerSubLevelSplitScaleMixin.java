@@ -5,6 +5,7 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import com.misterblusky9.pocket.scale.ScaleController;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.misterblusky9.pocket.scale.SubLevelParentage;
+import com.misterblusky9.pocket.physics.PlotShapeCache;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,11 +21,14 @@ public abstract class ServerSubLevelSplitScaleMixin {
     ) {
         final double scale = ScaleState.getServerScale(parent);
 
+        PlotShapeCache.invalidate(parent);
+
         originalPose.scale().set(scale, scale, scale);
 
         final ServerSubLevel child = (ServerSubLevel) (Object) this;
 
         ScaleController.adoptSplitScale(child, scale);
+        PlotShapeCache.invalidate(child);
 
         SubLevelParentage.record(child, parent);
     }

@@ -48,7 +48,7 @@ public final class ShrinkRayControls {
 
             final CompressionStage stage = stages[i];
             if (stage == selected) {
-                line.append(Component.literal("[" + stage.label() + "]")
+                line.append(Component.literal(stage.label())
                         .withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD));
             } else {
                 line.append(Component.literal(stage.label()).withStyle(ChatFormatting.DARK_GRAY));

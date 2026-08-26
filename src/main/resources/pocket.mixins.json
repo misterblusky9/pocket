@@ -28,12 +28,16 @@
     "interaction.PlacementMarginMixin",
     "interaction.PlacementDiagnosticMixin",
     "collision.SubLevelEntityCollisionMixin",
+    "explosion.ScaledSubLevelExplosionMixin",
+    "explosion.SableIntersectionFilterMixin",
     "entity.EntityDimensionsScaleMixin",
     "entity.LivingEntityDimensionsScaleMixin",
     "create.PotatoCannonImmediatePocketMixin",
     "create.PotatoCannonSettingsMixin",
     "create.PackagerUnwrapGuardMixin",
-    "create.PackageEntityDropMixin"
+    "create.PackageEntityDropMixin",
+    "simulated.PhysicsAssemblerDisassemblyScaleMixin",
+    "createbigcannons.CannonSurfaceNormalMixin"
   ],
   "client": [
     "client.ClientSubLevelMixin",

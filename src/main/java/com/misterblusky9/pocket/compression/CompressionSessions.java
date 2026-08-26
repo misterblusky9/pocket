@@ -59,7 +59,8 @@ public final class CompressionSessions {
             final CompressionStage floor,
             final boolean instant,
             final net.minecraft.world.InteractionHand hand,
-            final boolean growingIntent
+            final boolean growingIntent,
+            final boolean propagateJoints
     ) {
         if (player == null || subLevel == null || subLevel.isRemoved()) return false;
 
@@ -111,6 +112,7 @@ public final class CompressionSessions {
         session = new Session(id, player.getUUID(), hitLocalPos.immutable(), acquireTicks, airCost, floor, now);
         session.blocked = cellLimit > 0;
         session.hand = hand;
+        session.propagateJoints = propagateJoints;
         SESSIONS.put(id, session);
 
         CompressionSyncPayload.sendBegin(
@@ -122,7 +124,8 @@ public final class CompressionSessions {
             final ServerPlayer player,
             final ServerSubLevel subLevel,
             final BlockPos hitLocalPos,
-            final CompressionStage requested
+            final CompressionStage requested,
+            final boolean propagateJoints
     ) {
         if (player == null || subLevel == null || subLevel.isRemoved() || requested == null) return;
 
@@ -140,7 +143,7 @@ public final class CompressionSessions {
             }
         }
 
-        ScaleController.forceStage(subLevel, requested, now);
+        ScaleController.forceStage(subLevel, requested, now, null, propagateJoints);
 
         final Session session = new Session(
                 id, player.getUUID(), hitLocalPos.immutable(),
@@ -302,7 +305,13 @@ public final class CompressionSessions {
         final int direction = session.floor.depth() > current.depth() ? 1 : -1;
         final CompressionStage next = CompressionStage.fromDepth(current.depth() + direction);
 
-        ScaleController.forceStage(subLevel, next, subLevel.getLevel().getGameTime());
+        ScaleController.forceStage(
+                subLevel,
+                next,
+                subLevel.getLevel().getGameTime(),
+                null,
+                session.propagateJoints
+        );
         session.sinceStep = 0;
         session.pulsed = false;
         session.steps++;
@@ -439,6 +448,7 @@ public final class CompressionSessions {
         private boolean directDrive;
         private boolean pulsed;
         private boolean blocked;
+        private boolean propagateJoints = true;
         private net.minecraft.world.InteractionHand hand =
                 net.minecraft.world.InteractionHand.MAIN_HAND;
 

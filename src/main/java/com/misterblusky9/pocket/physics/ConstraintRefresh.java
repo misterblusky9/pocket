@@ -160,6 +160,8 @@ public final class ConstraintRefresh {
 
         RapierBridge.removeConstraint(scene, retired);
 
+        owned.pocket$replayMotors();
+
         synchronized (TRACKED) {
             TRACKED.remove(tracked);
             TRACKED.add(new Tracked(

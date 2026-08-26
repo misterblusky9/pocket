@@ -22,9 +22,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class SableColliderMirror {
-    private static final int SPARSE_CHANGE_LIMIT = 96;
-    private static final int SPARSE_REMOVAL_LIMIT = 96;
-
     private static final int OCTREE_SENTINEL_Y = 1_000_000;
     private static final Map<UUID, Applied> APPLIED = new HashMap<>();
 
@@ -134,7 +131,7 @@ public final class SableColliderMirror {
 
         final ServerLevel level = subLevel.getLevel();
         if (state.bodyId == RapierBridge.bodyId(subLevel)) {
-            removeBackingSections(level, state.sections.keySet());
+            clearSections(level, subLevel, state.sections.keySet());
             final CompiledCollider.Bounds original = originalBounds(subLevel);
             if (original != null) rebuildBodyOctree(level, subLevel, original);
             restoreOriginalChunks(level, subLevel);
@@ -155,23 +152,23 @@ public final class SableColliderMirror {
     ) {
         final UUID id = subLevel.getUniqueId();
         final Map<SectionKey, SectionBinding> prepared = retainAll(next);
-        final List<SectionKey> uploaded = new ArrayList<>();
-
         try {
-            if (oldState == null) removeOriginalBackingChunks(level, subLevel);
-            else removeBackingSections(level, oldState.sections.keySet());
+            if (oldState == null) {
+                clearOriginalBackingChunks(level, subLevel, next.sections().keySet());
+            } else {
+                clearMissingSections(level, subLevel, oldState.sections.keySet(), next.sections().keySet());
+            }
 
             rebuildBodyOctree(level, subLevel, next.bounds());
 
             for (final SectionBinding binding : prepared.values()) {
                 uploadWhole(level, subLevel, binding.section);
-                uploaded.add(binding.section.key());
             }
         } catch (final RuntimeException exception) {
             PocketTrace.warn("full collider apply failed uuid={} gen={} error={}",
                     id, next.generation(), exception.toString());
             try {
-                removeBackingSections(level, next.sections().keySet());
+                clearSections(level, subLevel, next.sections().keySet());
                 if (oldState == null) {
                     final CompiledCollider.Bounds original = originalBounds(subLevel);
                     if (original != null) rebuildBodyOctree(level, subLevel, original);
@@ -324,76 +321,13 @@ public final class SableColliderMirror {
             final CompiledCollider.Section wanted,
             final CompiledCollider.Bounds currentBounds
     ) {
-        if (old == null) {
-            if (wanted != null) uploadWhole(level, subLevel, wanted);
-            return false;
-        }
-
         if (wanted == null) {
-            if (old.cells().size() <= SPARSE_REMOVAL_LIMIT) {
-                clearCells(level, old.cells());
-                RapierBridge.removeSubLevelChunk(level, key.x(), key.y(), key.z());
-                return false;
-            }
-            RapierBridge.removeSubLevelChunk(level, key.x(), key.y(), key.z());
-            return true;
-        }
-
-        final Map<Integer, CompiledCollider.Cell> oldCells = old.byIndex();
-        final Map<Integer, CompiledCollider.Cell> newCells = wanted.byIndex();
-        final HashSet<Integer> changed = new HashSet<>(oldCells.keySet());
-        changed.addAll(newCells.keySet());
-        changed.removeIf(index -> {
-            final CompiledCollider.Cell a = oldCells.get(index);
-            final CompiledCollider.Cell b = newCells.get(index);
-            return a != null && b != null && a.shape().equals(b.shape());
-        });
-        if (changed.isEmpty()) return false;
-
-        if (changed.size() <= SPARSE_CHANGE_LIMIT
-                && newCellsWithinBounds(changed, newCells, currentBounds)) {
-            for (final int index : changed) {
-                final CompiledCollider.Cell cell = newCells.get(index);
-                if (cell == null) {
-                    final CompiledCollider.Cell previous = oldCells.get(index);
-                    RapierBridge.changeSubLevelBlock(level, previous.x(), previous.y(), previous.z(), 0);
-                } else {
-                    RapierBridge.changeSubLevelBlock(level, cell.x(), cell.y(), cell.z(), packed(cell.shape()));
-                }
-            }
+            if (old != null) uploadEmpty(level, subLevel, key);
             return false;
         }
 
-        final List<CompiledCollider.Cell> removed = new ArrayList<>();
-        for (final Map.Entry<Integer, CompiledCollider.Cell> entry : oldCells.entrySet()) {
-            if (!newCells.containsKey(entry.getKey())) removed.add(entry.getValue());
-        }
-
-        if (removed.size() <= SPARSE_REMOVAL_LIMIT) {
-            clearCells(level, removed);
-            uploadWhole(level, subLevel, wanted);
-            return false;
-        }
-
-        RapierBridge.removeSubLevelChunk(level, key.x(), key.y(), key.z());
         uploadWhole(level, subLevel, wanted);
-        return true;
-    }
-
-    private static boolean newCellsWithinBounds(
-            final Set<Integer> changed,
-            final Map<Integer, CompiledCollider.Cell> newCells,
-            final CompiledCollider.Bounds bounds
-    ) {
-        if (bounds == null) return false;
-        for (final int index : changed) {
-            final CompiledCollider.Cell cell = newCells.get(index);
-            if (cell == null) continue;
-            if (cell.x() < bounds.minX() || cell.x() > bounds.maxX()
-                    || cell.y() < bounds.minY() || cell.y() > bounds.maxY()
-                    || cell.z() < bounds.minZ() || cell.z() > bounds.maxZ()) return false;
-        }
-        return true;
+        return false;
     }
 
     private static void rollbackBackingSection(
@@ -402,8 +336,8 @@ public final class SableColliderMirror {
             final SectionKey key,
             final CompiledCollider.Section old
     ) {
-        RapierBridge.removeSubLevelChunk(level, key.x(), key.y(), key.z());
-        if (old != null) uploadWhole(level, subLevel, old);
+        if (old == null) uploadEmpty(level, subLevel, key);
+        else uploadWhole(level, subLevel, old);
     }
 
     private static void uploadWhole(
@@ -421,24 +355,44 @@ public final class SableColliderMirror {
 
     private static int packed(final ColliderShapeKey shape) {
         final int handle = ShapeRegistry.handle(shape);
+        if (handle < 0 || handle > ShapeRegistry.MAX_PACKABLE_HANDLE) {
+            throw new IllegalStateException("unpackable Sable collider handle: " + handle);
+        }
         return ((int) VoxelNeighborhoodState.CORNER.byteRepresentation()) | ((handle + 1) << 16);
     }
 
-    private static void clearCells(final ServerLevel level, final List<CompiledCollider.Cell> cells) {
-        for (final CompiledCollider.Cell cell : cells) {
-            RapierBridge.changeSubLevelBlock(level, cell.x(), cell.y(), cell.z(), 0);
-        }
-    }
-
-    private static void removeBackingSections(final ServerLevel level, final Set<SectionKey> sections) {
-        for (final SectionKey key : sections) {
-            RapierBridge.removeSubLevelChunk(level, key.x(), key.y(), key.z());
-        }
-    }
-
-    private static void removeOriginalBackingChunks(
+    private static void uploadEmpty(
             final ServerLevel level,
-            final ServerSubLevel subLevel
+            final ServerSubLevel subLevel,
+            final SectionKey key
+    ) {
+        RapierBridge.addSubLevelChunk(
+                level, subLevel, key.x(), key.y(), key.z(), new int[4096]);
+    }
+
+    private static void clearSections(
+            final ServerLevel level,
+            final ServerSubLevel subLevel,
+            final Set<SectionKey> sections
+    ) {
+        for (final SectionKey key : sections) uploadEmpty(level, subLevel, key);
+    }
+
+    private static void clearMissingSections(
+            final ServerLevel level,
+            final ServerSubLevel subLevel,
+            final Set<SectionKey> oldSections,
+            final Set<SectionKey> nextSections
+    ) {
+        for (final SectionKey key : oldSections) {
+            if (!nextSections.contains(key)) uploadEmpty(level, subLevel, key);
+        }
+    }
+
+    private static void clearOriginalBackingChunks(
+            final ServerLevel level,
+            final ServerSubLevel subLevel,
+            final Set<SectionKey> replacementSections
     ) {
         for (final PlotChunkHolder holder : subLevel.getPlot().getLoadedChunks()) {
             final LevelChunk chunk = holder.getChunk();
@@ -446,8 +400,9 @@ public final class SableColliderMirror {
             final LevelChunkSection[] sections = chunk.getSections();
             for (int i = 0; i < chunk.getSectionsCount(); i++) {
                 if (sections[i].hasOnlyAir()) continue;
-                RapierBridge.removeSubLevelChunk(
-                        level, global.x, chunk.getSectionYFromSectionIndex(i), global.z);
+                final SectionKey key = new SectionKey(
+                        global.x, chunk.getSectionYFromSectionIndex(i), global.z);
+                if (!replacementSections.contains(key)) uploadEmpty(level, subLevel, key);
             }
         }
     }

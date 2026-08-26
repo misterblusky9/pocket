@@ -6,6 +6,8 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.Level;
@@ -62,6 +64,8 @@ public final class PocketRenderSnapshot {
     private final double uprightYaw;
     private final int[] localBounds;
     private final Vector3d rotationPoint;
+    private final int[] wheels;
+    private final ListTag copycats;
 
     public PocketRenderSnapshot(
             final int sizeX,
@@ -73,6 +77,39 @@ public final class PocketRenderSnapshot {
             final double uprightYaw,
             final int[] localBounds,
             final Vector3dc rotationPoint
+    ) {
+        this(sizeX, sizeY, sizeZ, blocks, previewYaw, previewPitch, uprightYaw,
+                localBounds, rotationPoint, null, null);
+    }
+
+    public PocketRenderSnapshot(
+            final int sizeX,
+            final int sizeY,
+            final int sizeZ,
+            final int[] blocks,
+            final float previewYaw,
+            final float previewPitch,
+            final double uprightYaw,
+            final int[] localBounds,
+            final Vector3dc rotationPoint,
+            final int[] wheels
+    ) {
+        this(sizeX, sizeY, sizeZ, blocks, previewYaw, previewPitch, uprightYaw,
+                localBounds, rotationPoint, wheels, null);
+    }
+
+    public PocketRenderSnapshot(
+            final int sizeX,
+            final int sizeY,
+            final int sizeZ,
+            final int[] blocks,
+            final float previewYaw,
+            final float previewPitch,
+            final double uprightYaw,
+            final int[] localBounds,
+            final Vector3dc rotationPoint,
+            final int[] wheels,
+            final ListTag copycats
     ) {
         this.sizeX = Math.max(1, sizeX);
         this.sizeY = Math.max(1, sizeY);
@@ -89,6 +126,10 @@ public final class PocketRenderSnapshot {
         this.uprightYaw = uprightYaw;
         this.localBounds = localBounds == null ? new int[0] : localBounds.clone();
         this.rotationPoint = rotationPoint == null ? new Vector3d() : new Vector3d(rotationPoint);
+        this.wheels = wheels == null
+                ? new int[0]
+                : Arrays.copyOf(wheels, wheels.length - (wheels.length % PocketWheelPreview.STRIDE));
+        this.copycats = copycats == null ? new ListTag() : copycats.copy();
     }
 
     public int sizeX() { return this.sizeX; }
@@ -101,11 +142,15 @@ public final class PocketRenderSnapshot {
     public double uprightYaw() { return this.uprightYaw; }
     public int[] localBounds() { return this.localBounds.clone(); }
     public Vector3d rotationPoint() { return new Vector3d(this.rotationPoint); }
+    public int[] wheels() { return this.wheels.clone(); }
+    public int wheelCount() { return this.wheels.length / PocketWheelPreview.STRIDE; }
+    public ListTag copycats() { return this.copycats.copy(); }
 
     public PocketRenderSnapshot withUprightYaw(final double yaw) {
         return new PocketRenderSnapshot(
                 this.sizeX, this.sizeY, this.sizeZ, this.blocks.clone(),
-                this.previewYaw, this.previewPitch, yaw, this.localBounds, this.rotationPoint
+                this.previewYaw, this.previewPitch, yaw, this.localBounds, this.rotationPoint,
+                this.wheels, this.copycats
         );
     }
 
@@ -154,6 +199,8 @@ public final class PocketRenderSnapshot {
         };
 
         final List<Entry> shell = new ArrayList<>();
+        final List<PocketWheelPreview.Wheel> wheels = new ArrayList<>();
+        final List<PocketCopycatPreview.Entry> copycats = new ArrayList<>();
         final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         final BlockPos.MutableBlockPos neighbour = new BlockPos.MutableBlockPos();
 
@@ -185,6 +232,21 @@ public final class PocketRenderSnapshot {
                             if (!ShellVoxels.isExposed(level, neighbour, x, y, z)) continue;
 
                             pos.set(x, y, z);
+
+                            if (state.hasBlockEntity()) {
+                                final PocketWheelPreview.Wheel wheel = PocketWheelPreview.capture(
+                                        level, pos, state,
+                                        bounds.minX(), bounds.minY(), bounds.minZ()
+                                );
+                                if (wheel != null) wheels.add(wheel);
+
+                                final PocketCopycatPreview.Entry copycat = PocketCopycatPreview.capture(
+                                        level, pos, state,
+                                        bounds.minX(), bounds.minY(), bounds.minZ()
+                                );
+                                if (copycat != null) copycats.add(copycat);
+                            }
+
                             shell.add(new Entry(
                                     x - bounds.minX(), y - bounds.minY(), z - bounds.minZ(),
                                     ShellVoxels.averageColour(level, pos, state),
@@ -201,7 +263,9 @@ public final class PocketRenderSnapshot {
         if (fitsExactly) {
             return new PocketRenderSnapshot(
                     sizeX, sizeY, sizeZ, encode(shell), previewYaw, previewPitch, uprightYaw,
-                    placementBounds, pose.rotationPoint()
+                    placementBounds, pose.rotationPoint(),
+                    PocketWheelPreview.encode(wheels),
+                    PocketCopycatPreview.encode(copycats)
             );
         }
 
@@ -230,10 +294,41 @@ public final class PocketRenderSnapshot {
             if (cells.size() <= previewBudget || resolution <= COARSE_RESOLUTION_MIN) {
                 return new PocketRenderSnapshot(
                         gridX, gridY, gridZ, encode(new ArrayList<>(cells.values())),
-                        previewYaw, previewPitch, uprightYaw, placementBounds, pose.rotationPoint()
+                        previewYaw, previewPitch, uprightYaw, placementBounds, pose.rotationPoint(),
+                        PocketWheelPreview.encode(
+                                coarsenWheels(wheels, sizeX, sizeY, sizeZ, gridX, gridY, gridZ))
                 );
             }
         }
+    }
+
+    private static List<PocketWheelPreview.Wheel> coarsenWheels(
+            final List<PocketWheelPreview.Wheel> wheels,
+            final int sizeX, final int sizeY, final int sizeZ,
+            final int gridX, final int gridY, final int gridZ
+    ) {
+        if (wheels.isEmpty()) return wheels;
+
+        final double ratio = Math.min(
+                gridX / (double) Math.max(1, sizeX),
+                Math.min(gridY / (double) Math.max(1, sizeY), gridZ / (double) Math.max(1, sizeZ)));
+
+        final float scaleX = gridX / (float) Math.max(1, sizeX);
+        final float scaleY = gridY / (float) Math.max(1, sizeY);
+        final float scaleZ = gridZ / (float) Math.max(1, sizeZ);
+
+        final List<PocketWheelPreview.Wheel> coarse = new ArrayList<>(wheels.size());
+        for (final PocketWheelPreview.Wheel wheel : wheels) {
+            coarse.add(new PocketWheelPreview.Wheel(
+                    wheel.x() * scaleX,
+                    wheel.y() * scaleY,
+                    wheel.z() * scaleZ,
+                    wheel.facing(),
+                    (float) Math.max(0.05D, wheel.radius() * ratio),
+                    wheel.itemId()
+            ));
+        }
+        return coarse;
     }
 
     private static int axisCells(final int size, final int maxDim, final int resolution) {
@@ -246,6 +341,9 @@ public final class PocketRenderSnapshot {
         tag.putFloat(VIEW_YAW_KEY, this.previewYaw);
         tag.putFloat(VIEW_PITCH_KEY, this.previewPitch);
         tag.putDouble(UPRIGHT_YAW_KEY, this.uprightYaw);
+
+        if (this.wheels.length > 0) tag.putIntArray(PocketWheelPreview.WHEELS_KEY, this.wheels);
+        if (!this.copycats.isEmpty()) tag.put(PocketCopycatPreview.COPYCATS_KEY, this.copycats.copy());
 
         if (this.localBounds.length == 6) {
             tag.putIntArray(LOCAL_BOUNDS_KEY, this.localBounds);
@@ -287,10 +385,17 @@ public final class PocketRenderSnapshot {
                 tag.contains(ROTATION_POINT_Z_KEY) ? tag.getDouble(ROTATION_POINT_Z_KEY) : 0.0D
         );
 
+        final int[] wheels = tag.contains(PocketWheelPreview.WHEELS_KEY)
+                ? tag.getIntArray(PocketWheelPreview.WHEELS_KEY)
+                : new int[0];
+        final ListTag copycats = tag.contains(PocketCopycatPreview.COPYCATS_KEY, Tag.TAG_LIST)
+                ? tag.getList(PocketCopycatPreview.COPYCATS_KEY, Tag.TAG_COMPOUND)
+                : new ListTag();
+
         return new PocketRenderSnapshot(
                 size[0], size[1], size[2], blocks,
                 previewYaw, previewPitch, uprightYaw,
-                localBounds, rotationPoint
+                localBounds, rotationPoint, wheels, copycats
         );
     }
 

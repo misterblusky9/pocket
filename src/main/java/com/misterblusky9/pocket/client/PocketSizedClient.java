@@ -47,6 +47,7 @@ public final class PocketSizedClient {
                 }
         );
         NeoForge.EVENT_BUS.addListener(ShrinkRayControls::onScroll);
+        NeoForge.EVENT_BUS.addListener(CompressionGunControls::onScroll);
         NeoForge.EVENT_BUS.addListener(TweezerDrag::onScroll);
 
         NeoForge.EVENT_BUS.addListener(CompressionHud::render);

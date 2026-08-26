@@ -128,6 +128,21 @@ public final class SubLevelParentage {
         }
     }
 
+    public static boolean isJoinedToAnother(
+            final ServerSubLevelContainer container,
+            final ServerSubLevel subLevel
+    ) {
+        if (container == null || subLevel == null || subLevel.isRemoved()) return false;
+
+        for (final ServerSubLevel other : container.getAllSubLevels()) {
+            if (other == null || other == subLevel || other.isRemoved()) continue;
+            if (declaresConnection(subLevel, other) || declaresConnection(other, subLevel)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean stillJoined(final ServerSubLevel parent, final ServerSubLevel child) {
         return declaresConnection(parent, child) || declaresConnection(child, parent);
     }

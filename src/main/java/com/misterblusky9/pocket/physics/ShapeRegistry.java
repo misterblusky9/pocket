@@ -1,14 +1,19 @@
 package com.misterblusky9.pocket.physics;
 
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 
 public final class ShapeRegistry {
+    public static final int MAX_PACKABLE_HANDLE = 0xFFFE;
+
     private static final Map<ColliderShapeKey, Entry> INTERNED = new HashMap<>();
+    private static final ArrayDeque<Entry> FREE = new ArrayDeque<>();
 
     private static long allocations;
     private static long activeHits;
     private static long inactiveHits;
+    private static long recycles;
     private static int activeShapes;
 
     private static final class Entry {
@@ -26,18 +31,27 @@ public final class ShapeRegistry {
         }
 
         Entry entry = INTERNED.get(key);
-        if (entry == null) {
-            entry = new Entry(RapierBridge.createCollider(key).handle());
-            INTERNED.put(key, entry);
-            allocations++;
-        } else if (entry.references > 0) {
+        if (entry != null) {
             activeHits++;
-        } else {
-            inactiveHits++;
+            entry.references++;
+            return entry.handle;
         }
 
-        if (entry.references == 0) activeShapes++;
-        entry.references++;
+        entry = FREE.pollFirst();
+        if (entry != null) {
+            RapierBridge.reprogramCollider(entry.handle, key);
+            recycles++;
+            inactiveHits++;
+        } else {
+            final int handle = RapierBridge.createCollider(key).handle();
+            ensurePackable(handle);
+            entry = new Entry(handle);
+            allocations++;
+        }
+
+        entry.references = 1;
+        INTERNED.put(key, entry);
+        activeShapes++;
         return entry.handle;
     }
 
@@ -46,6 +60,7 @@ public final class ShapeRegistry {
         if (entry == null || entry.references <= 0) {
             throw new IllegalStateException("shape is not retained: " + key);
         }
+        ensurePackable(entry.handle);
         return entry.handle;
     }
 
@@ -55,17 +70,29 @@ public final class ShapeRegistry {
         if (entry == null || entry.references <= 0) return;
 
         entry.references--;
-        if (entry.references == 0) activeShapes--;
+        if (entry.references != 0) return;
+
+        INTERNED.remove(key, entry);
+        FREE.addLast(entry);
+        activeShapes--;
     }
 
     public static synchronized String stats() {
         return "activeShapes=" + activeShapes
                 + " internedShapes=" + INTERNED.size()
-                + " inactiveShapes=" + (INTERNED.size() - activeShapes)
+                + " inactiveShapes=" + FREE.size()
                 + " activeHits=" + activeHits
                 + " inactiveHits=" + inactiveHits
                 + " allocations=" + allocations
-                + " recycles=0";
+                + " recycles=" + recycles;
+    }
+
+    private static void ensurePackable(final int handle) {
+        if (handle < 0 || handle > MAX_PACKABLE_HANDLE) {
+            throw new IllegalStateException(
+                    "Sable collider handle cannot fit packed 16-bit voxel state: " + handle
+                            + " (max " + MAX_PACKABLE_HANDLE + ")");
+        }
     }
 
     private ShapeRegistry() {}

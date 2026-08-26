@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.network;
 
+import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
@@ -10,9 +11,11 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
+import java.util.UUID;
+
 public final class ScaleNetwork {
     public static void register(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("5");
+        final PayloadRegistrar registrar = event.registrar("8");
         registrar.playToClient(
                 ScaleSyncPayload.TYPE,
                 ScaleSyncPayload.STREAM_CODEC,
@@ -36,6 +39,31 @@ public final class ScaleNetwork {
                 (payload, context) -> context.enqueueWork(
                         () -> com.misterblusky9.pocket.client.CompressionClientHooks.acceptBeam(payload)
                 )
+        );
+        registrar.playToClient(
+                SelfCompressionEffectPayload.TYPE,
+                SelfCompressionEffectPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.CompressionClientHooks.acceptSelfEffect(payload)
+                )
+        );
+        registrar.playToClient(
+                CompressionGunOpenMenuPayload.TYPE,
+                CompressionGunOpenMenuPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.CompressionGunScreenHooks.open(payload.hand())
+                )
+        );
+        registrar.playToServer(
+                CompressionGunSettingsPayload.TYPE,
+                CompressionGunSettingsPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    final ItemStack stack = context.player().getItemInHand(payload.hand());
+                    if (!(stack.getItem() instanceof CompressionGunItem)) return;
+
+                    CompressionGunItem.setTargetingMode(stack, payload.targetingMode());
+                    CompressionGunItem.setGrowing(stack, payload.growing());
+                })
         );
         registrar.playToServer(
                 CannonExpansionPayload.TYPE,
@@ -125,9 +153,19 @@ public final class ScaleNetwork {
                     }
                 })
         );
+        registrar.playToServer(
+                CreativeShrinkRayTargetingPayload.TYPE,
+                CreativeShrinkRayTargetingPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    final ItemStack stack = context.player().getItemInHand(payload.hand());
+                    if (stack.getItem() instanceof CreativeShrinkRayItem) {
+                        CreativeShrinkRayItem.setTargetingMode(stack, payload.targetingMode());
+                    }
+                })
+        );
     }
 
-    private static void answerScaleRequest(final net.minecraft.server.level.ServerPlayer player, final java.util.UUID id) {
+    private static void answerScaleRequest(final net.minecraft.server.level.ServerPlayer player, final UUID id) {
         if (player == null || id == null) return;
 
         final ServerSubLevelContainer container = ServerSubLevelContainer.getContainer(player.serverLevel());

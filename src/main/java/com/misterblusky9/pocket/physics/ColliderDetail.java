@@ -41,7 +41,7 @@ public final class ColliderDetail {
 
     public static final int MAX_FRAGMENTS = 65_536;
 
-    public static final int MAX_CELL_BOXES = 512;
+    public static final int MAX_CELL_BOXES = 4_096;
 
     public static final long SLOW_REBUILD_MS = 6L;
     public static final int SLOW_REBUILDS_TO_DEGRADE = 3;

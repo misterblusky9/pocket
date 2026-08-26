@@ -4,8 +4,11 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.item.PocketContainer;
+import com.misterblusky9.pocket.pocket.PocketCopycatPreview;
 import com.misterblusky9.pocket.pocket.PocketRenderSnapshot;
+import com.misterblusky9.pocket.pocket.PocketWheelPreview;
 import com.misterblusky9.pocket.pocket.ShellVoxels;
+import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModel;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModelRenderer;
 import com.simibubi.create.foundation.item.render.PartialItemModelRenderer;
@@ -26,6 +29,7 @@ import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -61,6 +65,13 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     };
 
     private static final double COMPRESSED_SCALE = 1.0D / 16.0D;
+
+    private static final float WHEEL_MIN_RADIUS = 0.35F;
+    private static final float WHEEL_THICKNESS_RATIO = 0.32F;
+    private static final float WHEEL_MIN_THICKNESS = 0.14F;
+    private static final float WHEEL_RED = 0.13F;
+    private static final float WHEEL_GREEN = 0.13F;
+    private static final float WHEEL_BLUE = 0.145F;
 
     @Override
     protected void render(
@@ -135,7 +146,7 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         final boolean exactGeometry = snapshot.hasExactBlockGrid();
 
         final SnapshotBlockAndTintGetter previewLevel = exactGeometry
-                ? new SnapshotBlockAndTintGetter(data, stride)
+                ? new SnapshotBlockAndTintGetter(data, stride, snapshot.copycats())
                 : null;
 
         final IntSet fullOccluders = new IntOpenHashSet(data.length / stride * 2);
@@ -196,7 +207,75 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             }
         }
 
+        wheels(
+                bufferSource.getBuffer(RenderType.solid()), matrix, pose,
+                snapshot, white, packedLight, packedOverlay
+        );
+
         poseStack.popPose();
+    }
+
+    private static void wheels(
+            final VertexConsumer quads,
+            final Matrix4f matrix,
+            final PoseStack.Pose pose,
+            final PocketRenderSnapshot snapshot,
+            final TextureAtlasSprite sprite,
+            final int packedLight,
+            final int packedOverlay
+    ) {
+        for (final PocketWheelPreview.Wheel wheel : PocketWheelPreview.decode(snapshot.wheels())) {
+            final float centreX = wheel.x();
+            final float centreY = wheel.y();
+            final float centreZ = wheel.z();
+
+            final float radius = Math.max(WHEEL_MIN_RADIUS, wheel.radius());
+            final float thickness = Math.max(WHEEL_MIN_THICKNESS, radius * WHEEL_THICKNESS_RATIO);
+
+            final Direction.Axis axle = wheel.facing().getAxis();
+            final float extentX = axle == Direction.Axis.X ? thickness : radius;
+            final float extentY = axle == Direction.Axis.Y ? thickness : radius;
+            final float extentZ = axle == Direction.Axis.Z ? thickness : radius;
+
+            box(
+                    quads, matrix, pose, sprite,
+                    centreX - extentX, centreY - extentY, centreZ - extentZ,
+                    centreX + extentX, centreY + extentY, centreZ + extentZ,
+                    packedLight, packedOverlay
+            );
+        }
+    }
+
+    private static void box(
+            final VertexConsumer quads,
+            final Matrix4f matrix,
+            final PoseStack.Pose pose,
+            final TextureAtlasSprite sprite,
+            final float x0, final float y0, final float z0,
+            final float x1, final float y1, final float z1,
+            final int packedLight,
+            final int packedOverlay
+    ) {
+        final float u0 = sprite.getU0();
+        final float u1 = sprite.getU1();
+        final float v0 = sprite.getV0();
+        final float v1 = sprite.getV1();
+        final float r = WHEEL_RED;
+        final float g = WHEEL_GREEN;
+        final float b = WHEEL_BLUE;
+
+        face(quads, matrix, pose, r, g, b, SHADE_TOP, packedLight, packedOverlay, u0, u1, v0, v1,
+                0.0F, 1.0F, 0.0F, x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0);
+        face(quads, matrix, pose, r, g, b, SHADE_BOTTOM, packedLight, packedOverlay, u0, u1, v0, v1,
+                0.0F, -1.0F, 0.0F, x0, y0, z1, x0, y0, z0, x1, y0, z0, x1, y0, z1);
+        face(quads, matrix, pose, r, g, b, SHADE_NORTH_SOUTH, packedLight, packedOverlay, u0, u1, v0, v1,
+                0.0F, 0.0F, -1.0F, x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0);
+        face(quads, matrix, pose, r, g, b, SHADE_NORTH_SOUTH, packedLight, packedOverlay, u0, u1, v0, v1,
+                0.0F, 0.0F, 1.0F, x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1);
+        face(quads, matrix, pose, r, g, b, SHADE_EAST_WEST, packedLight, packedOverlay, u0, u1, v0, v1,
+                -1.0F, 0.0F, 0.0F, x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1);
+        face(quads, matrix, pose, r, g, b, SHADE_EAST_WEST, packedLight, packedOverlay, u0, u1, v0, v1,
+                1.0F, 0.0F, 0.0F, x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0);
     }
 
     private static boolean containsAt(
@@ -567,10 +646,17 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
 
     private static final class SnapshotBlockAndTintGetter implements BlockAndTintGetter {
         private final Int2ObjectOpenHashMap<BlockState> states = new Int2ObjectOpenHashMap<>();
+        private final Int2ObjectOpenHashMap<BlockEntity> blockEntities = new Int2ObjectOpenHashMap<>();
+        private final Int2ObjectOpenHashMap<ModelData> modelData = new Int2ObjectOpenHashMap<>();
         private final BlockAndTintGetter delegate;
 
-        private SnapshotBlockAndTintGetter(final int[] data, final int stride) {
-            this.delegate = Minecraft.getInstance().level;
+        private SnapshotBlockAndTintGetter(
+                final int[] data,
+                final int stride,
+                final net.minecraft.nbt.ListTag copycats
+        ) {
+            final var clientLevel = Minecraft.getInstance().level;
+            this.delegate = clientLevel;
 
             for (int i = 0; i + stride - 1 < data.length; i += stride) {
                 final int stateId = data[i + 2];
@@ -579,6 +665,29 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
                 final BlockState state = Block.stateById(stateId);
                 if (state != null && !state.isAir()) {
                     this.states.put(data[i], state);
+                }
+            }
+
+            if (this.delegate == null || copycats == null || copycats.isEmpty()) return;
+
+            for (final PocketCopycatPreview.PackedEntry entry : PocketCopycatPreview.decode(copycats)) {
+                final int packed = entry.packedPos();
+                final BlockState state = this.states.get(packed);
+                if (state == null || !(state.getBlock() instanceof final EntityBlock entityBlock)) continue;
+
+                final BlockPos pos = new BlockPos(xOf(packed), yOf(packed), zOf(packed));
+                try {
+                    final BlockEntity blockEntity = entityBlock.newBlockEntity(pos, state);
+                    if (!(blockEntity instanceof final SmartBlockEntity smart)) continue;
+
+                    blockEntity.setLevel(clientLevel);
+                    smart.markVirtual();
+                    smart.readClient(entry.data().copy(), clientLevel.registryAccess());
+
+                    this.blockEntities.put(packed, blockEntity);
+                    final ModelData dataAtPos = blockEntity.getModelData();
+                    this.modelData.put(packed, dataAtPos == null ? ModelData.EMPTY : dataAtPos);
+                } catch (final RuntimeException ignored) {
                 }
             }
         }
@@ -604,12 +713,23 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
 
         @Override
         public BlockEntity getBlockEntity(final BlockPos pos) {
-            return null;
+            final int x = pos.getX();
+            final int y = pos.getY();
+            final int z = pos.getZ();
+            if ((x | y | z) < 0 || x > 255 || y > 255 || z > 255) return null;
+            return this.blockEntities.get(ShellVoxels.packPosition(x, y, z));
         }
 
         @Override
         public ModelData getModelData(final BlockPos pos) {
-            return ModelData.EMPTY;
+            final int x = pos.getX();
+            final int y = pos.getY();
+            final int z = pos.getZ();
+            if ((x | y | z) < 0 || x > 255 || y > 255 || z > 255) return ModelData.EMPTY;
+            return this.modelData.getOrDefault(
+                    ShellVoxels.packPosition(x, y, z),
+                    ModelData.EMPTY
+            );
         }
 
         @Override

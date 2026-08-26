@@ -12,6 +12,7 @@ import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
 import com.misterblusky9.pocket.physics.ScaledFluidForces;
 import com.misterblusky9.pocket.scale.ScaleController;
 import com.misterblusky9.pocket.scale.ScaleState;
+import com.misterblusky9.pocket.scale.SubLevelParentage;
 import com.misterblusky9.pocket.client.PocketedSubLevelItemRenderer;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
@@ -198,6 +199,19 @@ public class PocketCaseItem extends PackageItem {
             final Player feedbackPlayer
     ) {
         if (subLevel == null || fullTag == null) return null;
+
+        final ServerSubLevelContainer container =
+                ServerSubLevelContainer.getContainer(subLevel.getLevel());
+        if (SubLevelParentage.isJoinedToAnother(container, subLevel)) {
+            PocketTrace.logger().info(
+                    "[PocketTransfer] capture rejected uuid={} reason=joined_to_another_sublevel",
+                    subLevel.getUniqueId());
+            if (feedbackPlayer != null) {
+                feedbackPlayer.displayClientMessage(Component.literal(
+                        "Can't pocket this sublevel! Disconnect any joints and try again."), true);
+            }
+            return null;
+        }
 
         final PayloadStructure structure = measureStructure(subLevel);
         if (structure.blocks() > PocketSized.MAX_COMPRESSED_BLOCKS) {

@@ -1,22 +1,24 @@
 package com.misterblusky9.pocket.mixin.physics;
 
-import dev.ryanhcode.sable.Sable;
-import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
-import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
-import dev.ryanhcode.sable.sublevel.SubLevel;
-import dev.ryanhcode.sable.sublevel.plot.LevelPlot;
-import com.misterblusky9.pocket.debug.PocketTrace;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.misterblusky9.pocket.compression.CompressionBlacklist;
+import com.misterblusky9.pocket.debug.PocketTrace;
+import com.misterblusky9.pocket.physics.MassScaleContext;
+import com.misterblusky9.pocket.physics.PivotDriftCompensation;
 import com.misterblusky9.pocket.physics.PlotShapeCache;
 import com.misterblusky9.pocket.physics.RapierSceneLifetime;
 import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
-import com.misterblusky9.pocket.physics.ScaledRebuildCollisionEffectFilter;
-import com.misterblusky9.pocket.physics.MassScaleContext;
-import com.misterblusky9.pocket.physics.PivotDriftCompensation;
 import com.misterblusky9.pocket.physics.ScaledFluidForces;
+import com.misterblusky9.pocket.physics.ScaledRebuildCollisionEffectFilter;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.ScaleState;
+import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.SubLevel;
+import dev.ryanhcode.sable.sublevel.plot.LevelPlot;
+import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -32,8 +34,6 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
 import java.util.List;
 
@@ -183,7 +183,14 @@ public abstract class RapierPhysicsPipelineMixin {
         final SubLevelContainer container = SubLevelContainer.getContainer(this.level);
         if (container == null) return;
         final LevelPlot plot = container.getPlot(x, z);
-        if (plot != null && ScaleState.isScaled(plot.getSubLevel())) {
+        if (plot == null) return;
+
+        PlotShapeCache.invalidate(plot.getSubLevel());
+        if (plot.getSubLevel() instanceof final ServerSubLevel serverSubLevel) {
+            CompressionBlacklist.invalidate(serverSubLevel.getUniqueId());
+        }
+
+        if (ScaleState.isScaled(plot.getSubLevel())) {
             ci.cancel();
         }
     }

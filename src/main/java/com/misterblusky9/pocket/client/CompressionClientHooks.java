@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.network.CompressionBeamPayload;
 import com.misterblusky9.pocket.network.CompressionSyncPayload;
+import com.misterblusky9.pocket.network.SelfCompressionEffectPayload;
 
 public final class CompressionClientHooks {
     private CompressionClientHooks() {}
@@ -36,4 +37,9 @@ public final class CompressionClientHooks {
                 payload.subLevelId(), payload.hitLocalPos(), payload.acquireTicks(),
                 payload.growing(), payload.cellLimit(), !payload.beam());
     }
+
+    public static void acceptSelfEffect(final SelfCompressionEffectPayload payload) {
+        if (payload == null) return;
+    }
+
 }

@@ -77,6 +77,17 @@ public final class RapierBridge {
         }
     }
 
+    // TODO(belts): args are (friction, volume, restitution, liquid, callback). Sable bakes those
+    // per BlockState in RapierVoxelColliderBakery#buildPhysicsDataForBlock; scaled sublevels skip
+    // that path (RapierPhysicsPipelineMixin cancels handleChunkSectionAddition/handleBlockChange),
+    // so the null callback drops every BlockSubLevelCollisionCallback: Create belts used as tracks
+    // lose their tangent surface velocity and spin in place, and impact handling dies for bells,
+    // TNT and fragile blocks. Per-block friction and restitution are flattened here too.
+    // Wiring it back needs three things: the source BlockPos carried per cell through
+    // ColliderCompiler (cells are binned at contracted coords, so cell != BlockPos and
+    // BeltBlockCallback's getBlockEntity lookup lands on the wrong block), the returned tangent
+    // velocity multiplied by scale to reach the contracted metric frame, and ShapeRegistry
+    // interning widened past pure geometry so two identical boxes can carry different callbacks.
     public static ColliderHandle createCollider(final ColliderShapeKey shape) {
         try {
             final double volume = shape.volume();
@@ -287,9 +298,7 @@ public final class RapierBridge {
         return found;
     }
 
-    public record ColliderHandle(int handle) {
-    }
+    public record ColliderHandle(int handle) {}
 
-    private RapierBridge() {
-    }
+    private RapierBridge() {}
 }

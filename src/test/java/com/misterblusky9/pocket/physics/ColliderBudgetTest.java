@@ -82,17 +82,28 @@ public final class ColliderBudgetTest {
     }
 
     private static void cellCapBucketsInsteadOfSolidifying() {
+        final double span = 0.001D;
+        final int lattice = latticeOverflowing(ColliderDetail.MAX_CELL_BOXES);
         final List<ColliderShapeKey.Face> faces = new ArrayList<>();
-        faces.add(ColliderShapeKey.face(SCALE, 0.0D, 0.0D, 0.0D, 0.1D, 0.1D, 0.1D));
-        faces.add(ColliderShapeKey.face(SCALE, 0.9D, 0.9D, 0.9D, 1.0D, 1.0D, 1.0D));
-        for (int i = 0; i < 600; i++) {
-            final double at = 0.4D + (i % 8) * 0.01D;
-            faces.add(ColliderShapeKey.face(SCALE, at, at, at, at + 0.02D, at + 0.02D, at + 0.02D));
+        for (int x = 0; x < lattice; x++) {
+            for (int y = 0; y < lattice; y++) {
+                for (int z = 0; z < lattice; z++) {
+                    final double px = (double) x / lattice;
+                    final double py = (double) y / lattice;
+                    final double pz = (double) z / lattice;
+                    faces.add(ColliderShapeKey.face(
+                            SCALE, px, py, pz, px + span, py + span, pz + span));
+                }
+            }
         }
+
+        check(faces.size() > ColliderDetail.MAX_CELL_BOXES,
+                "this case must actually overflow the cap, got " + faces.size());
 
         final List<ColliderShapeKey.Face> capped =
                 ColliderGeometry.capCell(faces, SCALE, ColliderDetail.MAX_CELL_BOXES);
 
+        check(capped != faces, "an overflowing cell must actually be capped");
         check(capped.size() <= ColliderDetail.MAX_CELL_BOXES,
                 "the cap must bound the compound, got " + capped.size());
         check(capped.size() > 1,
@@ -106,13 +117,25 @@ public final class ColliderBudgetTest {
                     "a capped box spans the whole cell - this is the solid-cube bug");
         }
 
-        final double bucket = 1.0D / 8.0D;
+        final double bound = 1.0D / bucketSide(ColliderDetail.MAX_CELL_BOXES) + span + 1.0E-6D;
         for (final ColliderShapeKey.Face face : capped) {
-            check(face.maxXd() - face.minXd() <= bucket + 1.0E-6D
-                            && face.maxYd() - face.minYd() <= bucket + 1.0E-6D
-                            && face.maxZd() - face.minZd() <= bucket + 1.0E-6D,
+            check(face.maxXd() - face.minXd() <= bound
+                            && face.maxYd() - face.minYd() <= bound
+                            && face.maxZd() - face.minZd() <= bound,
                     "a capped box is wider than its sub-cell");
         }
+    }
+
+    private static int bucketSide(final int maxBoxes) {
+        int side = 1;
+        while (((side * 2) * (side * 2) * (side * 2)) <= maxBoxes) side *= 2;
+        return side;
+    }
+
+    private static int latticeOverflowing(final int maxBoxes) {
+        int lattice = 2;
+        while (lattice * lattice * lattice <= maxBoxes) lattice++;
+        return lattice;
     }
 
     private static void cellCapLeavesAffordableCellsAlone() {

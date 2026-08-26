@@ -1,17 +1,16 @@
 package com.misterblusky9.pocket.entity;
 
+import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
-import com.misterblusky9.pocket.PocketSized;
-import com.misterblusky9.pocket.scale.ScaleState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.fml.ModList;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -31,21 +30,28 @@ public final class EntityScaleTracker {
     private static final Map<Entity, State> STATES =
             Collections.synchronizedMap(new WeakHashMap<>());
 
-    private static Boolean pehkuiLoaded;
-
     public static void tick(final Entity entity) {
-        if (entity == null || entity.isRemoved()) {
-            if (entity != null) STATES.remove(entity);
+        if (entity == null) return;
+
+        if (entity.isRemoved()) {
+            STATES.remove(entity);
+            if (PehkuiScaleBridge.ownsScaling()) {
+                PehkuiScaleBridge.clear(entity);
+            }
             return;
         }
 
-        if (entity instanceof final Player player) {
+        if (entity instanceof final Player player
+                && !PehkuiScaleBridge.ownsScaling()) {
             tickPlayer(player);
             return;
         }
 
         if (entity instanceof Projectile) {
             STATES.remove(entity);
+            if (PehkuiScaleBridge.ownsScaling()) {
+                PehkuiScaleBridge.clear(entity);
+            }
             return;
         }
 
@@ -54,6 +60,8 @@ public final class EntityScaleTracker {
         final Association immediate = resolveImmediate(entity);
         final State state = STATES.computeIfAbsent(entity, ignored -> new State());
 
+        final boolean wasTrackingShrunkenSubLevel =
+                entity instanceof Player && tracksShrunkenSubLevel(state);
         final double before = state.dimensionScale;
 
         if (immediate.mode == Mode.CONTAINED) {
@@ -61,7 +69,6 @@ public final class EntityScaleTracker {
             state.subLevel = immediate.subLevel;
             state.missingTicks = 0;
             clearCandidate(state);
-
             state.dimensionScale = 1.0D;
         } else if (immediate.mode == Mode.TRACKING) {
             if (state.mode == Mode.TRACKING
@@ -93,7 +100,6 @@ public final class EntityScaleTracker {
             }
         } else if (state.mode == Mode.TRACKING && shouldKeepPreviousBinding(entity, state)) {
             clearCandidate(state);
-
             state.dimensionScale = scaleOf(state.subLevel);
         } else {
             if (state.mode == Mode.TRACKING && state.missingTicks < LOST_TRACKING_GRACE_TICKS) {
@@ -105,14 +111,23 @@ public final class EntityScaleTracker {
                 state.subLevel = null;
                 state.missingTicks = 0;
                 clearCandidate(state);
-
                 state.dimensionScale = 1.0D;
             }
         }
 
         state.dimensionScale = sanitize(state.dimensionScale);
 
-        if (Math.abs(before - state.dimensionScale) > 1.0E-5D) {
+        if (PehkuiScaleBridge.ownsScaling()) {
+            if (entity instanceof final Player player) {
+                syncPehkuiPlayer(player);
+
+                if (wasTrackingShrunkenSubLevel && !tracksShrunkenSubLevel(state)) {
+                    PehkuiScaleBridge.clearPersonalScale(player);
+                }
+            } else {
+                syncPehkui(entity, state);
+            }
+        } else if (Math.abs(before - state.dimensionScale) > 1.0E-5D) {
             entity.refreshDimensions();
         }
 
@@ -123,6 +138,8 @@ public final class EntityScaleTracker {
     }
 
     public static double dimensionScale(final Entity entity) {
+        if (PehkuiScaleBridge.ownsScaling()) return 1.0D;
+
         final State state = STATES.get(entity);
         if (state == null) return 1.0D;
         return sanitize(state.dimensionScale);
@@ -171,10 +188,9 @@ public final class EntityScaleTracker {
     }
 
     private static SubLevel riddenSubLevel(final Player player) {
-        if (isPehkuiLoaded()) return null;
-
         final Set<Entity> visited = new HashSet<>();
         Entity vehicle = player.getVehicle();
+
         while (vehicle != null && visited.add(vehicle)) {
             SubLevel subLevel = Sable.HELPER.getContaining(vehicle);
             if (subLevel != null && !subLevel.isRemoved()) return subLevel;
@@ -184,17 +200,13 @@ public final class EntityScaleTracker {
 
             vehicle = vehicle.getVehicle();
         }
+
         return null;
     }
 
-    private static boolean isPehkuiLoaded() {
-        if (pehkuiLoaded == null) {
-            pehkuiLoaded = ModList.get().isLoaded("pehkui");
-        }
-        return pehkuiLoaded;
-    }
-
     public static double renderScale(final Entity entity, final float partialTick) {
+        if (PehkuiScaleBridge.ownsScaling()) return 1.0D;
+
         if (entity instanceof final Player player) {
             final SubLevel ridden = riddenSubLevel(player);
             if (ridden == null || ridden.isRemoved()) return 1.0D;
@@ -238,6 +250,36 @@ public final class EntityScaleTracker {
         return containing != null && !containing.isRemoved();
     }
 
+    private static void syncPehkuiPlayer(final Player player) {
+        PehkuiScaleBridge.apply(player, 1.0D, 1.0D);
+    }
+
+    private static boolean tracksShrunkenSubLevel(final State state) {
+        return state.mode == Mode.TRACKING
+                && state.subLevel != null
+                && !state.subLevel.isRemoved()
+                && scaleOf(state.subLevel) < 1.0D - PocketSized.EPSILON;
+    }
+
+    private static void syncPehkui(final Entity entity, final State state) {
+        double inheritedBaseScale = 1.0D;
+        double containedModelScale = 1.0D;
+
+        if (state.mode == Mode.TRACKING) {
+            inheritedBaseScale = sanitize(state.dimensionScale);
+        } else if (state.mode == Mode.CONTAINED
+                && state.subLevel != null
+                && !state.subLevel.isRemoved()) {
+            containedModelScale = scaleOf(state.subLevel);
+        }
+
+        PehkuiScaleBridge.apply(
+                entity,
+                inheritedBaseScale,
+                containedModelScale
+        );
+    }
+
     private static boolean shouldKeepPreviousBinding(final Entity entity, final State state) {
         if (state.subLevel == null || state.subLevel.isRemoved()) return false;
 
@@ -271,6 +313,37 @@ public final class EntityScaleTracker {
     }
 
     private static Association resolveImmediate(final Entity entity) {
+        if (entity instanceof Player) {
+            SubLevel subLevel = Sable.HELPER.getTrackingSubLevel(entity);
+            if (subLevel != null && !subLevel.isRemoved()) {
+                return new Association(Mode.TRACKING, subLevel);
+            }
+
+            subLevel = Sable.HELPER.getContaining(entity);
+            if (subLevel != null && !subLevel.isRemoved()) {
+                return new Association(Mode.TRACKING, subLevel);
+            }
+
+            final Set<Entity> visited = new HashSet<>();
+            Entity vehicle = entity.getVehicle();
+
+            while (vehicle != null && visited.add(vehicle)) {
+                subLevel = Sable.HELPER.getContaining(vehicle);
+                if (subLevel != null && !subLevel.isRemoved()) {
+                    return new Association(Mode.TRACKING, subLevel);
+                }
+
+                subLevel = Sable.HELPER.getTrackingSubLevel(vehicle);
+                if (subLevel != null && !subLevel.isRemoved()) {
+                    return new Association(Mode.TRACKING, subLevel);
+                }
+
+                vehicle = vehicle.getVehicle();
+            }
+
+            return new Association(Mode.NONE, null);
+        }
+
         SubLevel subLevel = Sable.HELPER.getContaining(entity);
         if (subLevel != null && !subLevel.isRemoved()) {
             return new Association(Mode.CONTAINED, subLevel);
@@ -283,6 +356,7 @@ public final class EntityScaleTracker {
 
         final Set<Entity> visited = new HashSet<>();
         Entity vehicle = entity.getVehicle();
+
         while (vehicle != null && visited.add(vehicle)) {
             subLevel = Sable.HELPER.getContaining(vehicle);
             if (subLevel != null && !subLevel.isRemoved()) {
@@ -302,9 +376,11 @@ public final class EntityScaleTracker {
 
     private static double scaleOf(final SubLevel subLevel) {
         if (subLevel == null || subLevel.isRemoved()) return 1.0D;
+
         if (subLevel instanceof final ServerSubLevel serverSubLevel) {
             return sanitize(ScaleState.getServerScale(serverSubLevel));
         }
+
         if (subLevel instanceof final ClientSubLevel clientSubLevel) {
             final double networkScale = ScaleState.getClientScale(clientSubLevel);
             final double logicalScale = clientSubLevel.logicalPose().scale().x();
@@ -312,8 +388,10 @@ public final class EntityScaleTracker {
             if (Math.abs(networkScale - 1.0D) > PocketSized.EPSILON) {
                 return sanitize(networkScale);
             }
+
             return sanitize(logicalScale);
         }
+
         return sanitize(subLevel.logicalPose().scale().x());
     }
 

@@ -8,6 +8,7 @@ import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
 import com.misterblusky9.pocket.physics.ScaledFluidForces;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleState;
+import com.misterblusky9.pocket.scale.SubLevelParentage;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
@@ -20,6 +21,7 @@ import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -79,6 +81,12 @@ public final class PocketedSubLevelEvents {
         final ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         if (container == null) return;
 
+        if (SubLevelParentage.isJoinedToAnother(container, subLevel)) {
+            player.displayClientMessage(Component.literal(
+                    "Cannot pocket a sublevel while it is joined to another sublevel."), true);
+            return;
+        }
+
         final SubLevelData serialized = SubLevelSerializer.toData(subLevel, List.of());
         final CompoundTag fullTag = serialized.fullTag().copy();
         final CompoundTag plotTag = fullTag.getCompound("plot");
@@ -108,7 +116,9 @@ public final class PocketedSubLevelEvents {
                 displayName, snapshot, canonicalMetrics.blocks(), canonicalMetrics.blockEntities(), mass);
         PocketCaseItem.setPackedBy(result, player.getGameProfile().getName());
 
-        PocketCaseItem.setContainer(result, packedInto);
+        PocketCaseItem.setContainer(result, packedInto.isEmpty()
+                ? new ItemStack(ModItems.EMPTY_BOX.get())
+                : packedInto);
 
         boolean removedFromWorld = false;
         boolean resultGiven = false;
@@ -134,7 +144,7 @@ public final class PocketedSubLevelEvents {
             resultGiven = true;
 
             storage.commitCapture(level, token,
-                    player instanceof final net.minecraft.server.level.ServerPlayer sp ? sp : null);
+                    player instanceof final ServerPlayer sp ? sp : null);
             final boolean payloadStored = storage.contains(token);
             final boolean sourceReserved = container.getOccupancy().get(container.getIndex(plotX, plotZ));
             final boolean sourceGone = container.getSubLevel(plotX, plotZ) == null;
@@ -167,7 +177,7 @@ public final class PocketedSubLevelEvents {
     private static void giveResult(final Player player, final ItemStack result) {
         final ItemStack held = player.getItemInHand(InteractionHand.MAIN_HAND);
 
-        if (!player.isCreative()) held.shrink(1);
+        if (!held.isEmpty()) held.shrink(1);
 
         if (held.isEmpty()) {
             player.setItemInHand(InteractionHand.MAIN_HAND, result);
@@ -176,6 +186,12 @@ public final class PocketedSubLevelEvents {
         }
 
         player.getInventory().setChanged();
+        if (player instanceof final ServerPlayer serverPlayer) {
+            serverPlayer.inventoryMenu.broadcastChanges();
+            if (serverPlayer.containerMenu != serverPlayer.inventoryMenu) {
+                serverPlayer.containerMenu.broadcastChanges();
+            }
+        }
     }
 
     private PocketedSubLevelEvents() {}

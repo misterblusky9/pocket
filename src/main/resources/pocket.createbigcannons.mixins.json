@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pocket.mixin.createbigcannons",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CannonSurfaceNormalMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}
