@@ -41,9 +41,12 @@ public final class EntityScaleTracker {
             return;
         }
 
-        if (entity instanceof final Player player
-                && !PehkuiScaleBridge.ownsScaling()) {
-            tickPlayer(player);
+        if (entity instanceof final Player player) {
+            if (PehkuiScaleBridge.ownsScaling()) {
+                tickPehkuiPlayer(player);
+            } else {
+                tickPlayer(player);
+            }
             return;
         }
 
@@ -60,8 +63,6 @@ public final class EntityScaleTracker {
         final Association immediate = resolveImmediate(entity);
         final State state = STATES.computeIfAbsent(entity, ignored -> new State());
 
-        final boolean wasTrackingShrunkenSubLevel =
-                entity instanceof Player && tracksShrunkenSubLevel(state);
         final double before = state.dimensionScale;
 
         if (immediate.mode == Mode.CONTAINED) {
@@ -118,15 +119,7 @@ public final class EntityScaleTracker {
         state.dimensionScale = sanitize(state.dimensionScale);
 
         if (PehkuiScaleBridge.ownsScaling()) {
-            if (entity instanceof final Player player) {
-                syncPehkuiPlayer(player);
-
-                if (wasTrackingShrunkenSubLevel && !tracksShrunkenSubLevel(state)) {
-                    PehkuiScaleBridge.clearPersonalScale(player);
-                }
-            } else {
-                syncPehkui(entity, state);
-            }
+            syncPehkui(entity, state);
         } else if (Math.abs(before - state.dimensionScale) > 1.0E-5D) {
             entity.refreshDimensions();
         }
@@ -185,6 +178,66 @@ public final class EntityScaleTracker {
         if (Math.abs(before - state.dimensionScale) > 1.0E-5D) {
             player.refreshDimensions();
         }
+    }
+
+    private static void tickPehkuiPlayer(final Player player) {
+        final SubLevel ridden = riddenSubLevel(player);
+        State state = STATES.get(player);
+
+        if (ridden != null) {
+            if (state == null) {
+                state = new State();
+                STATES.put(player, state);
+            }
+
+            final double scale = sanitize(scaleOf(ridden));
+            final boolean changed = !state.seatScaled
+                    || state.subLevel != ridden
+                    || Math.abs(state.dimensionScale - scale) > PocketSized.EPSILON;
+
+            state.mode = Mode.TRACKING;
+            state.subLevel = ridden;
+            state.missingTicks = 0;
+            state.dimensionScale = scale;
+            state.seatScaled = true;
+            clearCandidate(state);
+
+            if (changed) {
+                PehkuiScaleBridge.setPersonalScale(player, scale);
+            }
+            return;
+        }
+
+        if (state == null || !state.seatScaled) {
+            STATES.remove(player);
+            return;
+        }
+
+        if (state.subLevel == null || state.subLevel.isRemoved()) {
+            PehkuiScaleBridge.clearPersonalScale(player);
+            STATES.remove(player);
+            return;
+        }
+
+        final Association immediate = resolveImmediate(player);
+        if (immediate.subLevel == state.subLevel || shouldKeepPreviousBinding(player, state)) {
+            state.mode = Mode.TRACKING;
+            state.missingTicks = 0;
+            return;
+        }
+
+        state.missingTicks++;
+        if (state.missingTicks <= LOST_TRACKING_GRACE_TICKS) return;
+
+        PehkuiScaleBridge.clearPersonalScale(player);
+        STATES.remove(player);
+    }
+
+    public static double pehkuiRidingScale(final Entity entity, final SubLevel subLevel) {
+        if (!(entity instanceof final Player player) || !PehkuiScaleBridge.ownsScaling()) return 1.0D;
+        final SubLevel ridden = riddenSubLevel(player);
+        if (ridden == null || ridden != subLevel || ridden.isRemoved()) return 1.0D;
+        return sanitize(scaleOf(ridden));
     }
 
     private static SubLevel riddenSubLevel(final Player player) {
@@ -250,17 +303,6 @@ public final class EntityScaleTracker {
         return containing != null && !containing.isRemoved();
     }
 
-    private static void syncPehkuiPlayer(final Player player) {
-        PehkuiScaleBridge.apply(player, 1.0D, 1.0D);
-    }
-
-    private static boolean tracksShrunkenSubLevel(final State state) {
-        return state.mode == Mode.TRACKING
-                && state.subLevel != null
-                && !state.subLevel.isRemoved()
-                && scaleOf(state.subLevel) < 1.0D - PocketSized.EPSILON;
-    }
-
     private static void syncPehkui(final Entity entity, final State state) {
         double inheritedBaseScale = 1.0D;
         double containedModelScale = 1.0D;
@@ -313,37 +355,6 @@ public final class EntityScaleTracker {
     }
 
     private static Association resolveImmediate(final Entity entity) {
-        if (entity instanceof Player) {
-            SubLevel subLevel = Sable.HELPER.getTrackingSubLevel(entity);
-            if (subLevel != null && !subLevel.isRemoved()) {
-                return new Association(Mode.TRACKING, subLevel);
-            }
-
-            subLevel = Sable.HELPER.getContaining(entity);
-            if (subLevel != null && !subLevel.isRemoved()) {
-                return new Association(Mode.TRACKING, subLevel);
-            }
-
-            final Set<Entity> visited = new HashSet<>();
-            Entity vehicle = entity.getVehicle();
-
-            while (vehicle != null && visited.add(vehicle)) {
-                subLevel = Sable.HELPER.getContaining(vehicle);
-                if (subLevel != null && !subLevel.isRemoved()) {
-                    return new Association(Mode.TRACKING, subLevel);
-                }
-
-                subLevel = Sable.HELPER.getTrackingSubLevel(vehicle);
-                if (subLevel != null && !subLevel.isRemoved()) {
-                    return new Association(Mode.TRACKING, subLevel);
-                }
-
-                vehicle = vehicle.getVehicle();
-            }
-
-            return new Association(Mode.NONE, null);
-        }
-
         SubLevel subLevel = Sable.HELPER.getContaining(entity);
         if (subLevel != null && !subLevel.isRemoved()) {
             return new Association(Mode.CONTAINED, subLevel);
@@ -421,6 +432,7 @@ public final class EntityScaleTracker {
         private SubLevel candidateSubLevel;
         private int candidateTicks;
         private double dimensionScale = 1.0D;
+        private boolean seatScaled;
     }
 
     private EntityScaleTracker() {

@@ -19,11 +19,11 @@ public abstract class CannonSurfaceNormalMixin {
             remap = false,
             require = 0
     )
-    private Vec3 pocket$unitSurfaceNormal(final Vec3 normal) {
+    private Vec3 pocket$scaleSurfaceNormal(final Vec3 normal) {
         if (normal == null) return null;
-        if (!ScaledSurfaceNormal.needsUnit(normal.x, normal.y, normal.z)) return normal;
+        if (!ScaledSurfaceNormal.needsRescale(normal.x, normal.y, normal.z)) return normal;
 
-        final double[] unit = ScaledSurfaceNormal.unit(normal.x, normal.y, normal.z);
-        return new Vec3(unit[0], unit[1], unit[2]);
+        final double[] scaled = ScaledSurfaceNormal.perWorldBlock(normal.x, normal.y, normal.z);
+        return new Vec3(scaled[0], scaled[1], scaled[2]);
     }
 }

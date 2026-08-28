@@ -28,9 +28,8 @@
     "interaction.PlacementMarginMixin",
     "interaction.PlacementDiagnosticMixin",
     "collision.SubLevelEntityCollisionMixin",
-    "explosion.ScaledSubLevelExplosionMixin",
-    "explosion.SableIntersectionFilterMixin",
     "entity.EntityDimensionsScaleMixin",
+    "entity.SablePehkuiRiderPositionMixin",
     "entity.LivingEntityDimensionsScaleMixin",
     "create.PotatoCannonImmediatePocketMixin",
     "create.PotatoCannonSettingsMixin",
@@ -62,7 +61,12 @@
     "client.GoggleOverlaySubLevelMixin",
     "create.PackageEntityCraftRenderMixin",
     "create.PackageVisualModelMixin",
-    "create.ContraptionVisualScaleMixin"
+    "create.ContraptionVisualScaleMixin",
+    "create.CarriageContraptionVisualScaleMixin",
+    "create.ContraptionHandlerClientScaleMixin",
+    "create.CarriageCouplingScaleMixin",
+    "create.TrackMarkerScaleMixin",
+    "create.TrackPlacementLineScaleMixin"
   ],
   "injectors": {
     "defaultRequire": 1

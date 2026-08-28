@@ -9,6 +9,7 @@ import com.misterblusky9.pocket.physics.PivotDriftCompensation;
 import com.misterblusky9.pocket.physics.PlotShapeCache;
 import com.misterblusky9.pocket.physics.RapierSceneLifetime;
 import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
+import com.misterblusky9.pocket.physics.ScaledColliderRebuildQueue;
 import com.misterblusky9.pocket.physics.ScaledFluidForces;
 import com.misterblusky9.pocket.physics.ScaledRebuildCollisionEffectFilter;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
@@ -146,7 +147,7 @@ public abstract class RapierPhysicsPipelineMixin {
 
         if (ScaleState.isScaled(subLevel)) {
             if (subLevel instanceof final ServerSubLevel serverSubLevel) {
-                if (oldState.hasBlockEntity() != newState.hasBlockEntity()) {
+                if (oldState.hasBlockEntity() || newState.hasBlockEntity()) {
                     PocketMetrics.invalidate(serverSubLevel.getUniqueId());
                 } else if (oldState.isAir() != newState.isAir()) {
                     PocketMetrics.adjustBlocks(
@@ -204,9 +205,9 @@ public abstract class RapierPhysicsPipelineMixin {
 
         PivotDriftCompensation.before(subLevel);
 
-        final boolean repeat = ScaledBoundsCollider.statsAlreadyServedThisTick(subLevel);
+        final boolean firstDirty = ScaledColliderRebuildQueue.mark(subLevel);
 
-        if (!repeat) {
+        if (firstDirty) {
             PocketTrace.scale(
                     "onStatsChanged HEAD {} scale={} loadedChunks={} hasTrackedState={}",
                     PocketTrace.context(subLevel),
@@ -216,7 +217,6 @@ public abstract class RapierPhysicsPipelineMixin {
         }
 
         MassScaleContext.enter(subLevel);
-        if (!repeat) ScaledBoundsCollider.rebuildInPlace(subLevel);
     }
 
     @Inject(method = "onStatsChanged", at = @At("TAIL"), remap = false)

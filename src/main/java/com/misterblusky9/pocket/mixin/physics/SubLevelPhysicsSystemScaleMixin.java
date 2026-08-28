@@ -3,6 +3,7 @@ package com.misterblusky9.pocket.mixin.physics;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
+import com.misterblusky9.pocket.physics.ScaledColliderRebuildQueue;
 import com.misterblusky9.pocket.scale.ScaleController;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,6 +27,7 @@ public abstract class SubLevelPhysicsSystemScaleMixin {
     ) {
         if (sidelessContainer instanceof final ServerSubLevelContainer container) {
             ScaleController.tickServer(container);
+            ScaledColliderRebuildQueue.flush(container);
         }
     }
 }

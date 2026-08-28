@@ -5,6 +5,7 @@ import com.misterblusky9.pocket.compression.CompressionBlacklist;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -80,13 +81,24 @@ public record PocketMetrics(int blocks, int blockEntities) {
                             final BlockState state = section.getBlockState(x & 15, y & 15, z & 15);
                             if (state.isAir()) continue;
                             blocks++;
-                            if (state.hasBlockEntity()) blockEntities++;
                             if (blocks >= stopAfterBlocks) {
                                 return new PocketMetrics(blocks, blockEntities);
                             }
                         }
                     }
                 }
+            }
+
+            for (final BlockPos blockEntityPos : chunk.getBlockEntities().keySet()) {
+                final int x = blockEntityPos.getX();
+                final int y = blockEntityPos.getY();
+                final int z = blockEntityPos.getZ();
+                if (x < chunkMinX || x > chunkMaxX
+                        || y < bounds.minY() || y > bounds.maxY()
+                        || z < chunkMinZ || z > chunkMaxZ) {
+                    continue;
+                }
+                if (!chunk.getBlockState(blockEntityPos).isAir()) blockEntities++;
             }
         }
 

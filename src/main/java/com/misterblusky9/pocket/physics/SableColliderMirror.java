@@ -151,14 +151,19 @@ public final class SableColliderMirror {
             final Applied oldState
     ) {
         final UUID id = subLevel.getUniqueId();
-        final Map<SectionKey, SectionBinding> prepared = retainAll(next);
+        boolean oldReleased = false;
+        Map<SectionKey, SectionBinding> prepared = null;
+
         try {
             if (oldState == null) {
                 clearOriginalBackingChunks(level, subLevel, next.sections().keySet());
             } else {
-                clearMissingSections(level, subLevel, oldState.sections.keySet(), next.sections().keySet());
+                clearSections(level, subLevel, oldState.sections.keySet());
+                release(oldState);
+                oldReleased = true;
             }
 
+            prepared = retainAll(next);
             rebuildBodyOctree(level, subLevel, next.bounds());
 
             for (final SectionBinding binding : prepared.values()) {
@@ -167,12 +172,26 @@ public final class SableColliderMirror {
         } catch (final RuntimeException exception) {
             PocketTrace.warn("full collider apply failed uuid={} gen={} error={}",
                     id, next.generation(), exception.toString());
+            if (prepared != null) releaseBindings(prepared);
             try {
                 clearSections(level, subLevel, next.sections().keySet());
                 if (oldState == null) {
                     final CompiledCollider.Bounds original = originalBounds(subLevel);
                     if (original != null) rebuildBodyOctree(level, subLevel, original);
                     restoreOriginalChunks(level, subLevel);
+                    APPLIED.remove(id);
+                } else if (oldReleased) {
+                    final Map<SectionKey, SectionBinding> restored = retainAll(oldState.collider);
+                    try {
+                        rebuildBodyOctree(level, subLevel, oldState.collider.bounds());
+                        for (final SectionBinding binding : restored.values()) {
+                            uploadWhole(level, subLevel, binding.section);
+                        }
+                    } catch (final RuntimeException rollbackFailure) {
+                        releaseBindings(restored);
+                        throw rollbackFailure;
+                    }
+                    APPLIED.put(id, new Applied(oldState.bodyId, oldState.collider, restored));
                 } else {
                     rebuildBodyOctree(level, subLevel, oldState.collider.bounds());
                     for (final SectionBinding binding : oldState.sections.values()) {
@@ -180,16 +199,17 @@ public final class SableColliderMirror {
                     }
                 }
             } catch (final RuntimeException rollbackFailure) {
+                APPLIED.remove(id);
+                exception.addSuppressed(rollbackFailure);
                 PocketTrace.warn("full collider rollback failed uuid={} error={}",
                         id, rollbackFailure.toString());
             }
-            releaseBindings(prepared);
             throw exception;
         }
 
         final Applied replacement = new Applied(next.bodyId(), next, prepared);
         APPLIED.put(id, replacement);
-        release(oldState);
+        if (!oldReleased) release(oldState);
         traceApplied(id, next, next.sections().size(), true);
     }
 

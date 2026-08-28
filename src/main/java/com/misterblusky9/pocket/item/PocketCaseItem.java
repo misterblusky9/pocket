@@ -1289,6 +1289,7 @@ public class PocketCaseItem extends PackageItem {
 
         int blocks = 0;
         int blockEntities = 0;
+        final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         long hash = STRUCTURE_HASH_OFFSET;
         hash = hashStructure(hash, bounds.maxX() - bounds.minX() + 1);
         hash = hashStructure(hash, bounds.maxY() - bounds.minY() + 1);
@@ -1318,7 +1319,7 @@ public class PocketCaseItem extends PackageItem {
                             final var state = section.getBlockState(x & 15, y & 15, z & 15);
                             if (state.isAir()) continue;
                             blocks++;
-                            if (state.hasBlockEntity()) blockEntities++;
+                            if (chunk.getBlockEntity(pos.set(x, y, z)) != null) blockEntities++;
                             hash = hashStructure(hash, x - bounds.minX());
                             hash = hashStructure(hash, y - bounds.minY());
                             hash = hashStructure(hash, z - bounds.minZ());

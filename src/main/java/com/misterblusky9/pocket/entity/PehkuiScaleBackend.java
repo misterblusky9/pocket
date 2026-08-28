@@ -7,7 +7,6 @@ import net.minecraft.world.entity.Entity;
 import virtuoel.pehkui.api.ScaleData;
 import virtuoel.pehkui.api.ScaleModifier;
 import virtuoel.pehkui.api.ScaleRegistries;
-import virtuoel.pehkui.api.ScaleType;
 import virtuoel.pehkui.api.ScaleTypes;
 
 import java.util.ArrayList;
@@ -17,17 +16,14 @@ import java.util.WeakHashMap;
 
 public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
     private static final float MODIFIER_PRIORITY = 1024.0F;
-    private static final float PERSONAL_MODIFIER_PRIORITY = 1025.0F;
 
     private final Map<Entity, Factors> factors =
             Collections.synchronizedMap(new WeakHashMap<>());
-    private final Map<Entity, Boolean> personalEntities =
+    private final Map<Entity, Boolean> baseScaledEntities =
             Collections.synchronizedMap(new WeakHashMap<>());
 
     private final ScaleModifier inheritedModifier;
     private final ScaleModifier containedModelModifier;
-    private final ScaleModifier personalModifier;
-    private final ScaleType personalScaleType;
 
     public PehkuiScaleBackend() {
         this.inheritedModifier = ScaleRegistries.register(
@@ -74,39 +70,6 @@ public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
                         return modifiedScale * containedModelPreviousFactor(scaleData.getEntity());
                     }
                 }
-        );
-
-        this.personalModifier = ScaleRegistries.register(
-                ScaleRegistries.SCALE_MODIFIERS,
-                ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "personal_scale_modifier"),
-                new ScaleModifier(PERSONAL_MODIFIER_PRIORITY) {
-                    @Override
-                    public float modifyScale(
-                            final ScaleData scaleData,
-                            final float modifiedScale,
-                            final float delta
-                    ) {
-                        return modifiedScale * personalFactor(scaleData.getEntity(), delta);
-                    }
-
-                    @Override
-                    public float modifyPrevScale(
-                            final ScaleData scaleData,
-                            final float modifiedScale
-                    ) {
-                        return modifiedScale * personalPreviousFactor(scaleData.getEntity());
-                    }
-                }
-        );
-
-        this.personalScaleType = ScaleRegistries.register(
-                ScaleRegistries.SCALE_TYPES,
-                ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "personal_scale"),
-                ScaleType.Builder.create()
-                        .defaultBaseScale(1.0F)
-                        .defaultPersistence(true)
-                        .addDependentModifier(this.personalModifier)
-                        .build()
         );
     }
 
@@ -197,51 +160,43 @@ public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
 
     @Override
     public void setPersonalScale(final Entity entity, final double scale) {
-        final float personal = sanitize(scale);
-        if (isNeutral(personal)) {
-            clearPersonalScale(entity);
-            return;
-        }
+        final float value = sanitize(scale);
+        ScaleTypes.BASE.getScaleData(entity).setScale(value);
 
-        this.personalScaleType.getScaleData(entity).setScale(personal);
-        this.personalEntities.put(entity, Boolean.TRUE);
-        setModifier(ScaleTypes.BASE.getScaleData(entity), this.personalModifier, true);
+        if (isNeutral(value)) {
+            this.baseScaledEntities.remove(entity);
+        } else {
+            this.baseScaledEntities.put(entity, Boolean.TRUE);
+        }
     }
 
     @Override
     public void clearPersonalScale(final Entity entity) {
-        this.personalScaleType.getScaleData(entity).setScale(1.0F);
-        this.personalEntities.remove(entity);
-        setModifier(ScaleTypes.BASE.getScaleData(entity), this.personalModifier, false);
+        this.baseScaledEntities.remove(entity);
+        ScaleTypes.BASE.getScaleData(entity).setScale(1.0F);
     }
 
     @Override
     public void disable() {
-        final ArrayList<Entity> entities;
+        final ArrayList<Entity> modifierEntities;
+        final ArrayList<Entity> baseEntities;
 
         synchronized (this.factors) {
-            entities = new ArrayList<>(this.factors.keySet());
+            modifierEntities = new ArrayList<>(this.factors.keySet());
             this.factors.clear();
         }
-        synchronized (this.personalEntities) {
-            for (final Entity entity : this.personalEntities.keySet()) {
-                if (!entities.contains(entity)) entities.add(entity);
-            }
-            this.personalEntities.clear();
+        synchronized (this.baseScaledEntities) {
+            baseEntities = new ArrayList<>(this.baseScaledEntities.keySet());
+            this.baseScaledEntities.clear();
         }
 
-        for (final Entity entity : entities) {
+        for (final Entity entity : modifierEntities) {
             if (entity == null) continue;
 
             try {
                 setModifier(
                         ScaleTypes.BASE.getScaleData(entity),
                         this.inheritedModifier,
-                        false
-                );
-                setModifier(
-                        ScaleTypes.BASE.getScaleData(entity),
-                        this.personalModifier,
                         false
                 );
                 setModifier(
@@ -254,6 +209,15 @@ public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
                         this.containedModelModifier,
                         false
                 );
+            } catch (final RuntimeException | LinkageError ignored) {
+            }
+        }
+
+        for (final Entity entity : baseEntities) {
+            if (entity == null) continue;
+
+            try {
+                ScaleTypes.BASE.getScaleData(entity).setScale(1.0F);
             } catch (final RuntimeException | LinkageError ignored) {
             }
         }
@@ -285,16 +249,6 @@ public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
     private float containedModelPreviousFactor(final Entity entity) {
         final Factors value = this.factors.get(entity);
         return value == null ? 1.0F : value.modelPrevious();
-    }
-
-    private float personalFactor(final Entity entity, final float delta) {
-        if (entity == null) return 1.0F;
-        return sanitize(this.personalScaleType.getScaleData(entity).getBaseScale(delta));
-    }
-
-    private float personalPreviousFactor(final Entity entity) {
-        if (entity == null) return 1.0F;
-        return sanitize(this.personalScaleType.getScaleData(entity).getPrevBaseScale());
     }
 
     private static boolean setModifier(

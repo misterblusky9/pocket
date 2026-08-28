@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.ArrayDeque;
 
-@Mixin(EntityRenderDispatcher.class)
+@Mixin(value = EntityRenderDispatcher.class, priority = 900)
 public abstract class SubLevelEntityRenderScaleMixin {
     @Unique
     private static final ThreadLocal<ArrayDeque<Boolean>> pocket$SCALE_STACK =

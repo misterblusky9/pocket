@@ -101,9 +101,24 @@ public final class ColliderCoordinator {
                 subLevel, bodyId, generation, shape, revision, changed, previous);
         if (compiled == null) return;
 
-        final boolean changedNative = SableColliderMirror.apply(subLevel, compiled);
+        CompiledCollider applied = compiled;
+        boolean changedNative;
+        try {
+            changedNative = SableColliderMirror.apply(subLevel, applied);
+        } catch (final ShapeRegistry.CapacityExceededException capacity) {
+            if (applied.mode() == CompiledCollider.Mode.PRISM_FALLBACK) throw capacity;
+            PocketTrace.warn(
+                    "scaled collider exceeded Sable packed shape capacity; using prism fallback uuid={} gen={} sections={} cells={} shapes={} error={}",
+                    id, applied.generation(), applied.sections().size(), applied.occupiedCellCount(),
+                    applied.shapeCount(), capacity.getMessage());
+            applied = ColliderCompiler.compile(
+                    subLevel, bodyId, generation, null, revision, PlotShapeCache.Region.FULL,
+                    SableColliderMirror.current(id));
+            if (applied == null) throw capacity;
+            changedNative = SableColliderMirror.apply(subLevel, applied);
+        }
         LAST_REQUESTS.put(id, request);
-        if (nativeImage != null && compiled.mode() == request.mode()) {
+        if (nativeImage != null && applied.mode() == request.mode()) {
             LAST_NATIVE_IMAGES.put(id, nativeImage);
         } else {
             LAST_NATIVE_IMAGES.remove(id);
@@ -115,9 +130,9 @@ public final class ColliderCoordinator {
         final long elapsedMicros = (System.nanoTime() - start) / 1_000L;
         PocketTrace.scale(
                 "collider compile uuid={} gen={} nativeChanged={} mode={} detail={} sections={} cells={} shapes={} approximateCells={} compileUs={}",
-                id, compiled.generation(), changedNative, compiled.modeName(),
-                shape == null ? "prism" : shape.level(), compiled.sections().size(),
-                compiled.occupiedCellCount(), compiled.shapeCount(), compiled.approximateCellCount(), elapsedMicros);
+                id, applied.generation(), changedNative, applied.modeName(),
+                applied.mode() == CompiledCollider.Mode.PRISM_FALLBACK ? "prism" : shape.level(), applied.sections().size(),
+                applied.occupiedCellCount(), applied.shapeCount(), applied.approximateCellCount(), elapsedMicros);
     }
 
     public static synchronized CompiledCollider current(final UUID id) {

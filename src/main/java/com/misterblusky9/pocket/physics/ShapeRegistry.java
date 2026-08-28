@@ -15,6 +15,13 @@ public final class ShapeRegistry {
     private static long inactiveHits;
     private static long recycles;
     private static int activeShapes;
+    private static boolean allocationCeilingReached;
+
+    public static final class CapacityExceededException extends IllegalStateException {
+        private CapacityExceededException(final String message) {
+            super(message);
+        }
+    }
 
     private static final class Entry {
         private final int handle;
@@ -43,8 +50,13 @@ public final class ShapeRegistry {
             recycles++;
             inactiveHits++;
         } else {
+            if (allocationCeilingReached) throw capacityExceeded(MAX_PACKABLE_HANDLE + 1);
             final int handle = RapierBridge.createCollider(key).handle();
-            ensurePackable(handle);
+            if (handle < 0 || handle > MAX_PACKABLE_HANDLE) {
+                allocationCeilingReached = true;
+                throw capacityExceeded(handle);
+            }
+            if (handle == MAX_PACKABLE_HANDLE) allocationCeilingReached = true;
             entry = new Entry(handle);
             allocations++;
         }
@@ -88,11 +100,13 @@ public final class ShapeRegistry {
     }
 
     private static void ensurePackable(final int handle) {
-        if (handle < 0 || handle > MAX_PACKABLE_HANDLE) {
-            throw new IllegalStateException(
-                    "Sable collider handle cannot fit packed 16-bit voxel state: " + handle
-                            + " (max " + MAX_PACKABLE_HANDLE + ")");
-        }
+        if (handle < 0 || handle > MAX_PACKABLE_HANDLE) throw capacityExceeded(handle);
+    }
+
+    private static CapacityExceededException capacityExceeded(final int handle) {
+        return new CapacityExceededException(
+                "Sable collider handle cannot fit packed 16-bit voxel state: " + handle
+                        + " (max " + MAX_PACKABLE_HANDLE + ")");
     }
 
     private ShapeRegistry() {}
