@@ -11,13 +11,15 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 public final class PocketPackageModels {
     public static void register(final FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
-            final ResourceLocation id = BuiltInRegistries.ITEM.getKey(ModItems.POCKETED_SUBLEVEL.get());
-            if (id == null) return;
-
-            AllPartialModels.PACKAGES.put(id, PartialModel.of(id.withPrefix("item/")));
-
-            AllPartialModels.PACKAGE_RIGGING.put(id, PartialModel.of(PocketCaseItem.STYLE.getRiggingModel()));
+            registerPackage(BuiltInRegistries.ITEM.getKey(ModItems.POCKETED_SUBLEVEL.get()));
+            registerPackage(BuiltInRegistries.ITEM.getKey(ModItems.THE_MOON.get()));
         });
+    }
+
+    private static void registerPackage(final ResourceLocation id) {
+        if (id == null) return;
+        AllPartialModels.PACKAGES.put(id, PartialModel.of(id.withPrefix("item/")));
+        AllPartialModels.PACKAGE_RIGGING.put(id, PartialModel.of(PocketCaseItem.STYLE.getRiggingModel()));
     }
 
     private PocketPackageModels() {}

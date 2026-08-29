@@ -4,13 +4,12 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.misterblusky9.pocket.compression.CompressionBlacklist;
 import com.misterblusky9.pocket.debug.PocketTrace;
-import com.misterblusky9.pocket.physics.MassScaleContext;
-import com.misterblusky9.pocket.physics.PivotDriftCompensation;
 import com.misterblusky9.pocket.physics.PlotShapeCache;
 import com.misterblusky9.pocket.physics.RapierSceneLifetime;
 import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
 import com.misterblusky9.pocket.physics.ScaledColliderRebuildQueue;
 import com.misterblusky9.pocket.physics.ScaledFluidForces;
+import com.misterblusky9.pocket.physics.ScalePhysicsTransitions;
 import com.misterblusky9.pocket.physics.ScaledRebuildCollisionEffectFilter;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.ScaleState;
@@ -19,7 +18,6 @@ import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.ryanhcode.sable.sublevel.plot.LevelPlot;
-import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -114,7 +112,8 @@ public abstract class RapierPhysicsPipelineMixin {
             CompressionBlacklist.invalidate(serverSubLevel.getUniqueId());
         }
 
-        if (ScaleState.isScaled(plot.getSubLevel())) {
+        if (plot.getSubLevel() instanceof final ServerSubLevel serverSubLevel
+                && ScalePhysicsTransitions.ownsScaledCollider(serverSubLevel)) {
             ci.cancel();
         }
     }
@@ -145,15 +144,14 @@ public abstract class RapierPhysicsPipelineMixin {
             CompressionBlacklist.invalidate(serverSubLevel.getUniqueId());
         }
 
-        if (ScaleState.isScaled(subLevel)) {
-            if (subLevel instanceof final ServerSubLevel serverSubLevel) {
-                if (oldState.hasBlockEntity() || newState.hasBlockEntity()) {
-                    PocketMetrics.invalidate(serverSubLevel.getUniqueId());
-                } else if (oldState.isAir() != newState.isAir()) {
-                    PocketMetrics.adjustBlocks(
-                            serverSubLevel.getUniqueId(), newState.isAir() ? -1 : 1, this.level.getGameTime()
-                    );
-                }
+        if (subLevel instanceof final ServerSubLevel serverSubLevel
+                && ScalePhysicsTransitions.ownsScaledCollider(serverSubLevel)) {
+            if (oldState.hasBlockEntity() || newState.hasBlockEntity()) {
+                PocketMetrics.invalidate(serverSubLevel.getUniqueId());
+            } else if (oldState.isAir() != newState.isAir()) {
+                PocketMetrics.adjustBlocks(
+                        serverSubLevel.getUniqueId(), newState.isAir() ? -1 : 1, this.level.getGameTime()
+                );
             }
             ci.cancel();
         }
@@ -191,45 +189,32 @@ public abstract class RapierPhysicsPipelineMixin {
             CompressionBlacklist.invalidate(serverSubLevel.getUniqueId());
         }
 
-        if (ScaleState.isScaled(plot.getSubLevel())) {
+        if (plot.getSubLevel() instanceof final ServerSubLevel serverSubLevel
+                && ScalePhysicsTransitions.ownsScaledCollider(serverSubLevel)) {
             ci.cancel();
         }
     }
 
-    @Inject(method = "onStatsChanged", at = @At("HEAD"), remap = false)
-    private void pocket$rebuildScaledColliderBeforeStats(
+    @Inject(method = "onStatsChanged", at = @At("HEAD"), cancellable = true, remap = false)
+    private void pocket$replaceScaledStatsUpdate(
             final ServerSubLevel subLevel,
             final CallbackInfo ci
     ) {
-        if (!ScaleState.isScaled(subLevel)) return;
-
-        PivotDriftCompensation.before(subLevel);
+        if (!ScalePhysicsTransitions.ownsScaledCollider(subLevel)) return;
 
         final boolean firstDirty = ScaledColliderRebuildQueue.mark(subLevel);
-
         if (firstDirty) {
             PocketTrace.scale(
-                    "onStatsChanged HEAD {} scale={} loadedChunks={} hasTrackedState={}",
+                    "onStatsChanged scaled {} collisionScale={} loadedChunks={} hasTrackedState={}",
                     PocketTrace.context(subLevel),
                     ScaleState.getServerScale(subLevel),
                     subLevel.getPlot().getLoadedChunks().size(),
                     ScaleState.hasServerState(subLevel.getUniqueId()));
         }
 
-        MassScaleContext.enter(subLevel);
-    }
-
-    @Inject(method = "onStatsChanged", at = @At("TAIL"), remap = false)
-    private void pocket$restoreScaledStatsGeometry(
-            final ServerSubLevel subLevel,
-            final CallbackInfo ci
-    ) {
-        if (!ScaleState.isScaled(subLevel)) return;
+        ScalePhysicsTransitions.syncExternalStats(subLevel);
         ScaledBoundsCollider.applyScaledLocalBounds(subLevel);
-        ScaleState.captureServerBounds(subLevel);
-        MassScaleContext.exit(subLevel);
-
-        PivotDriftCompensation.after(
-                SubLevelPhysicsSystem.require(subLevel.getLevel()).getPipeline(), subLevel);
+        ci.cancel();
     }
+
 }

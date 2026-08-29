@@ -164,7 +164,7 @@ public final class SableColliderMirror {
             }
 
             prepared = retainAll(next);
-            rebuildBodyOctree(level, subLevel, next.bounds());
+            rebuildBodyOctree(level, subLevel, ScalePhysicsTransitions.nativeBounds(subLevel, next.bounds()));
 
             for (final SectionBinding binding : prepared.values()) {
                 uploadWhole(level, subLevel, binding.section);
@@ -183,7 +183,7 @@ public final class SableColliderMirror {
                 } else if (oldReleased) {
                     final Map<SectionKey, SectionBinding> restored = retainAll(oldState.collider);
                     try {
-                        rebuildBodyOctree(level, subLevel, oldState.collider.bounds());
+                        rebuildBodyOctree(level, subLevel, ScalePhysicsTransitions.nativeBounds(subLevel, oldState.collider.bounds()));
                         for (final SectionBinding binding : restored.values()) {
                             uploadWhole(level, subLevel, binding.section);
                         }
@@ -193,7 +193,7 @@ public final class SableColliderMirror {
                     }
                     APPLIED.put(id, new Applied(oldState.bodyId, oldState.collider, restored));
                 } else {
-                    rebuildBodyOctree(level, subLevel, oldState.collider.bounds());
+                    rebuildBodyOctree(level, subLevel, ScalePhysicsTransitions.nativeBounds(subLevel, oldState.collider.bounds()));
                     for (final SectionBinding binding : oldState.sections.values()) {
                         uploadWhole(level, subLevel, binding.section);
                     }
@@ -261,7 +261,7 @@ public final class SableColliderMirror {
                         wanted == null ? null : wanted.section,
                         state.collider.bounds());
             }
-            if (needsOctreeRepair) rebuildBodyOctree(level, subLevel, next.bounds());
+            if (needsOctreeRepair) rebuildBodyOctree(level, subLevel, ScalePhysicsTransitions.nativeBounds(subLevel, next.bounds()));
         } catch (final RuntimeException exception) {
             for (int i = committed.size() - 1; i >= 0; i--) {
                 final SectionKey key = committed.get(i);
@@ -274,7 +274,7 @@ public final class SableColliderMirror {
                 }
             }
             try {
-                rebuildBodyOctree(level, subLevel, state.collider.bounds());
+                rebuildBodyOctree(level, subLevel, ScalePhysicsTransitions.nativeBounds(subLevel, state.collider.bounds()));
             } catch (final RuntimeException rollbackFailure) {
                 PocketTrace.warn("collider octree rollback failed uuid={} error={}",
                         id, rollbackFailure.toString());
@@ -294,16 +294,7 @@ public final class SableColliderMirror {
     }
 
     private static boolean requiresFullReplace(final Applied state, final CompiledCollider next) {
-        if (state == null) return true;
-        final CompiledCollider.GeometryKey old = state.collider.geometryKey();
-        final CompiledCollider.GeometryKey wanted = next.geometryKey();
-        return old.bodyId() != wanted.bodyId()
-                || old.scaleBits() != wanted.scaleBits()
-                || old.pivotX() != wanted.pivotX()
-                || old.pivotY() != wanted.pivotY()
-                || old.pivotZ() != wanted.pivotZ()
-                || !old.bounds().equals(wanted.bounds())
-                || old.mode() != wanted.mode();
+        return state == null || state.bodyId != next.bodyId();
     }
 
     private static Map<SectionKey, SectionBinding> retainAll(final CompiledCollider collider) {

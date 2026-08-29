@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public final class ScaledBoundsCollider {
     public static void forgetSubLevel(final UUID id) {
+        ScalePhysicsTransitions.forget(id);
         ColliderCoordinator.forget(id);
     }
 

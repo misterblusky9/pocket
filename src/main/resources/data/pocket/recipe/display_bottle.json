@@ -9,7 +9,7 @@
     "C": { "item": "minecraft:glass_pane" }
   },
   "result": {
-    "id": "pocket:display_case",
+    "id": "pocket:display_bottle",
     "count": 1
   }
 }

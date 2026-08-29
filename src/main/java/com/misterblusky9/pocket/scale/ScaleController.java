@@ -2,12 +2,13 @@ package com.misterblusky9.pocket.scale;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compression.CompressionBlacklist;
+import com.misterblusky9.pocket.compat.simulatedcoasters.SimulatedCoastersRivetCompat;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.network.ScaleNetwork;
 import com.misterblusky9.pocket.persistence.ScalePersistence;
+import com.misterblusky9.pocket.physics.ScalePhysicsTransitions;
 import com.misterblusky9.pocket.physics.ExpansionClearance;
 import com.misterblusky9.pocket.physics.KinematicCollisionSuppression;
-import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
 import com.misterblusky9.pocket.physics.SubLevelLoadGuard;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import dev.ryanhcode.sable.Sable;
@@ -81,8 +82,21 @@ public final class ScaleController {
             final Vector3d anchorLocalPoint,
             final boolean propagateJoints
     ) {
+        forceStage(subLevel, stage, gameTime, anchorLocalPoint, propagateJoints, ScalePhysicsMode.TRACKING);
+    }
+
+    public static void forceStage(
+            final ServerSubLevel subLevel,
+            final CompressionStage stage,
+            final long gameTime,
+            final Vector3d anchorLocalPoint,
+            final boolean propagateJoints,
+            final ScalePhysicsMode physicsMode
+    ) {
         if (subLevel == null || stage == null) return;
 
+        final ScalePhysicsMode effectiveMode =
+                physicsMode == null ? ScalePhysicsMode.TRACKING : physicsMode;
         final CompressionStage effectiveStage = stage.isCompressed()
                 && CompressionBlacklist.find(subLevel, gameTime).blocked()
                 ? CompressionStage.NORMAL
@@ -91,7 +105,8 @@ public final class ScaleController {
         PocketTrace.scale(
                 "forceStage {} -> {} by {}", subLevel.getUniqueId(), effectiveStage, PocketTrace.caller());
 
-        if (propagateJoints) JointScalePropagation.onCommanded(subLevel, effectiveStage);
+        ScalePhysicsTransitions.setMode(subLevel, effectiveMode);
+        if (propagateJoints) JointScalePropagation.onCommanded(subLevel, effectiveStage, effectiveMode);
 
         final long expires = gameTime + 20L * 20L;
         registerExternalCommandUntil(
@@ -151,6 +166,8 @@ public final class ScaleController {
 
         for (final ServerSubLevel subLevel : container.getAllSubLevels()) {
             if (subLevel.isRemoved()) continue;
+            // The moon carries its own scale; it is not a compression target.
+            if (com.misterblusky9.pocket.moon.MoonSubLevels.isMoon(subLevel)) continue;
 
             CommandChoice choice = commandSource(subLevel, subLevel.getLevel().getGameTime());
             final boolean alreadyManaged = ScaleState.hasServerState(subLevel.getUniqueId());
@@ -243,24 +260,14 @@ public final class ScaleController {
                 KinematicCollisionSuppression.ensureRestored(subLevel, pipeline);
             }
 
-            if (scaleChanged || boundsChanged || reachedTarget) {
-                if (next >= 1.0D - PocketSized.EPSILON) {
-                    if (previous < 1.0D - PocketSized.EPSILON
-                            || ScaledBoundsCollider.hasSynthetic(subLevel.getUniqueId())) {
-                        ScaledBoundsCollider.restoreOriginal(subLevel);
-                    }
-                    ScaleState.clearServerBounds(subLevel.getUniqueId());
-                }
-
-                PocketTrace.enter("PhysicsPipeline.onStatsChanged",
-                        "scale=" + next,
-                        "scaleChanged=" + scaleChanged,
-                        "boundsChanged=" + boundsChanged,
-                        "reachedTarget=" + reachedTarget,
-                        PocketTrace.context(subLevel));
-                pipeline.onStatsChanged(subLevel);
-                PocketTrace.exit("PhysicsPipeline.onStatsChanged uuid=" + subLevel.getUniqueId());
-            }
+            ScalePhysicsTransitions.drive(
+                    subLevel,
+                    previous,
+                    state.currentScale(),
+                    target,
+                    scaleChanged,
+                    reachedTarget,
+                    boundsChanged);
 
             if (state.needsPersistence()) ScalePersistence.persist(subLevel, state);
 
@@ -415,7 +422,10 @@ public final class ScaleController {
             final double nextScale,
             final ScaleCommandSource source
     ) {
-        final Vector3d localAnchor = source == null ? null : source.anchorLocalPoint();
+        final boolean rivet = SimulatedCoastersRivetCompat.isRivetSubLevel(subLevel);
+        final Vector3d localAnchor = rivet
+                ? SimulatedCoastersRivetCompat.attachmentAnchor(subLevel)
+                : source == null ? null : source.anchorLocalPoint();
         if (localAnchor == null) {
             applyScaleAroundBodyPivot(container, subLevel, previousScale, nextScale);
             return;
@@ -426,7 +436,7 @@ public final class ScaleController {
         final Vector3d relativeAtNewScale = localRelativeWorld(subLevel, localAnchor, nextScale);
         Vector3d correctedPosition = new Vector3d(oldWorldAnchor).sub(relativeAtNewScale);
 
-        if (nextScale > previousScale) {
+        if (nextScale > previousScale && !rivet) {
             correctedPosition = ExpansionClearance.resolve(
                     subLevel, correctedPosition, previousScale, nextScale);
         }

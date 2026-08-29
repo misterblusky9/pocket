@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.physics;
 
+import com.misterblusky9.pocket.compat.simulatedcoasters.SimulatedCoastersRivetCompat;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -47,6 +48,12 @@ public final class ConstraintConfigurations {
             final double scale2
     ) {
         if (configuration == null) return true;
+
+        if (configuration instanceof final FixedConstraintConfiguration fixed
+                && SimulatedCoastersRivetCompat.requiresRefresh(
+                        fixed, body1, scale1, body2, scale2)) {
+            return true;
+        }
 
         return anchorMoves(body1, pos1(configuration), pivot1, scale1)
                 || anchorMoves(body2, pos2(configuration), pivot2, scale2);

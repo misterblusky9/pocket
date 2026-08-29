@@ -32,10 +32,14 @@ public final class PocketSizedClient {
     }
     public PocketSizedClient(final IEventBus modBus) {
         modBus.addListener(PocketPackageModels::register);
+        modBus.addListener(TheMoonPackageRenderer::register);
         modBus.addListener(PocketShaders::register);
         modBus.addListener(PortableSubspaceCompressorRenderer::register);
+        modBus.addListener(SubspaceRecyclerRenderer::register);
+        modBus.addListener(SubspaceRecyclerRenderer::registerVisual);
         modBus.addListener(PocketKeys::register);
         NeoForge.EVENT_BUS.addListener(CompressionFieldRenderer::render);
+        NeoForge.EVENT_BUS.addListener(MoonPhysicsRenderer::render);
         NeoForge.EVENT_BUS.addListener(CompressionBeamRenderer::render);
         NeoForge.EVENT_BUS.addListener(ColliderOutlineRenderer::render);
         NeoForge.EVENT_BUS.addListener(TweezerBeamRenderer::render);
@@ -63,6 +67,7 @@ public final class PocketSizedClient {
                         TweezerBeamRenderer.clear();
                         ColliderOutlineRenderer.clear();
                         ScaleHandshake.clear();
+                        MoonPhysicsClient.clear();
                     }
                 }
         );

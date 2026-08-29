@@ -20,8 +20,7 @@ public final class ScaleFrame {
     }
 
     public static Vector3dc pivot(final ServerSubLevel subLevel) {
-        final Vector3dc centerOfMass = subLevel.getMassTracker().getCenterOfMass();
-        return centerOfMass != null ? centerOfMass : subLevel.logicalPose().rotationPoint();
+        return subLevel.logicalPose().rotationPoint();
     }
 
     public static Vector3dc toBodyMetric(final PhysicsPipelineBody body, final Vector3dc plotPoint) {

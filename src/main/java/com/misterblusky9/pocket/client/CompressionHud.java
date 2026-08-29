@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
+import com.misterblusky9.pocket.moon.MoonTargeting;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleState;
 import net.createmod.catnip.animation.AnimationTickHolder;
@@ -33,17 +34,39 @@ public final class CompressionHud {
         if (player == null || minecraft.options.hideGui || minecraft.screen != null) return;
         if (!holdingTool(player)) return;
 
-        final CompressionAim.Aim aim = CompressionAim.ofLocalPlayer(
-                holding(player, CompressionGunItem.class).isEmpty() ? RAY_RANGE : GUN_RANGE);
-        if (aim == null) return;
+        final boolean creativeRay = holding(player, CompressionGunItem.class).isEmpty();
+        final double range = creativeRay ? RAY_RANGE : GUN_RANGE;
+        final float partialTick = minecraft.getTimer().getGameTimeDeltaPartialTick(false);
 
         final GuiGraphics graphics = event.getGuiGraphics();
         final Font font = minecraft.font;
         final int centreX = graphics.guiWidth() / 2;
+        final int y = graphics.guiHeight() - HOTBAR_CLEARANCE;
+
+        if (MoonTargeting.isLookingAtMoon(player, MoonScaleClient.get(), partialTick, range)) {
+            final String moonStatus = moonStatus();
+            if (moonStatus != null) {
+                drawCentred(
+                        graphics, font, moonStatus, centreX,
+                        y + font.lineHeight + 1, STATUS_COLOUR);
+            }
+            drawCentred(
+                    graphics,
+                    font,
+                    CompressionStage.nearest(MoonScaleClient.get()).label(),
+                    centreX,
+                    y,
+                    SCALE_COLOUR
+            );
+            return;
+        }
+
+        final CompressionAim.Aim aim = CompressionAim.ofLocalPlayer(range);
+        if (aim == null) return;
+
         final UUID id = aim.subLevelId();
         final String status = statusOf(id);
 
-        int y = graphics.guiHeight() - HOTBAR_CLEARANCE;
         if (status != null) {
             drawCentred(graphics, font, status, centreX, y + font.lineHeight + 1, STATUS_COLOUR);
         }
@@ -51,6 +74,15 @@ public final class CompressionHud {
         drawCentred(graphics, font,
                 CompressionStage.nearest(ScaleState.getClientScale(id)).label(),
                 centreX, y, SCALE_COLOUR);
+    }
+
+
+    private static String moonStatus() {
+        if (!MoonCompressionFieldRenderer.isGripped()) return null;
+        if (!MoonCompressionFieldRenderer.isSealed()) {
+            return Math.round(MoonCompressionFieldRenderer.progress() * 100.0F) + "%";
+        }
+        return (MoonCompressionFieldRenderer.isGrowing() ? "Growing" : "Shrinking") + ellipsis();
     }
 
     private static String statusOf(final UUID id) {

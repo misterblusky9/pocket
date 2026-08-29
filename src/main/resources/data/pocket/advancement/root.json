@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "pocket:compression_gun"
+    },
+    "title": {
+      "text": "Pocket Sized"
+    },
+    "description": {
+      "text": ""
+    },
+    "background": "minecraft:textures/block/gray_concrete.png",
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "tick": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}

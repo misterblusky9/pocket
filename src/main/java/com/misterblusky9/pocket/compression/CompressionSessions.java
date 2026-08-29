@@ -45,6 +45,7 @@ public final class CompressionSessions {
     private static final int PULSE_LEAD_TICKS = 10;
 
     private static final int HOLD_GRACE_TICKS = 3;
+    private static final double AIM_RANGE = 160.0D;
 
     private static final int AIR_PER_DURABILITY = 12;
 
@@ -165,6 +166,8 @@ public final class CompressionSessions {
 
         final long now = player.level().getGameTime();
         boolean held = false;
+        boolean sampledAim = false;
+        UUID aimedSubLevelId = null;
 
         final Iterator<Map.Entry<UUID, Session>> iterator = SESSIONS.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -181,6 +184,13 @@ public final class CompressionSessions {
                 continue;
             }
 
+            if (!session.sealed && !sampledAim) {
+                final CompressionTargeting.Target target = CompressionTargeting.find(player, AIM_RANGE);
+                aimedSubLevelId = target == null ? null : target.subLevel().getUniqueId();
+                sampledAim = true;
+            }
+
+            session.illuminated = session.sealed || session.subLevelId.equals(aimedSubLevelId);
             session.lastHeldTick = now;
             held = true;
         }
@@ -268,11 +278,12 @@ public final class CompressionSessions {
             final ServerPlayer holder,
             final ServerSubLevel subLevel
     ) {
-        session.age++;
-
         if (session.blocked) return true;
 
         if (!session.sealed) {
+            if (!session.autoRelease && !session.illuminated) return true;
+
+            session.age++;
             if (session.airCost > 0 && !drawAir(session, holder)) {
                 holder.displayClientMessage(Component.literal("Backtank empty"), true);
                 return false;
@@ -281,6 +292,7 @@ public final class CompressionSessions {
             if (session.age < session.acquireTicks) return true;
 
             session.sealed = true;
+            session.illuminated = true;
             session.sinceStep = Integer.MAX_VALUE / 2;
             return true;
         }
@@ -335,8 +347,6 @@ public final class CompressionSessions {
         if (level == null) return;
         CompressionSyncPayload.sendRelease(level, session.subLevelId);
     }
-
-    // Estimates
 
     public static int estimateAcquireTicks(final ServerSubLevel subLevel) {
         final var bounds = subLevel.getPlot().getBoundingBox();
@@ -448,6 +458,7 @@ public final class CompressionSessions {
         private boolean directDrive;
         private boolean pulsed;
         private boolean blocked;
+        private boolean illuminated = true;
         private boolean propagateJoints = true;
         private net.minecraft.world.InteractionHand hand =
                 net.minecraft.world.InteractionHand.MAIN_HAND;

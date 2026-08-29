@@ -1,7 +1,9 @@
 package com.misterblusky9.pocket;
 
+import com.misterblusky9.pocket.entity.ModEntities;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
+import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
 import com.misterblusky9.pocket.item.ModCreativeTabs;
@@ -30,7 +32,10 @@ public final class PocketSized {
 
         ModBlocks.BLOCKS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
+        modBus.addListener(SubspaceRecyclerBlockEntity::registerCapabilities);
         ModItems.ITEMS.register(modBus);
+        ModEntities.ENTITIES.register(modBus);
+        modBus.addListener(ModEntities::registerAttributes);
         ModCreativeTabs.TABS.register(modBus);
         PocketCreateIntegration.register(modBus);
         modBus.addListener(ScaleNetwork::register);

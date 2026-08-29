@@ -28,7 +28,6 @@ import org.joml.Vector3d;
 import org.joml.Vector3dc;
 import org.joml.Vector3f;
 
-import it.unimi.dsi.fastutil.longs.Long2FloatMap;
 import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -44,7 +43,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class CompressionFieldRenderer {
-    // Feel
     private static final float INITIAL_SPEED_FRACTION = 0.35F;
     private static final float CLIMB_TICKS = 9.0F;
     private static final int SHAPE_SAMPLES = 64;
@@ -77,9 +75,21 @@ public final class CompressionFieldRenderer {
     private static final int POCKET_PASSES = 8;
 
     private static final float JITTER_AMOUNT = 0.45F;
+    private static final float COAST_VELOCITY_RETAIN_PER_TICK = 0.92F;
+    private static final float COAST_MAX_LEAD = 6.0F;
+    private static final float RESUME_VISUAL_SPEED_FRACTION = 0.45F;
     private static final long MAX_SCAN_VOLUME = 4_000_000L;
 
-    private static final float RESEED_INTERVAL_TICKS = 3.0F;
+    private static final float NUCLEUS_COMMIT_INTERVAL_TICKS = 1.0F;
+    private static final double NUCLEUS_SAMPLE_SPACING = 0.22D;
+    private static final int NUCLEUS_MAX_SAMPLES = 384;
+    private static final int NUCLEUS_MAX_CONSECUTIVE_MISSES = 3;
+    private static final double NUCLEUS_LOCAL_RADIUS_SQR = 2.25D;
+    private static final float NUCLEUS_REVEAL_EPSILON = 0.03F;
+    private static final int NUCLEUS_RELAXATION_NODE_BUDGET = 768;
+    private static final float EDGE_OFF_RETAIN_PER_TICK = 0.72F;
+    private static final float EDGE_ON_RETAIN_PER_TICK = 0.30F;
+    private static final float DORMANT_EDGE_ACTIVITY = 0.58F;
 
     private static final AABB FULL_CUBE = new AABB(0.0D, 0.0D, 0.0D, 1.0D, 1.0D, 1.0D);
     private static final Direction[] DIRECTIONS = Direction.values();
@@ -110,7 +120,6 @@ public final class CompressionFieldRenderer {
 
     private enum Phase { ACQUIRING, SEALED, RELEASING }
 
-    // API
 
     public static void begin(
             final UUID subLevelId,
@@ -152,6 +161,26 @@ public final class CompressionFieldRenderer {
 
         field.lastPulseTick = AnimationTickHolder.getRenderTime(level);
         field.pulsePlotOrigin = aimedPointOn(level, sourcePlayerId, subLevelId);
+    }
+
+    public static void nucleate(final UUID subLevelId, final Vec3 worldPoint) {
+        if (subLevelId == null || worldPoint == null) return;
+
+        final Field field = ACTIVE.get(subLevelId);
+        if (field == null || field.phase != Phase.ACQUIRING || field.cellLimit > 0) return;
+
+        final Level level = Minecraft.getInstance().level;
+        if (level == null) return;
+
+        final SubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container == null) return;
+
+        final SubLevel found = container.getSubLevel(subLevelId);
+        if (!(found instanceof final ClientSubLevel subLevel) || subLevel.isRemoved()) return;
+
+        final Vector3d plot = subLevel.renderPose().transformPositionInverse(
+                new Vector3d(worldPoint.x, worldPoint.y, worldPoint.z));
+        queueBeamNuclei(field, new Vec3(plot.x, plot.y, plot.z));
     }
 
     private static Vec3 aimedPointOn(final Level level, final UUID playerId, final UUID subLevelId) {
@@ -220,7 +249,6 @@ public final class CompressionFieldRenderer {
         return field != null && field.phase != Phase.RELEASING;
     }
 
-    // Render
     public static void render(final RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
             PocketClientFrame.captureFrustum(event.getFrustum());
@@ -248,13 +276,8 @@ public final class CompressionFieldRenderer {
             final Field field = ACTIVE.get(id);
             if (field == null) continue;
 
-            if (field.pendingSeed != null && field.surface != null
-                    && renderTicks - field.lastReseedTick >= RESEED_INTERVAL_TICKS) {
-                reseed(field, subLevel, renderTicks);
-            }
-
             if (field.surface == null) {
-                field.surface = buildSurface(subLevel, field.seed, null, field);
+                field.surface = buildSurface(subLevel, field.seed, field);
                 if (field.surface == null || field.surface.faces().isEmpty()) {
                     ACTIVE.remove(id);
                     continue;
@@ -268,8 +291,21 @@ public final class CompressionFieldRenderer {
                 field.sealedMesh = CompressionFieldMesh.upload(field.surface.sealedFaces());
             }
 
+            if (field.pendingBeamPlotPoint != null) {
+                final Vec3 pending = field.pendingBeamPlotPoint;
+                field.pendingBeamPlotPoint = null;
+                queueBeamNuclei(field, pending);
+            }
+            if (field.pendingSeed != null) {
+                final MutableCell pending = nearestCell(field.scan, field.pendingSeed);
+                field.pendingSeed = null;
+                if (pending != null) queueNucleus(field, pending, field.front);
+            }
             final float resistance = resistanceOf(subLevel);
-            advance(field, renderTicks, resistance);
+            final boolean acquisitionActive = field.acquired
+                    || !CompressionBeamRenderer.hasLockedTarget(id)
+                    || CompressionBeamRenderer.isAimingAt(id);
+            advance(field, renderTicks, resistance, acquisitionActive);
 
             if (field.phase == Phase.RELEASING && field.front <= 0.0F) {
                 field.dispose();
@@ -279,7 +315,9 @@ public final class CompressionFieldRenderer {
 
             if (!PocketClientFrame.isPotentiallyVisible(subLevel)) continue;
 
-            draw(event, camera, subLevel, field, renderTicks, resistance);
+            if (acquisitionActive) commitNuclei(field, renderTicks);
+            draw(event, camera, subLevel, field, renderTicks, resistance,
+                    field.phase == Phase.ACQUIRING && !acquisitionActive);
         }
     }
 
@@ -289,7 +327,8 @@ public final class CompressionFieldRenderer {
             final ClientSubLevel subLevel,
             final Field field,
             final float renderTicks,
-            final float resistance
+            final float resistance,
+            final boolean halted
     ) {
         final var shader = PocketShaders.compressionField();
         if (shader == null) return;
@@ -325,6 +364,8 @@ public final class CompressionFieldRenderer {
             final float shudder = 0.5F + 0.5F * Mth.sin(renderTicks * GRIND_SLOW * 2.7F + 0.9F);
             strain = STRAIN_BOOST * (0.25F + 0.75F * grind * grind * shudder)
                     * (0.35F + 0.65F * resistance);
+        } else if (field.phase == Phase.ACQUIRING && field.edgeActivity < 0.999F) {
+            strain = -(1.0F - field.edgeActivity);
         }
 
         final Vector3f pulseOrigin = pulseOrigin(field, baked);
@@ -346,46 +387,160 @@ public final class CompressionFieldRenderer {
                 modelView,
                 event.getProjectionMatrix(),
                 localCamera,
+                new Vector3f((float) baked.x(), (float) baked.y(), (float) baked.z()),
                 epsilon,
-                field.front,
+                field.visualFront,
                 FRONT_WIDTH,
                 pulseOrigin,
                 pulseRadius(field, renderTicks, pulseOrigin),
                 PULSE_WIDTH,
                 PULSE_CELL,
                 strain,
+                renderTicks,
+                halted ? 1.0F : 0.0F,
                 field.growing ? GROW_SHEEN : SHRINK_SHEEN,
                 field.growing ? GROW_FRONT : SHRINK_FRONT
         );
     }
 
-    private static void reseed(final Field field, final ClientSubLevel subLevel, final float renderTicks) {
-        final BlockPos newSeed = field.pendingSeed;
-        field.pendingSeed = null;
-        field.lastReseedTick = renderTicks;
-        if (newSeed == null) return;
+    private static void queueBeamNuclei(final Field field, final Vec3 plotPoint) {
+        if (field == null || plotPoint == null) return;
 
-        final LongSet covered = new LongOpenHashSet();
-        for (final Long2FloatMap.Entry entry : field.surface.distances().long2FloatEntrySet()) {
-            if (entry.getFloatValue() <= field.front) covered.add(entry.getLongKey());
+        final VoxelScan scan = field.scan;
+        if (scan == null || field.surface == null) {
+            field.pendingBeamPlotPoint = plotPoint;
+            return;
         }
 
-        final SurfaceCache rebuilt = buildSurface(subLevel, newSeed, covered, field);
-        if (rebuilt == null || rebuilt.faces().isEmpty()) return;
+        final Vec3 previous = field.lastBeamPlotPoint;
+        field.lastBeamPlotPoint = plotPoint;
 
-        final CompressionFieldMesh mesh = CompressionFieldMesh.upload(rebuilt.faces());
-        if (mesh == null) return;
-        final CompressionFieldMesh sealedMesh = CompressionFieldMesh.upload(rebuilt.sealedFaces());
+        if (previous != null) {
+            final double distance = previous.distanceTo(plotPoint);
+            if (distance > 1.0E-4D) {
+                final int steps = Math.min(
+                        NUCLEUS_MAX_SAMPLES,
+                        Math.max(1, Mth.ceil(distance / NUCLEUS_SAMPLE_SPACING)));
+                int misses = 0;
+                long lastKey = Long.MIN_VALUE;
+                for (int i = 1; i < steps; i++) {
+                    final Vec3 sample = previous.lerp(plotPoint, i / (double) steps);
+                    final MutableCell cell = nearestSurfaceCell(scan, sample);
+                    if (cell == null) {
+                        if (++misses >= NUCLEUS_MAX_CONSECUTIVE_MISSES) break;
+                        continue;
+                    }
+                    misses = 0;
+                    if (cell.key == lastKey) continue;
+                    lastKey = cell.key;
+                    queueNucleus(field, cell, field.front);
+                }
+            }
+        }
 
-        field.dispose();
-        field.seed = newSeed;
-        field.surface = rebuilt;
-        field.mesh = mesh;
-        field.sealedMesh = sealedMesh;
-        field.shape = null;
+        final MutableCell cell = nearestSurfaceCell(scan, plotPoint);
+        if (cell != null) queueNucleus(field, cell, field.front);
+    }
 
-        field.front = 0.0F;
-        if (field.phase == Phase.SEALED) field.phase = Phase.ACQUIRING;
+    private static void queueNucleus(final Field field, final MutableCell cell, final float front) {
+        if (field == null || cell == null) return;
+        if (field.nuclei.contains(cell.key)) return;
+
+        final float queued = field.pendingNuclei.get(cell.key);
+        if (!Float.isFinite(queued) || front < queued) {
+            field.pendingNuclei.put(cell.key, Math.max(0.0F, front));
+        }
+    }
+
+    private static void commitNuclei(final Field field, final float renderTicks) {
+        if (field == null || field.phase != Phase.ACQUIRING) return;
+        if (field.scan == null || field.surface == null) return;
+        if (field.pendingNuclei.isEmpty()
+                && (field.relaxationQueue == null || field.relaxationQueue.isEmpty())) return;
+        if (renderTicks - field.lastNucleusCommitTick < NUCLEUS_COMMIT_INTERVAL_TICKS) return;
+
+        field.lastNucleusCommitTick = renderTicks;
+
+        final MutableCell[] cells = field.scan.cells();
+        IndexedMinHeap queue = field.relaxationQueue;
+        if (queue == null || queue.capacity() != cells.length) {
+            queue = new IndexedMinHeap(cells);
+            field.relaxationQueue = queue;
+        }
+
+        for (final it.unimi.dsi.fastutil.longs.Long2FloatMap.Entry entry
+                : field.pendingNuclei.long2FloatEntrySet()) {
+            final long key = entry.getLongKey();
+            final float sourceFront = entry.getFloatValue();
+            field.nuclei.add(key);
+
+            final MutableCell cell = field.scan.byKey().get(key);
+            if (cell == null) continue;
+
+            final float sourceRoute = Math.max(
+                    0.0F,
+                    sourceFront - jitter(cell.key) * JITTER_AMOUNT - NUCLEUS_REVEAL_EPSILON);
+            if (sourceRoute >= cell.routeDistance - 1.0E-4F) continue;
+
+            cell.routeDistance = sourceRoute;
+            lowerVisualDistance(field, cell, sourceRoute);
+            queue.offerOrDecrease(cell.index);
+        }
+        field.pendingNuclei.clear();
+
+        int processed = 0;
+        while (processed < NUCLEUS_RELAXATION_NODE_BUDGET && !queue.isEmpty()) {
+            final int currentIndex = queue.poll();
+            final MutableCell current = cells[currentIndex];
+            final int base = currentIndex * SURFACE_NEIGHBOUR_COUNT;
+
+            for (int n = 0; n < SURFACE_NEIGHBOUR_COUNT; n++) {
+                final int nextIndex = field.scan.neighbours()[base + n];
+                if (nextIndex < 0) continue;
+
+                final MutableCell next = cells[nextIndex];
+                final float candidate = current.routeDistance + NEIGHBOUR_COST[n];
+                if (candidate >= next.routeDistance - 1.0E-4F) continue;
+
+                next.routeDistance = candidate;
+                lowerVisualDistance(field, next, candidate);
+                queue.offerOrDecrease(nextIndex);
+            }
+            processed++;
+        }
+
+        refreshActiveMesh(field);
+    }
+
+    private static void lowerVisualDistance(
+            final Field field,
+            final MutableCell cell,
+            final float distance
+    ) {
+        if (distance >= cell.distance - 1.0E-4F) return;
+
+        cell.distance = distance;
+        final SurfaceCache surface = field.surface;
+        if (surface == null || cell.faceCount <= 0) return;
+
+        final float rendered = renderDistance(cell);
+        final List<CompressionFieldMesh.Face> faces = surface.faces();
+        final int end = Math.min(faces.size(), cell.faceStart + cell.faceCount);
+        for (int i = cell.faceStart; i < end; i++) {
+            faces.get(i).setDistance(rendered);
+        }
+
+        field.dirtyDirectionMask |= cell.exposedMask;
+        field.meshDirty = true;
+    }
+
+    private static void refreshActiveMesh(final Field field) {
+        if (!field.meshDirty || field.mesh == null) return;
+
+        final int directions = field.dirtyDirectionMask;
+        field.meshDirty = false;
+        field.dirtyDirectionMask = 0;
+        if (directions != 0) field.mesh.refresh(directions);
     }
 
     private static Vector3f pulseOrigin(final Field field, final Vector3dc baked) {
@@ -416,7 +571,12 @@ public final class CompressionFieldRenderer {
         return (age / PULSE_TRAVEL_TICKS) * span;
     }
 
-    private static void advance(final Field field, final float renderTicks, final float resistance) {
+    private static void advance(
+            final Field field,
+            final float renderTicks,
+            final float resistance,
+            final boolean acquiring
+    ) {
         final float deltaTicks = field.lastRenderTick < 0.0F
                 ? 0.0F
                 : Mth.clamp(renderTicks - field.lastRenderTick, 0.0F, 4.0F);
@@ -428,13 +588,18 @@ public final class CompressionFieldRenderer {
             final float retractPerTick = sealDistance / Math.max(1.0F, field.acquireTicks)
                     * RETRACT_SPEED_MULTIPLIER;
             field.front = Math.max(0.0F, field.front - retractPerTick * deltaTicks);
+            field.visualFront = Math.max(field.front, field.visualFront - retractPerTick * deltaTicks);
+            field.edgeActivity = 1.0F;
             field.progress = Mth.clamp(
                     field.front / Math.max(1.0E-4F, field.surface.maxDistance()), 0.0F, 1.0F);
             return;
         }
 
-        final float elapsed = Math.max(0.0F, renderTicks - field.startRenderTick);
-        final float u = Mth.clamp(elapsed / field.acquireTicks, 0.0F, 1.0F);
+        final float previousFront = field.front;
+        if (field.phase == Phase.ACQUIRING && acquiring) {
+            field.acquireElapsedTicks = Math.min(field.acquireTicks, field.acquireElapsedTicks + deltaTicks);
+        }
+        final float u = Mth.clamp(field.acquireElapsedTicks / field.acquireTicks, 0.0F, 1.0F);
 
         if (field.acquired) {
             field.front = Math.max(field.front, u * sealDistance);
@@ -443,12 +608,50 @@ public final class CompressionFieldRenderer {
             field.front = Math.max(field.front, sampleShape(field.shape, u) * sealDistance);
         }
 
+        if (field.visualFront < field.front) field.visualFront = field.front;
+
+        if (field.phase == Phase.ACQUIRING) {
+            if (acquiring) {
+                final float logicalVelocity = deltaTicks <= 1.0E-4F
+                        ? 0.0F
+                        : Math.max(0.0F, (field.front - previousFront) / deltaTicks);
+                field.drivenVelocity = Math.max(logicalVelocity, field.drivenVelocity * 0.65F);
+                field.coastVelocity = field.drivenVelocity;
+                field.edgeActivity = easeRetained(
+                        field.edgeActivity, 1.0F, EDGE_ON_RETAIN_PER_TICK, deltaTicks);
+
+                if (field.visualFront > field.front + 1.0E-4F && deltaTicks > 0.0F) {
+                    field.visualFront = Math.min(
+                            sealDistance,
+                            field.visualFront + field.drivenVelocity
+                                    * RESUME_VISUAL_SPEED_FRACTION * deltaTicks);
+                    if (field.visualFront < field.front) field.visualFront = field.front;
+                } else {
+                    field.visualFront = field.front;
+                }
+            } else {
+                field.edgeActivity = easeRetained(
+                        field.edgeActivity, DORMANT_EDGE_ACTIVITY, EDGE_OFF_RETAIN_PER_TICK, deltaTicks);
+                if (deltaTicks > 0.0F && field.coastVelocity > 1.0E-4F) {
+                    final float lead = Math.max(0.0F, field.visualFront - field.front);
+                    final float room = Math.max(0.0F, COAST_MAX_LEAD - lead);
+                    final float move = Math.min(room, field.coastVelocity * deltaTicks);
+                    field.visualFront = Math.min(sealDistance, field.visualFront + move);
+                    field.coastVelocity *= (float) Math.pow(
+                            COAST_VELOCITY_RETAIN_PER_TICK, deltaTicks);
+                    if (field.coastVelocity < 1.0E-4F) field.coastVelocity = 0.0F;
+                }
+            }
+        }
+
         if (u >= 1.0F) {
             field.front = sealDistance;
+            field.visualFront = sealDistance;
             if (field.cellLimit > 0) return;
             if (field.phase == Phase.ACQUIRING) {
                 field.phase = Phase.SEALED;
                 field.sealedTicks = 0.0F;
+                field.edgeActivity = 1.0F;
             } else {
                 field.sealedTicks += deltaTicks;
             }
@@ -457,6 +660,17 @@ public final class CompressionFieldRenderer {
         field.progress = field.surface.maxDistance() <= 1.0E-4F
                 ? 1.0F
                 : Mth.clamp(field.front / field.surface.maxDistance(), 0.0F, 1.0F);
+    }
+
+    private static float easeRetained(
+            final float value,
+            final float target,
+            final float retainPerTick,
+            final float deltaTicks
+    ) {
+        if (deltaTicks <= 0.0F) return value;
+        final float retain = (float) Math.pow(retainPerTick, deltaTicks);
+        return target + (value - target) * retain;
     }
 
     private static float[] buildShape(final Field field, final float resistance) {
@@ -497,12 +711,10 @@ public final class CompressionFieldRenderer {
         return Mth.clamp((float) (depth / 4.0D), 0.0F, 1.0F);
     }
 
-    // Surface
 
     private static SurfaceCache buildSurface(
             final ClientSubLevel subLevel,
             final BlockPos requestedHit,
-            final LongSet covered,
             final Field field
     ) {
         final VoxelScan scan = scanFor(subLevel, field);
@@ -516,31 +728,26 @@ public final class CompressionFieldRenderer {
 
         float maxDistance = 0.0F;
         for (final MutableCell cell : scan.cells()) {
-            float distance = cell.distance;
-            if (!Float.isFinite(distance)) {
+            if (!Float.isFinite(cell.routeDistance)) {
                 final double dx = cell.x - requestedHit.getX();
                 final double dy = cell.y - requestedHit.getY();
                 final double dz = cell.z - requestedHit.getZ();
-                distance = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+                cell.routeDistance = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
             }
-            if (covered != null && covered.contains(cell.key)) {
-                distance = 0.0F;
-            } else {
-                distance = Math.max(0.0F, distance + jitter(cell.key) * JITTER_AMOUNT);
-            }
-            cell.distance = distance;
-            maxDistance = Math.max(maxDistance, cell.distance);
+            if (!Float.isFinite(cell.distance)) cell.distance = cell.routeDistance;
+            maxDistance = Math.max(maxDistance, renderDistance(cell));
         }
+
+        field.nuclei.add(seed.key);
+        field.relaxationQueue = new IndexedMinHeap(scan.cells());
 
         final Vector3dc pivot = new Vector3d(subLevel.renderPose().rotationPoint());
         final List<CompressionFieldMesh.Face> faces = new ArrayList<>();
-        final Long2FloatOpenHashMap distances = new Long2FloatOpenHashMap(scan.cells().length * 2);
-        distances.defaultReturnValue(Float.POSITIVE_INFINITY);
 
         float maxRadius = 0.0F;
         for (final MutableCell cell : scan.cells()) {
-            emitFaces(faces, cell, pivot, cell.distance);
-            distances.put(cell.key, cell.distance);
+            final float distance = renderDistance(cell);
+            emitFaces(faces, cell, pivot, distance);
 
             final double rx = cell.x + 0.5D - pivot.x();
             final double ry = cell.y + 0.5D - pivot.y();
@@ -558,8 +765,7 @@ public final class CompressionFieldRenderer {
                 maxDistance,
                 maxRadius,
                 scan.cells().length,
-                pivot,
-                distances
+                pivot
         );
     }
 
@@ -569,11 +775,14 @@ public final class CompressionFieldRenderer {
             final Vector3dc pivot,
             final float distance
     ) {
+        final int start = output.size();
         final int mask = cell.exposedMask;
         for (final Direction direction : DIRECTIONS) {
             if ((mask & (1 << direction.ordinal())) == 0) continue;
             emitFace(output, cell, pivot, direction, distance);
         }
+        cell.faceStart = start;
+        cell.faceCount = output.size() - start;
     }
 
     private static void emitFace(
@@ -922,10 +1131,13 @@ public final class CompressionFieldRenderer {
     }
 
     private static void solveSurfaceDistances(final VoxelScan scan, final MutableCell seed) {
-        for (final MutableCell cell : scan.cells()) cell.distance = Float.POSITIVE_INFINITY;
+        for (final MutableCell cell : scan.cells()) {
+            cell.routeDistance = Float.POSITIVE_INFINITY;
+            cell.distance = Float.POSITIVE_INFINITY;
+        }
 
         final IndexedMinHeap queue = new IndexedMinHeap(scan.cells());
-        seed.distance = 0.0F;
+        seed.routeDistance = 0.0F;
         queue.offerOrDecrease(seed.index);
 
         while (!queue.isEmpty()) {
@@ -938,13 +1150,15 @@ public final class CompressionFieldRenderer {
                 if (nextIndex < 0) continue;
 
                 final MutableCell next = scan.cells()[nextIndex];
-                final float candidate = current.distance + NEIGHBOUR_COST[n];
-                if (candidate < next.distance) {
-                    next.distance = candidate;
+                final float candidate = current.routeDistance + NEIGHBOUR_COST[n];
+                if (candidate < next.routeDistance) {
+                    next.routeDistance = candidate;
                     queue.offerOrDecrease(nextIndex);
                 }
             }
         }
+
+        for (final MutableCell cell : scan.cells()) cell.distance = cell.routeDistance;
     }
 
     private static void sealEnclosedPockets(final VoxelScan scan) {
@@ -986,6 +1200,52 @@ public final class CompressionFieldRenderer {
         }
     }
 
+    private static MutableCell nearestSurfaceCell(final VoxelScan scan, final Vec3 point) {
+        if (scan == null || point == null) return null;
+
+        final int bx = Mth.floor(point.x);
+        final int by = Mth.floor(point.y);
+        final int bz = Mth.floor(point.z);
+
+        MutableCell best = null;
+        double bestDistance = Double.POSITIVE_INFINITY;
+
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    final MutableCell cell = scan.byKey().get(BlockPos.asLong(bx + dx, by + dy, bz + dz));
+                    if (cell == null) continue;
+
+                    final double minX = cell.x + cell.shape.minX;
+                    final double minY = cell.y + cell.shape.minY;
+                    final double minZ = cell.z + cell.shape.minZ;
+                    final double maxX = cell.x + cell.shape.maxX;
+                    final double maxY = cell.y + cell.shape.maxY;
+                    final double maxZ = cell.z + cell.shape.maxZ;
+
+                    final double px = Mth.clamp(point.x, minX, maxX);
+                    final double py = Mth.clamp(point.y, minY, maxY);
+                    final double pz = Mth.clamp(point.z, minZ, maxZ);
+                    final double ddx = point.x - px;
+                    final double ddy = point.y - py;
+                    final double ddz = point.z - pz;
+                    final double d2 = ddx * ddx + ddy * ddy + ddz * ddz;
+
+                    if (d2 < bestDistance) {
+                        bestDistance = d2;
+                        best = cell;
+                    }
+                }
+            }
+        }
+
+        return bestDistance <= NUCLEUS_LOCAL_RADIUS_SQR ? best : null;
+    }
+
+    private static float renderDistance(final MutableCell cell) {
+        return Math.max(0.0F, cell.distance + jitter(cell.key) * JITTER_AMOUNT);
+    }
+
     private static MutableCell nearestCell(final VoxelScan scan, final BlockPos hit) {
         final MutableCell exact = scan.byKey().get(hit.asLong());
         if (exact != null) return exact;
@@ -1015,13 +1275,20 @@ public final class CompressionFieldRenderer {
         return ((h & 0xFFFFL) / 65535.0F) * 2.0F - 1.0F;
     }
 
-    // State
     private static final class Field {
-        private BlockPos seed;
+        private final BlockPos seed;
         private volatile BlockPos pendingSeed;
-        private float lastReseedTick = -1000.0F;
+        private final LongSet nuclei = new LongOpenHashSet();
+        private final Long2FloatOpenHashMap pendingNuclei = new Long2FloatOpenHashMap();
+        private Vec3 lastBeamPlotPoint;
+        private Vec3 pendingBeamPlotPoint;
+        private IndexedMinHeap relaxationQueue;
+        private int dirtyDirectionMask;
+        private boolean meshDirty;
+        private float lastNucleusCommitTick = -1000.0F;
         private final float startRenderTick;
         private final int acquireTicks;
+        private float acquireElapsedTicks;
 
         private SurfaceCache surface;
 
@@ -1031,6 +1298,10 @@ public final class CompressionFieldRenderer {
         private float[] shape;
         private volatile Phase phase = Phase.ACQUIRING;
         private float front;
+        private float visualFront;
+        private float drivenVelocity;
+        private float coastVelocity;
+        private float edgeActivity = 1.0F;
         private float lastRenderTick = -1.0F;
         private volatile float sealedTicks;
         private volatile float progress;
@@ -1046,6 +1317,7 @@ public final class CompressionFieldRenderer {
             this.seed = hitPos;
             this.startRenderTick = startRenderTick;
             this.acquireTicks = acquireTicks;
+            this.pendingNuclei.defaultReturnValue(Float.POSITIVE_INFINITY);
         }
 
         private float sealDistance() {
@@ -1072,8 +1344,7 @@ public final class CompressionFieldRenderer {
             float maxDistance,
             float maxRadius,
             int cellCount,
-            Vector3dc bakedPivot,
-            Long2FloatOpenHashMap distances
+            Vector3dc bakedPivot
     ) {}
 
     private record PlaneKey(Direction direction, long planeBits) {}
@@ -1086,6 +1357,9 @@ public final class CompressionFieldRenderer {
         private final int z;
         private final int exposedMask;
         private final AABB shape;
+        private int faceStart;
+        private int faceCount;
+        private float routeDistance = Float.POSITIVE_INFINITY;
         private float distance = Float.POSITIVE_INFINITY;
 
         private MutableCell(
@@ -1122,6 +1396,10 @@ public final class CompressionFieldRenderer {
 
         private boolean isEmpty() {
             return this.size == 0;
+        }
+
+        private int capacity() {
+            return this.heap.length;
         }
 
         private void offerOrDecrease(final int index) {
@@ -1188,7 +1466,7 @@ public final class CompressionFieldRenderer {
         }
 
         private boolean less(final int a, final int b) {
-            final int compared = Float.compare(this.cells[a].distance, this.cells[b].distance);
+            final int compared = Float.compare(this.cells[a].routeDistance, this.cells[b].routeDistance);
             return compared < 0 || (compared == 0 && a < b);
         }
     }

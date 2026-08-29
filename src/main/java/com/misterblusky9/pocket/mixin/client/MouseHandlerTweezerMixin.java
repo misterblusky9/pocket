@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.mixin.client;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.client.MoonPunchClient;
 import com.misterblusky9.pocket.client.TweezerDrag;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleState;
@@ -42,16 +43,21 @@ public abstract class MouseHandlerTweezerMixin {
             return;
         }
 
-        if (!TweezerDrag.acceptingInput()) return;
+        if (TweezerDrag.acceptingInput()) {
+            if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+                TweezerDrag.toggleDrag();
+                ci.cancel();
+                return;
+            }
 
-        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
-            TweezerDrag.toggleDrag();
-            ci.cancel();
+            if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                TweezerDrag.punch();
+                ci.cancel();
+            }
             return;
         }
 
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            TweezerDrag.punch();
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && MoonPunchClient.tryPunch()) {
             ci.cancel();
         }
     }

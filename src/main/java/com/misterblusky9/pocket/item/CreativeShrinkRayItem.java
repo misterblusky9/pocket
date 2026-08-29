@@ -1,24 +1,31 @@
 package com.misterblusky9.pocket.item;
 
-import com.misterblusky9.pocket.client.CreativeShrinkRayRenderer;
+import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.client.CompressionGunTargetingScreen;
+import com.misterblusky9.pocket.client.CreativeShrinkRayRenderer;
+import com.misterblusky9.pocket.client.MoonScaleClient;
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
-import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
-import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
-import java.util.function.Consumer;
+import com.misterblusky9.pocket.moon.MoonCompressionSessions;
+import com.misterblusky9.pocket.moon.MoonScale;
+import com.misterblusky9.pocket.moon.MoonTargeting;
+import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleController;
-import com.misterblusky9.pocket.pocket.PocketMetrics;
-import com.misterblusky9.pocket.PocketSized;
 import com.simibubi.create.AllDataComponents;
+import com.simibubi.create.CreateClient;
+import com.simibubi.create.content.equipment.zapper.ShootableGadgetItemMethods;
+import com.simibubi.create.content.equipment.zapper.ZapperBeamPacket;
 import com.simibubi.create.content.equipment.zapper.ZapperItem;
+import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
@@ -27,13 +34,18 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Consumer;
 
 public final class CreativeShrinkRayItem extends ZapperItem {
     private static final String STAGE_KEY = "PocketStage";
     private static final String TARGETING_MODE_KEY = "PocketTargetingMode";
+    private static final double RANGE = 192.0D;
 
     public CreativeShrinkRayItem(final Properties properties) {
         super(properties);
@@ -89,7 +101,6 @@ public final class CreativeShrinkRayItem extends ZapperItem {
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
     }
 
-
     @Override
     public InteractionResultHolder<ItemStack> use(
             final Level level,
@@ -97,8 +108,10 @@ public final class CreativeShrinkRayItem extends ZapperItem {
             final InteractionHand hand
     ) {
         final ItemStack stack = player.getItemInHand(hand);
-        if (!player.isShiftKeyDown() && targetingMode(stack) == CompressionGunTargetingMode.SELF) {
-            if (!level.isClientSide && player instanceof final net.minecraft.server.level.ServerPlayer serverPlayer) {
+        final CompressionGunTargetingMode targeting = targetingMode(stack);
+
+        if (!player.isShiftKeyDown() && targeting == CompressionGunTargetingMode.SELF) {
+            if (!level.isClientSide && player instanceof final ServerPlayer serverPlayer) {
                 if (!PehkuiScaleBridge.isOperational()) {
                     player.displayClientMessage(Component.literal("Pehkui integration unavailable"), true);
                 } else {
@@ -108,6 +121,50 @@ public final class CreativeShrinkRayItem extends ZapperItem {
             }
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
+
+        if (!player.isShiftKeyDown() && targeting != CompressionGunTargetingMode.SELF) {
+            final float moonScale = level.isClientSide
+                    ? MoonScaleClient.get()
+                    : player instanceof final ServerPlayer serverPlayer
+                            ? MoonScale.get(serverPlayer.serverLevel().getServer())
+                            : 1.0F;
+
+            final MoonTargeting.Hit moonHit = MoonTargeting.hit(
+                    player, moonScale, 1.0F, RANGE);
+            if (moonHit != null) {
+                if (ShootableGadgetItemMethods.shouldSwap(player, stack, hand, this::isZapper)) {
+                    return new InteractionResultHolder<>(InteractionResult.FAIL, stack);
+                }
+
+                if (level.isClientSide) {
+                    CreateClient.ZAPPER_RENDER_HANDLER.dontAnimateItem(hand);
+                    return new InteractionResultHolder<>(InteractionResult.SUCCESS, stack);
+                }
+
+                if (player instanceof final ServerPlayer serverPlayer) {
+                    MoonCompressionSessions.instant(serverPlayer, selectedStage(stack), moonHit);
+                    ShootableGadgetItemMethods.applyCooldown(
+                            player,
+                            stack,
+                            hand,
+                            this::isZapper,
+                            getCooldownDelay(stack)
+                    );
+                    final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
+                            player,
+                            hand == InteractionHand.MAIN_HAND,
+                            new Vec3(0.35D, -0.1D, 1.0D)
+                    );
+                    ShootableGadgetItemMethods.sendPackets(
+                            player,
+                            local -> new ZapperBeamPacket(barrel, hand, local, moonHit.worldPoint())
+                    );
+                }
+
+                return new InteractionResultHolder<>(InteractionResult.SUCCESS, stack);
+            }
+        }
+
         return super.use(level, player, hand);
     }
 
@@ -126,7 +183,7 @@ public final class CreativeShrinkRayItem extends ZapperItem {
 
     @Override
     protected int getZappingRange(final ItemStack stack) {
-        return 192;
+        return (int) RANGE;
     }
 
     @Override
@@ -167,7 +224,7 @@ public final class CreativeShrinkRayItem extends ZapperItem {
         final CompressionStage target = selectedStage(stack);
         final CompressionGunTargetingMode targeting = targetingMode(stack);
         if (targeting == CompressionGunTargetingMode.SELF) {
-            if (!(player instanceof final net.minecraft.server.level.ServerPlayer serverPlayer)) return false;
+            if (!(player instanceof final ServerPlayer serverPlayer)) return false;
             if (!PehkuiScaleBridge.isOperational()) {
                 player.displayClientMessage(Component.literal("Pehkui integration unavailable"), true);
                 return false;
@@ -181,7 +238,7 @@ public final class CreativeShrinkRayItem extends ZapperItem {
 
         boolean lockedOn = false;
         if (!(subLevel instanceof ServerSubLevel)
-                && player instanceof final net.minecraft.server.level.ServerPlayer holder) {
+                && player instanceof final ServerPlayer holder) {
             subLevel = com.misterblusky9.pocket.compression.CompressionSessions.lockedSubLevel(holder);
             lockedOn = subLevel != null;
         }
@@ -199,7 +256,7 @@ public final class CreativeShrinkRayItem extends ZapperItem {
             }
         }
 
-        if (player instanceof final net.minecraft.server.level.ServerPlayer serverPlayer) {
+        if (player instanceof final ServerPlayer serverPlayer) {
             com.misterblusky9.pocket.compression.CompressionSessions.instant(
                     serverPlayer, serverSubLevel, contact, target,
                     targeting == CompressionGunTargetingMode.CONNECTED_SUBLEVELS

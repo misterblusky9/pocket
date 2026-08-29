@@ -18,8 +18,8 @@ public final class ModItems {
             "empty_box", () -> new EmptyBoxItem(new Item.Properties())
     );
 
-    public static final DeferredItem<EmptyBoxItem> DISPLAY_CASE = ITEMS.register(
-            "display_case", () -> new EmptyBoxItem(new Item.Properties())
+    public static final DeferredItem<EmptyBoxItem> DISPLAY_BOTTLE = ITEMS.register(
+            "display_bottle", () -> new EmptyBoxItem(new Item.Properties())
     );
 
     public static final DeferredItem<EmptyBoxItem> BRASS_DISPLAY_CASE = ITEMS.register(
@@ -53,6 +53,11 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.PORTABLE_SUBSPACE_COMPRESSOR.get(), new Item.Properties())
     );
 
+    public static final DeferredItem<BlockItem> SUBSPACE_RECYCLER = ITEMS.register(
+            "subspace_recycler",
+            () -> new BlockItem(ModBlocks.SUBSPACE_RECYCLER.get(), new Item.Properties())
+    );
+
     public static final DeferredItem<TweezersItem> TWEEZERS = ITEMS.register(
             "tweezers", () -> new TweezersItem(new Item.Properties().stacksTo(1))
     );
@@ -60,6 +65,9 @@ public final class ModItems {
     public static final DeferredItem<ColliderWandItem> COLLIDER_WAND = ITEMS.register(
             "collider_wand", () -> new ColliderWandItem(new Item.Properties().stacksTo(1))
     );
+
+    public static final DeferredItem<TheMoonItem> THE_MOON =
+            ITEMS.register("the_moon", () -> new TheMoonItem(new Item.Properties().stacksTo(1)));
 
     private ModItems() {}
 }

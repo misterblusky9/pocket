@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:root",
+  "display": {
+    "icon": {
+      "id": "pocket:the_moon"
+    },
+    "title": {
+      "text": "The Nefario Principle"
+    },
+    "description": {
+      "text": "Unfortunately, the effects of subspace compression are only temporary on objects of sufficient mass."
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "criteria": {
+    "principle": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

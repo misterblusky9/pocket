@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.mixin.physics;
 
 import com.llamalad7.mixinextras.sugar.Local;
+import com.misterblusky9.pocket.compat.simulatedcoasters.SimulatedCoastersRivetCompat;
 import com.misterblusky9.pocket.physics.ConstraintRefresh;
 import com.misterblusky9.pocket.physics.ScaleFrame;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
@@ -44,12 +45,19 @@ public abstract class RapierConstraintAnchorScaleMixin {
             @Local(argsOnly = true, index = 1) final PhysicsPipelineBody body1,
             @Local(argsOnly = true, index = 2) final PhysicsPipelineBody body2
     ) {
+        pocket$originalConfiguration.remove();
+
         if (configuration == null) return null;
+        SimulatedCoastersRivetCompat.initializePlacementScale(body1, body2);
         if (!ScaleFrame.isScaled(body1) && !ScaleFrame.isScaled(body2)) return configuration;
 
         pocket$originalConfiguration.set(configuration);
 
         if (configuration instanceof final FixedConstraintConfiguration fixed) {
+            final FixedConstraintConfiguration rivet =
+                    SimulatedCoastersRivetCompat.transform(body1, body2, fixed);
+            if (rivet != null) return rivet;
+
             return new FixedConstraintConfiguration(
                     anchor(body1, fixed.pos1()),
                     anchor(body2, fixed.pos2()),

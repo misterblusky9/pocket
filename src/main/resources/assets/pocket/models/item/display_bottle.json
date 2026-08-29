@@ -1,0 +1,5 @@
+{
+  "credit": "Wrapper. Geometry is item/export/display_bottle.json - export Blockbench there, never over this file. render_type is declared HERE because it is what makes the glass draw see-through instead of opaque black, in the item, the dropped entity and the Flywheel-instanced entity alike; forcing a render type in code only ever fixed one of those three.",
+  "parent": "pocket:item/export/display_bottle",
+  "render_type": "minecraft:translucent"
+}

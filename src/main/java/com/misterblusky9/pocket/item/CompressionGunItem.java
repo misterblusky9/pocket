@@ -2,9 +2,12 @@ package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.client.CompressionGunRenderer;
 import com.misterblusky9.pocket.compression.CompressionSessions;
-import com.misterblusky9.pocket.compression.SelfCompressionSessions;
 import com.misterblusky9.pocket.compression.CompressionTargeting;
+import com.misterblusky9.pocket.compression.SelfCompressionSessions;
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
+import com.misterblusky9.pocket.moon.MoonCompressionSessions;
+import com.misterblusky9.pocket.moon.MoonScale;
+import com.misterblusky9.pocket.moon.MoonTargeting;
 import com.misterblusky9.pocket.network.CompressionBeamPayload;
 import com.misterblusky9.pocket.network.CompressionGunOpenMenuPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
@@ -104,8 +107,6 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem 
         final CompressionGunTargetingMode targeting = targetingMode(stack);
 
         if (targeting == CompressionGunTargetingMode.SELF) {
-            if (elapsed < CHARGE_TICKS) return;
-
             if (!PehkuiScaleBridge.isOperational()) {
                 player.displayClientMessage(Component.literal("Pehkui integration unavailable"), true);
                 return;
@@ -116,7 +117,19 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem 
             return;
         }
 
+        if (MoonCompressionSessions.renew(player, goal)) return;
         if (CompressionSessions.renew(player, goal)) return;
+
+        final MoonTargeting.Hit moonHit = MoonTargeting.hit(
+                player,
+                MoonScale.get(player.serverLevel().getServer()),
+                1.0F,
+                RANGE
+        );
+        if (moonHit != null) {
+            MoonCompressionSessions.hold(player, goal, player.getUsedItemHand(), moonHit);
+            return;
+        }
 
         final CompressionTargeting.Target target = CompressionTargeting.find(player, RANGE);
         if (target == null) return;
@@ -142,6 +155,7 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem 
     ) {
         if (!level.isClientSide && entity instanceof final ServerPlayer player) {
             CompressionSessions.releaseAll(player);
+            MoonCompressionSessions.release(player);
             SelfCompressionSessions.release(player);
             CompressionBeamPayload.send(player, false, false);
         }
@@ -151,6 +165,7 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem 
     public void onStopUsing(final ItemStack stack, final LivingEntity entity, final int count) {
         if (!entity.level().isClientSide && entity instanceof final ServerPlayer player) {
             CompressionSessions.releaseAll(player);
+            MoonCompressionSessions.release(player);
             SelfCompressionSessions.release(player);
             CompressionBeamPayload.send(player, false, false);
         }

@@ -124,7 +124,9 @@ public final class SubLevelParentage {
                     "parent stage propagated child={} parent={} stage={} from={}",
                     childId, parentId, commanded, childGoal);
 
-            ScaleController.forceStage(child, commanded, child.getLevel().getGameTime());
+            ScaleController.forceStage(
+                    child, commanded, child.getLevel().getGameTime(), null, true,
+                    com.misterblusky9.pocket.physics.ScalePhysicsTransitions.modeOf(parent));
         }
     }
 

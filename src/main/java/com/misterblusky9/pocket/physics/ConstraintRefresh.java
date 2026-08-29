@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.physics;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.debug.PocketTrace;
+import com.misterblusky9.pocket.moon.MoonPhysicsTarget;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.misterblusky9.pocket.scale.SubLevelParentage;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
@@ -47,6 +48,7 @@ public final class ConstraintRefresh {
             final PhysicsConstraintConfiguration<?> originalConfiguration
     ) {
         if (handle == null) return;
+        if (MoonPhysicsTarget.isBody(bodyA) || MoonPhysicsTarget.isBody(bodyB)) return;
 
         final UUID idA = idOf(bodyA);
         final UUID idB = idOf(bodyB);

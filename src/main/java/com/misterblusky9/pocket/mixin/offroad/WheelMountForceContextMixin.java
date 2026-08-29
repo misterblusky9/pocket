@@ -35,7 +35,7 @@ public abstract class WheelMountForceContextMixin {
             remap = false,
             require = 0
     )
-    private Vector3d pocket$froudeLocalVelocity(
+    private Vector3d pocket$scaleSuspensionVelocity(
             final Vector3d localVelocity,
             final ServerSubLevel subLevel,
             final RigidBodyHandle handle,
@@ -45,7 +45,9 @@ public abstract class WheelMountForceContextMixin {
         if (!PocketSized.isValidScale(scale) || Math.abs(scale - 1.0D) <= PocketSized.EPSILON) {
             return localVelocity;
         }
-        return localVelocity.mul(Math.sqrt(scale));
+
+        localVelocity.y *= Math.sqrt(scale);
+        return localVelocity;
     }
 
     @WrapOperation(

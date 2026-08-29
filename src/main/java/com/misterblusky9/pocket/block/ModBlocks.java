@@ -5,6 +5,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -20,6 +21,15 @@ public final class ModBlocks {
                             BlockBehaviour.Properties.ofFullCopy(Blocks.ANDESITE)
                                     .sound(SoundType.NETHERITE_BLOCK)
                                     .noOcclusion()
+                    )
+            );
+
+    public static final DeferredHolder<Block, SubspaceRecyclerBlock> SUBSPACE_RECYCLER =
+            BLOCKS.register(
+                    "subspace_recycler",
+                    () -> new SubspaceRecyclerBlock(
+                            BlockBehaviour.Properties.ofFullCopy(Blocks.ANDESITE)
+                                    .mapColor(MapColor.METAL)
                     )
             );
 

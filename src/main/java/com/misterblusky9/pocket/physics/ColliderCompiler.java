@@ -19,7 +19,6 @@ public final class ColliderCompiler {
 
     public record NativeImageKey(
             int bodyId,
-            long scaleBits,
             CompiledCollider.Bounds bounds,
             CompiledCollider.Mode mode,
             int sourceBoxCount,
@@ -115,10 +114,13 @@ public final class ColliderCompiler {
     }
 
     public static CompiledCollider.Bounds boundsFor(final ServerSubLevel subLevel) {
+        return boundsFor(subLevel, ScaleState.getServerScale(subLevel));
+    }
+
+    public static CompiledCollider.Bounds boundsFor(final ServerSubLevel subLevel, final double scale) {
         if (subLevel == null || subLevel.getPlot() == null) return null;
         final BoundingBox3ic source = subLevel.getPlot().getBoundingBox();
         final Vector3dc pivot = ScaleFrame.pivot(subLevel);
-        final double scale = ScaleState.getServerScale(subLevel);
         if (source == null || pivot == null || !PocketSized.isValidScale(scale)) return null;
 
         final double minX = ScaleFrame.contract(pivot.x(), source.minX(), scale);
@@ -193,7 +195,7 @@ public final class ColliderCompiler {
         }
 
         return new NativeImageKey(
-                bodyId, Double.doubleToLongBits(scale), bounds, mode, boxCount,
+                bodyId, bounds, mode, boxCount,
                 fingerprint.a, fingerprint.b);
     }
 

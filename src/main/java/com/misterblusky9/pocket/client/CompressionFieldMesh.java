@@ -17,15 +17,65 @@ import java.util.EnumMap;
 import java.util.List;
 
 public final class CompressionFieldMesh implements AutoCloseable {
-    public record Face(
-            Direction dir,
-            double plane,
-            double minU,
-            double maxU,
-            double minV,
-            double maxV,
-            float distance
-    ) {}
+    public static final class Face {
+        private final Direction dir;
+        private final double plane;
+        private final double minU;
+        private final double maxU;
+        private final double minV;
+        private final double maxV;
+        private float distance;
+
+        public Face(
+                final Direction dir,
+                final double plane,
+                final double minU,
+                final double maxU,
+                final double minV,
+                final double maxV,
+                final float distance
+        ) {
+            this.dir = dir;
+            this.plane = plane;
+            this.minU = minU;
+            this.maxU = maxU;
+            this.minV = minV;
+            this.maxV = maxV;
+            this.distance = distance;
+        }
+
+        public Direction dir() {
+            return this.dir;
+        }
+
+        public double plane() {
+            return this.plane;
+        }
+
+        public double minU() {
+            return this.minU;
+        }
+
+        public double maxU() {
+            return this.maxU;
+        }
+
+        public double minV() {
+            return this.minV;
+        }
+
+        public double maxV() {
+            return this.maxV;
+        }
+
+        public float distance() {
+            return this.distance;
+        }
+
+        public void setDistance(final float distance) {
+            this.distance = distance;
+        }
+    }
 
     private final DirectionBuffer[] buffers = new DirectionBuffer[Direction.values().length];
     private final int quadCount;
@@ -74,26 +124,49 @@ public final class CompressionFieldMesh implements AutoCloseable {
     }
 
     private static DirectionBuffer uploadDirection(final Direction direction, final List<Face> faces) {
+        double minPlane = Double.POSITIVE_INFINITY;
+        double maxPlane = Double.NEGATIVE_INFINITY;
+        for (final Face face : faces) {
+            minPlane = Math.min(minPlane, face.plane());
+            maxPlane = Math.max(maxPlane, face.plane());
+        }
+
+        final VertexBuffer buffer = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+        if (!uploadInto(buffer, faces)) {
+            buffer.close();
+            return null;
+        }
+        return new DirectionBuffer(
+                direction,
+                buffer,
+                new ArrayList<>(faces),
+                faces.size(),
+                minPlane,
+                maxPlane);
+    }
+
+    private static boolean uploadInto(final VertexBuffer buffer, final List<Face> faces) {
         try (ByteBufferBuilder scratch = new ByteBufferBuilder(Math.max(256, faces.size() * 4 * 24))) {
             final BufferBuilder builder = new BufferBuilder(
                     scratch, VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-
-            double minPlane = Double.POSITIVE_INFINITY;
-            double maxPlane = Double.NEGATIVE_INFINITY;
-            for (final Face face : faces) {
-                emit(builder, face);
-                minPlane = Math.min(minPlane, face.plane());
-                maxPlane = Math.max(maxPlane, face.plane());
-            }
+            for (final Face face : faces) emit(builder, face);
 
             final MeshData mesh = builder.build();
-            if (mesh == null) return null;
+            if (mesh == null) return false;
 
-            final VertexBuffer buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
             buffer.bind();
             buffer.upload(mesh);
             VertexBuffer.unbind();
-            return new DirectionBuffer(direction, buffer, faces.size(), minPlane, maxPlane);
+            return true;
+        }
+    }
+
+    public void refresh(final int directionMask) {
+        if (directionMask == 0) return;
+        for (final Direction direction : Direction.values()) {
+            if ((directionMask & (1 << direction.ordinal())) == 0) continue;
+            final DirectionBuffer part = this.buffers[direction.ordinal()];
+            if (part != null) part.refresh();
         }
     }
 
@@ -102,6 +175,7 @@ public final class CompressionFieldMesh implements AutoCloseable {
             final Matrix4f modelView,
             final Matrix4f projection,
             final Vector3f localCamera,
+            final Vector3f gridOrigin,
             final float faceOffset,
             final float frontDistance,
             final float frontWidth,
@@ -110,6 +184,8 @@ public final class CompressionFieldMesh implements AutoCloseable {
             final float pulseWidth,
             final float pulseCell,
             final float strain,
+            final float shimmerTime,
+            final float halted,
             final float[] sheenColour,
             final float[] frontColour
     ) {
@@ -122,7 +198,11 @@ public final class CompressionFieldMesh implements AutoCloseable {
         setUniform(shader, "PulseWidth", pulseWidth);
         setUniform(shader, "PulseCell", pulseCell);
         setUniform(shader, "Strain", strain);
+        setUniform(shader, "ShimmerTime", shimmerTime);
+        setUniform(shader, "Halted", halted);
 
+        final var gridUniform = shader.getUniform("GridOrigin");
+        if (gridUniform != null) gridUniform.set(gridOrigin.x, gridOrigin.y, gridOrigin.z);
         final var originUniform = shader.getUniform("PulseOrigin");
         if (originUniform != null) originUniform.set(pulseOrigin.x, pulseOrigin.y, pulseOrigin.z);
         final var sheen = shader.getUniform("SheenColor");
@@ -246,6 +326,7 @@ public final class CompressionFieldMesh implements AutoCloseable {
 
         private final Direction direction;
         private final VertexBuffer buffer;
+        private final List<Face> faces;
         private final int quadCount;
         private final double minPlane;
         private final double maxPlane;
@@ -253,15 +334,21 @@ public final class CompressionFieldMesh implements AutoCloseable {
         private DirectionBuffer(
                 final Direction direction,
                 final VertexBuffer buffer,
+                final List<Face> faces,
                 final int quadCount,
                 final double minPlane,
                 final double maxPlane
         ) {
             this.direction = direction;
             this.buffer = buffer;
+            this.faces = faces;
             this.quadCount = quadCount;
             this.minPlane = minPlane;
             this.maxPlane = maxPlane;
+        }
+
+        private void refresh() {
+            uploadInto(this.buffer, this.faces);
         }
 
         private boolean mayFace(final Vector3f camera) {

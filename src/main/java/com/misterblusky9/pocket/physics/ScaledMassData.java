@@ -57,7 +57,7 @@ public final class ScaledMassData implements MassData {
 
     @Override
     public double getInverseNormalMass(final Vector3dc position, final Vector3dc direction) {
-        return this.delegate.getInverseNormalMass(position, direction) / this.scale3;
+        return this.delegate.getInverseNormalMass(position, direction) / this.massScale();
     }
 
     public MassData delegate() {

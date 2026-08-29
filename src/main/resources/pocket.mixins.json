@@ -28,6 +28,7 @@
     "interaction.PlacementMarginMixin",
     "interaction.PlacementDiagnosticMixin",
     "collision.SubLevelEntityCollisionMixin",
+    "collision.PlayerSubLevelEdgeScaleMixin",
     "entity.EntityDimensionsScaleMixin",
     "entity.SablePehkuiRiderPositionMixin",
     "entity.LivingEntityDimensionsScaleMixin",
@@ -36,7 +37,12 @@
     "create.PackagerUnwrapGuardMixin",
     "create.PackageEntityDropMixin",
     "simulated.PhysicsAssemblerDisassemblyScaleMixin",
-    "createbigcannons.CannonSurfaceNormalMixin"
+    "simulated.LaunchedPlungerMoonMixin",
+    "createbigcannons.CannonSurfaceNormalMixin",
+    "sable.MoonSubLevelLookupMixin",
+    "sable.MoonPlotLookupMixin",
+    "sable.MoonConstraintAnchorMixin",
+    "simulated.StickerMoonTargetMixin"
   ],
   "client": [
     "client.ClientSubLevelMixin",
@@ -46,6 +52,9 @@
     "client.SingleBlockSubLevelScaleMixin",
     "client.SubLevelOutlineCameraMixin",
     "simulated.RopeStrandScaleMixin",
+    "simulated.PhysicsStaffMoonPickMixin",
+    "simulated.PhysicsStaffMoonAnchorMixin",
+    "client.MoonClientPlotLookupMixin",
     "client.SubLevelRenderOffsetScaleMixin",
     "client.MouseHandlerTweezerMixin",
     "client.OutlineFaceCullMixin",
@@ -54,7 +63,9 @@
     "client.SubLevelBlockEntityLodMixin",
     "client.ComputerCraftMonitorRenderDistanceMixin",
     "client.FlywheelSubLevelScaleMixin",
-    "client.SingleQuadParticleScaleMixin",
+    "client.ParticleMotionAccessor",
+    "client.TerrainParticleScaleMixin",
+    "client.TerrainParticleCollisionGraceMixin",
     "client.DiagramScaleOverlayMixin",
     "client.SubLevelEntityRenderScaleMixin",
     "client.SubLevelSnapshotInterpolatorAccessor",
@@ -66,7 +77,8 @@
     "create.ContraptionHandlerClientScaleMixin",
     "create.CarriageCouplingScaleMixin",
     "create.TrackMarkerScaleMixin",
-    "create.TrackPlacementLineScaleMixin"
+    "create.TrackPlacementLineScaleMixin",
+    "client.MoonScaleMixin"
   ],
   "injectors": {
     "defaultRequire": 1

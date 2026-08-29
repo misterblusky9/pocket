@@ -100,8 +100,24 @@ public final class CompressionBeamRenderer {
     public static Vec3 landingOn(final UUID playerId, final UUID subLevelId) {
         if (playerId == null || subLevelId == null) return null;
         final Beam beam = ACTIVE.get(playerId);
-        if (beam == null || !subLevelId.equals(beam.lockedTarget)) return null;
+        if (beam == null || !subLevelId.equals(beam.lockedTarget) || !beam.targetSurface) return null;
         return beam.endpoint;
+    }
+
+    public static boolean hasLockedTarget(final UUID subLevelId) {
+        if (subLevelId == null) return false;
+        for (final Beam beam : ACTIVE.values()) {
+            if (subLevelId.equals(beam.lockedTarget)) return true;
+        }
+        return false;
+    }
+
+    public static boolean isAimingAt(final UUID subLevelId) {
+        if (subLevelId == null) return false;
+        for (final Beam beam : ACTIVE.values()) {
+            if (subLevelId.equals(beam.lockedTarget) && beam.targetSurface) return true;
+        }
+        return false;
     }
 
     public static void clearTarget(final UUID subLevelId) {
@@ -184,7 +200,7 @@ public final class CompressionBeamRenderer {
         return start.add(local.xRot(pitch).yRot(yaw));
     }
 
-    private record Landing(Vec3 point, boolean struck) {}
+    private record Landing(Vec3 point, boolean struck, boolean targetSurface) {}
 
     private static Landing endpointOf(final Player player, final Level level, final UUID lockedTarget) {
         final Vec3 eye = player.getEyePosition();
@@ -196,19 +212,17 @@ public final class CompressionBeamRenderer {
         final SubLevel struck = hit == null || hit.getType() == HitResult.Type.MISS
                 ? null : Sable.HELPER.getContaining(level, hit.getBlockPos());
 
-        if (lockedTarget != null && !lockedTarget.equals(idOf(struck))) {
-            final Vec3 held = silhouettePoint(level, lockedTarget, eye, player.getViewVector(1.0F));
-            if (held != null) return new Landing(held, true);
-        }
-
         if (hit == null || hit.getType() == HitResult.Type.MISS) {
             return new Landing(
-                    eye.add(player.getViewVector(1.0F).scale(RANGE * MISS_REACH_FRACTION)), false);
+                    eye.add(player.getViewVector(1.0F).scale(RANGE * MISS_REACH_FRACTION)), false, false);
         }
 
         final SubLevel found = struck;
         if (!(found instanceof final ClientSubLevel subLevel) || subLevel.isRemoved()) {
-            return new Landing(hit.getLocation(), true);
+            return new Landing(
+                    hit.getLocation(),
+                    true,
+                    lockedTarget != null && lockedTarget.equals(idOf(found)));
         }
 
         final Pose3dc pose = subLevel.renderPose();
@@ -225,7 +239,8 @@ public final class CompressionBeamRenderer {
         pose.orientation().transform(local);
         return new Landing(
                 new Vec3(local.x + position.x(), local.y + position.y(), local.z + position.z()),
-                true);
+                true,
+                lockedTarget != null && lockedTarget.equals(idOf(found)));
     }
 
     private static UUID idOf(final SubLevel subLevel) {
@@ -327,6 +342,8 @@ public final class CompressionBeamRenderer {
         private boolean growing;
 
         private volatile UUID lockedTarget;
+        private volatile boolean targetSurface;
+        private UUID establishedSurfaceTarget;
 
         private volatile UUID surgeTarget;
         private float surgeAge = -1.0F;
@@ -387,6 +404,7 @@ public final class CompressionBeamRenderer {
 
             final Landing landing = endpointOf(owner, level, this.lockedTarget);
             this.endpoint = landing.point();
+            this.targetSurface = this.lockedTarget != null && landing.targetSurface();
 
             this.previousReach = this.reach;
             if (this.chargeTicks < CHARGE_TICKS) {
@@ -396,16 +414,25 @@ public final class CompressionBeamRenderer {
             }
 
             final double wanted = this.muzzle.distanceTo(this.endpoint);
-            final boolean travelling = this.reach < wanted;
-            if (travelling) this.reach = Math.min(wanted, this.reach + TRAVEL_SPEED);
-            else this.reach = wanted;
+            final boolean targetSurface = this.lockedTarget != null && landing.targetSurface();
+            final boolean established = targetSurface && this.lockedTarget.equals(this.establishedSurfaceTarget);
+
+            if (established || this.reach >= wanted) this.reach = wanted;
+            else this.reach = Math.min(wanted, this.reach + TRAVEL_SPEED);
+
+            final boolean reached = this.reach + 1.0E-6D >= wanted;
+            if (targetSurface && reached) this.establishedSurfaceTarget = this.lockedTarget;
+            else if (!targetSurface && this.lockedTarget == null) this.establishedSurfaceTarget = null;
 
             this.arcTicks += 1.0F;
             this.arcAmount = (float) Math.exp(-this.arcTicks / ARC_SETTLE_TICKS);
 
             updateNodes();
 
-            if (!travelling && landing.struck() && !this.nodes.isEmpty()) {
+            if (reached && landing.struck() && !this.nodes.isEmpty()) {
+                if (targetSurface) {
+                    CompressionFieldRenderer.nucleate(this.lockedTarget, this.endpoint);
+                }
                 final Vec3 back = this.muzzle.subtract(this.endpoint);
                 if (back.lengthSqr() > 1.0E-6D) {
                     spawnImpactParticles(level, this.endpoint, back.normalize(), this.energy);

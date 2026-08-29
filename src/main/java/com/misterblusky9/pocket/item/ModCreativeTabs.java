@@ -18,15 +18,17 @@ public final class ModCreativeTabs {
                     .title(Component.translatable("itemGroup.pocket"))
                     .icon(() -> new ItemStack(ModItems.COMPRESSION_GUN.get()))
                     .displayItems((parameters, output) -> {
+                        output.accept(ModItems.COMPRESSION_GUN.get());
+                        output.accept(ModItems.CREATIVE_SHRINK_RAY.get());
+                        output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.EMPTY_BOX.get());
-                        output.accept(ModItems.DISPLAY_CASE.get());
+                        output.accept(ModItems.DISPLAY_BOTTLE.get());
                         output.accept(ModItems.BRASS_DISPLAY_CASE.get());
                         output.accept(ModItems.BRASS_DISPLAY_PLATE.get());
                         output.accept(ModItems.ANDESITE_DISPLAY_CASE.get());
                         output.accept(ModItems.ANDESITE_DISPLAY_PLATE.get());
-                        output.accept(ModItems.CREATIVE_SHRINK_RAY.get());
-                        output.accept(ModItems.COMPRESSION_GUN.get());
-                        output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
+                        //output.accept(ModItems.SUBSPACE_RECYCLER.get());
+                        output.accept(ModItems.THE_MOON.get());
                     })
                     .build()
     );

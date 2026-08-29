@@ -1,11 +1,8 @@
 package com.misterblusky9.pocket.physics;
 
 import com.misterblusky9.pocket.debug.PocketTrace;
-import com.misterblusky9.pocket.PocketSized;
-import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import org.joml.Vector3dc;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,26 +11,14 @@ import java.util.UUID;
 public final class ColliderCoordinator {
     private static final int NATIVE_FLUID_VOID_OFFSET = 1 << 20;
 
-    private static final double COLLIDER_SCALE_QUANTUM = 1.0D / 32.0D;
-
     private record StatsKey(long tick, int bodyId, int shapeRevision, long scaleBits) {}
     private record BoundsKey(int bodyId, CompiledCollider.Bounds bounds) {}
-    private record RebuildGate(
-            int bodyId,
-            int shapeRevision,
-            long pivotXBits,
-            long pivotYBits,
-            long pivotZBits,
-            double scale
-    ) {}
-
     private static final Map<UUID, StatsKey> LAST_STATS = new HashMap<>();
     private static final Map<UUID, CompiledCollider.GeometryKey> LAST_REQUESTS = new HashMap<>();
     private static final Map<UUID, ColliderCompiler.NativeImageKey> LAST_NATIVE_IMAGES = new HashMap<>();
     private static final Map<UUID, BoundsKey> LAST_BOUNDS = new HashMap<>();
     private static final Map<UUID, Long> GENERATIONS = new HashMap<>();
     private static final Map<UUID, Integer> COALESCED_REBUILDS = new HashMap<>();
-    private static final Map<UUID, RebuildGate> LAST_REBUILD_GATES = new HashMap<>();
 
     public static synchronized boolean statsAlreadyServedThisTick(final ServerSubLevel subLevel) {
         if (subLevel == null || subLevel.getUniqueId() == null) return false;
@@ -60,19 +45,15 @@ public final class ColliderCoordinator {
             PocketTrace.warn("scaled collider rebuild at unsafe mutation point {}", PocketTrace.context(subLevel));
         }
 
-        final int observedRevision = PlotShapeCache.revision(id);
-        if (canDeferScaleOnlyRebuild(subLevel, id, bodyId, observedRevision)) {
-            return;
-        }
-
-        final PlotShape shape = PlotShapeCache.get(subLevel);
+        final PlotShape shape = ScalePhysicsTransitions.usePrism(subLevel)
+                ? null
+                : PlotShapeCache.get(subLevel);
         final int revision = PlotShapeCache.revision(id);
         final CompiledCollider.GeometryKey request = ColliderCompiler.requestKey(
                 subLevel, bodyId, revision, shape != null);
         if (request == null) return;
 
         if (request.equals(LAST_REQUESTS.get(id)) && SableColliderMirror.has(id)) {
-            rememberAppliedScale(subLevel, id, bodyId, revision);
             return;
         }
 
@@ -88,7 +69,6 @@ public final class ColliderCoordinator {
             if (retagged != null && SableColliderMirror.retagMetadata(retagged)) {
                 PlotShapeCache.consumePending(id);
                 LAST_REQUESTS.put(id, request);
-                rememberAppliedScale(subLevel, id, bodyId, revision);
                 traceCoalesced(id, subLevel, previous, retagged, revision);
                 return;
             }
@@ -103,6 +83,7 @@ public final class ColliderCoordinator {
 
         CompiledCollider applied = compiled;
         boolean changedNative;
+        applyScaledLocalBounds(subLevel);
         try {
             changedNative = SableColliderMirror.apply(subLevel, applied);
         } catch (final ShapeRegistry.CapacityExceededException capacity) {
@@ -124,7 +105,6 @@ public final class ColliderCoordinator {
             LAST_NATIVE_IMAGES.remove(id);
         }
         COALESCED_REBUILDS.remove(id);
-        rememberAppliedScale(subLevel, id, bodyId, revision);
         applyScaledLocalBounds(subLevel);
 
         final long elapsedMicros = (System.nanoTime() - start) / 1_000L;
@@ -148,11 +128,9 @@ public final class ColliderCoordinator {
         final int bodyId = RapierBridge.bodyId(subLevel);
         if (bodyId == RapierBridge.NO_BODY) return;
 
-        CompiledCollider.Bounds bounds = null;
-        final CompiledCollider current = SableColliderMirror.current(subLevel.getUniqueId());
-        if (current != null && current.bodyId() == bodyId) bounds = current.bounds();
-        if (bounds == null) bounds = ColliderCompiler.boundsFor(subLevel);
+        CompiledCollider.Bounds bounds = ColliderCompiler.boundsFor(subLevel);
         if (bounds == null) return;
+        bounds = ScalePhysicsTransitions.nativeBounds(subLevel, bounds);
 
         final BoundsKey key = new BoundsKey(bodyId, bounds);
         if (key.equals(LAST_BOUNDS.get(subLevel.getUniqueId()))) return;
@@ -188,8 +166,9 @@ public final class ColliderCoordinator {
         if (subLevel == null || subLevel.getUniqueId() == null) return;
         final int bodyId = RapierBridge.bodyId(subLevel);
         if (bodyId == RapierBridge.NO_BODY) return;
-        final CompiledCollider.Bounds bounds = boundsOf(subLevel, bodyId);
+        CompiledCollider.Bounds bounds = boundsOf(subLevel, bodyId);
         if (bounds == null) return;
+        bounds = ScalePhysicsTransitions.nativeBounds(subLevel, bounds);
 
         RapierBridge.setLocalBoundsQuiet(
                 subLevel.getLevel(), subLevel,
@@ -207,7 +186,6 @@ public final class ColliderCoordinator {
         LAST_BOUNDS.remove(id);
         LAST_STATS.remove(id);
         COALESCED_REBUILDS.remove(id);
-        LAST_REBUILD_GATES.remove(id);
     }
 
     public static synchronized void forget(final UUID id) {
@@ -219,66 +197,7 @@ public final class ColliderCoordinator {
         LAST_STATS.remove(id);
         GENERATIONS.remove(id);
         COALESCED_REBUILDS.remove(id);
-        LAST_REBUILD_GATES.remove(id);
         PlotShapeCache.forget(id);
-    }
-
-    private static boolean canDeferScaleOnlyRebuild(
-            final ServerSubLevel subLevel,
-            final UUID id,
-            final int bodyId,
-            final int shapeRevision
-    ) {
-        final RebuildGate last = LAST_REBUILD_GATES.get(id);
-        final CompiledCollider current = SableColliderMirror.current(id);
-        if (last == null || current == null || current.bodyId() != bodyId) return false;
-        if (last.bodyId() != bodyId || last.shapeRevision() != shapeRevision) return false;
-
-        final Vector3dc pivot = ScaleFrame.pivot(subLevel);
-        if (pivot == null) return false;
-        if (last.pivotXBits() != Double.doubleToLongBits(pivot.x())
-                || last.pivotYBits() != Double.doubleToLongBits(pivot.y())
-                || last.pivotZBits() != Double.doubleToLongBits(pivot.z())) {
-            return false;
-        }
-
-        final double scale = ScaleState.getServerScale(subLevel);
-        if (!PocketSized.isValidScale(scale)) return false;
-
-        final double delta = Math.abs(scale - last.scale());
-        if (delta <= PocketSized.EPSILON) return true;
-
-        if (isExactStageScale(scale)) return false;
-
-        return delta < COLLIDER_SCALE_QUANTUM;
-    }
-
-    private static boolean isExactStageScale(final double scale) {
-        for (final CompressionStage stage : CompressionStage.values()) {
-            if (Math.abs(scale - stage.scale()) <= PocketSized.EPSILON) return true;
-        }
-        return false;
-    }
-
-    private static void rememberAppliedScale(
-            final ServerSubLevel subLevel,
-            final UUID id,
-            final int bodyId,
-            final int shapeRevision
-    ) {
-        final Vector3dc pivot = ScaleFrame.pivot(subLevel);
-        if (pivot == null) {
-            LAST_REBUILD_GATES.remove(id);
-            return;
-        }
-        LAST_REBUILD_GATES.put(id, new RebuildGate(
-                bodyId,
-                shapeRevision,
-                Double.doubleToLongBits(pivot.x()),
-                Double.doubleToLongBits(pivot.y()),
-                Double.doubleToLongBits(pivot.z()),
-                ScaleState.getServerScale(subLevel)
-        ));
     }
 
     private static void traceCoalesced(

@@ -2,9 +2,11 @@ package com.misterblusky9.pocket.physics;
 
 import com.misterblusky9.pocket.debug.PocketTrace;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
+import dev.ryanhcode.sable.api.physics.mass.MassData;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.server.level.ServerLevel;
 import org.joml.Vector3d;
+import org.joml.Vector3dc;
 
 import java.lang.reflect.Method;
 
@@ -18,6 +20,8 @@ public final class RapierBridge {
     private static final Method GET_SCENE_HANDLE;
     private static final Method GET_ID;
     private static final Method SET_LOCAL_BOUNDS;
+    private static final Method SET_CENTER_OF_MASS;
+    private static final Method SET_MASS_PROPERTIES_FROM;
     private static final Method COLLIDER_HANDLE;
     private static final Method COLLIDER_ADD_BOX;
     private static final java.lang.reflect.Constructor<?> COLLIDER_OF_HANDLE;
@@ -34,6 +38,8 @@ public final class RapierBridge {
             GET_SCENE_HANDLE = RAPIER_3D.getMethod("getSceneHandle", ServerLevel.class);
             GET_ID = RAPIER_3D.getMethod("getID", PhysicsPipelineBody.class);
             SET_LOCAL_BOUNDS = find(RAPIER_3D, "setLocalBounds", 8);
+            SET_CENTER_OF_MASS = find(RAPIER_3D, "setCenterOfMass", 5);
+            SET_MASS_PROPERTIES_FROM = find(RAPIER_3D, "setMassPropertiesFrom", 3);
 
             final Class<?> colliderClass = Class.forName("dev.ryanhcode.sable.physics.impl.rapier.collider.RapierVoxelColliderData");
             COLLIDER_HANDLE = colliderClass.getMethod("handle");
@@ -253,6 +259,28 @@ public final class RapierBridge {
             if (trace) PocketTrace.exit("Rapier3D.setLocalBounds bodyId=" + id);
         } catch (final ReflectiveOperationException exception) {
             throw new IllegalStateException("Failed to set scaled Sable Rapier local bounds", exception);
+        }
+    }
+
+
+    public static void syncMassProperties(
+            final ServerSubLevel subLevel,
+            final double scale,
+            final boolean updateCenterOfMass
+    ) {
+        if (subLevel == null || subLevel.getLevel() == null) return;
+        final MassData raw = subLevel.getMassTracker();
+        if (raw == null) return;
+        try {
+            final long scene = scene(subLevel.getLevel());
+            final int id = ((Number) GET_ID.invoke(null, subLevel)).intValue();
+            final Vector3dc center = raw.getCenterOfMass();
+            if (updateCenterOfMass && center != null) {
+                SET_CENTER_OF_MASS.invoke(null, scene, id, center.x(), center.y(), center.z());
+            }
+            SET_MASS_PROPERTIES_FROM.invoke(null, scene, id, new ScaledMassData(raw, scale));
+        } catch (final ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to sync scaled Sable Rapier mass properties", exception);
         }
     }
 

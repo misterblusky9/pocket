@@ -19,5 +19,14 @@ public final class ModBlockEntities {
                     ).build(null)
             );
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SubspaceRecyclerBlockEntity>>
+            SUBSPACE_RECYCLER = BLOCK_ENTITIES.register(
+                    "subspace_recycler",
+                    () -> BlockEntityType.Builder.of(
+                            SubspaceRecyclerBlockEntity::new,
+                            ModBlocks.SUBSPACE_RECYCLER.get()
+                    ).build(null)
+            );
+
     private ModBlockEntities() {}
 }

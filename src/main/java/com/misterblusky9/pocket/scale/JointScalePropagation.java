@@ -15,7 +15,11 @@ import java.util.UUID;
 public final class JointScalePropagation {
     private static boolean propagating;
 
-    public static void onCommanded(final ServerSubLevel subLevel, final CompressionStage stage) {
+    public static void onCommanded(
+            final ServerSubLevel subLevel,
+            final CompressionStage stage,
+            final ScalePhysicsMode physicsMode
+    ) {
         if (propagating) return;
         if (subLevel == null || stage == null || subLevel.isRemoved()) return;
 
@@ -33,14 +37,17 @@ public final class JointScalePropagation {
 
         propagating = true;
         try {
-            spread(container, origin, delta);
+            spread(container, origin, delta, physicsMode);
         } finally {
             propagating = false;
         }
     }
 
     private static void spread(
-            final ServerSubLevelContainer container, final UUID origin, final int delta
+            final ServerSubLevelContainer container,
+            final UUID origin,
+            final int delta,
+            final ScalePhysicsMode physicsMode
     ) {
         final Deque<UUID> queue = new ArrayDeque<>(ConstraintRefresh.neighbours(origin));
         final Set<UUID> seen = new HashSet<>(queue);
@@ -50,13 +57,13 @@ public final class JointScalePropagation {
             final UUID id = queue.poll();
             if (id == null) continue;
 
-            for (final UUID next : ConstraintRefresh.neighbours(id)) {
-                if (seen.add(next)) queue.add(next);
-            }
-
             if (!(container.getSubLevel(id) instanceof final ServerSubLevel attached)
                     || attached.isRemoved()) {
                 continue;
+            }
+
+            for (final UUID next : ConstraintRefresh.neighbours(id)) {
+                if (seen.add(next)) queue.add(next);
             }
 
             if (SubLevelParentage.parentOf(id) != null) continue;
@@ -71,7 +78,8 @@ public final class JointScalePropagation {
                     "joint-propagating {} stages to attached craft {} (depth {} -> {})",
                     delta, id, current, goal.depth());
 
-            ScaleController.forceStage(attached, goal, attached.getLevel().getGameTime());
+            ScaleController.forceStage(
+                    attached, goal, attached.getLevel().getGameTime(), null, true, physicsMode);
         }
     }
 

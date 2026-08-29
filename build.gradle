@@ -237,12 +237,21 @@ tasks.register('surfaceNormalTest', JavaExec) {
     mainClass = 'com.misterblusky9.pocket.interaction.ScaledSurfaceNormalTest'
 }
 
+tasks.register('moonSubLevelContractTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the moon sublevel-shim anchor, spring and constraint-preflight checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.moon.MoonSubLevelContractTest'
+}
+
 tasks.named('check') {
     dependsOn tasks.named('scaleTransitionTest')
     dependsOn tasks.named('colliderBudgetTest')
     dependsOn tasks.named('scaleContractTest')
     dependsOn tasks.named('expansionClearanceBudgetTest')
     dependsOn tasks.named('surfaceNormalTest')
+    dependsOn tasks.named('moonSubLevelContractTest')
 }
 
 idea {

@@ -15,8 +15,8 @@ public enum PocketContainer {
             false
     ),
 
-    DISPLAY_CASE(
-            "display_case", "item/display_case",
+    DISPLAY_BOTTLE(
+            "display_bottle", "item/display_bottle",
             12.0D, 0.5D,
             0.5D, 12.0D, 0.5D,
             true
