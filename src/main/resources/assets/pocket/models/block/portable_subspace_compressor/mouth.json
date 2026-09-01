@@ -1,0 +1,6 @@
+{
+  "parent": "simulated:block/portable_engine/mouth",
+  "textures": {
+    "0": "pocket:block/portable_compressor"
+  }
+}

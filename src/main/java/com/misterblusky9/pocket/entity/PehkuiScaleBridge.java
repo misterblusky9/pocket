@@ -81,6 +81,19 @@ public final class PehkuiScaleBridge {
         }
     }
 
+    public static void snapPersonalScale(final Entity entity, final double scale) {
+        if (entity == null || !ownsScaling()) return;
+
+        final Backend current = backend;
+        if (current == null) return;
+
+        try {
+            current.snapPersonalScale(entity, scale);
+        } catch (final RuntimeException | LinkageError exception) {
+            fail(current, exception);
+        }
+    }
+
     public static void clearPersonalScale(final Entity entity) {
         if (entity == null || !ownsScaling()) return;
 
@@ -113,6 +126,7 @@ public final class PehkuiScaleBridge {
         void apply(Entity entity, double inheritedBaseScale, double containedModelScale);
         void clear(Entity entity);
         void setPersonalScale(Entity entity, double scale);
+        void snapPersonalScale(Entity entity, double scale);
         void clearPersonalScale(Entity entity);
         void disable();
     }

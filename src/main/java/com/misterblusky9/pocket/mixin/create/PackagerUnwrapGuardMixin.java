@@ -16,7 +16,7 @@ public abstract class PackagerUnwrapGuardMixin {
             final boolean simulate,
             final CallbackInfoReturnable<Boolean> cir
     ) {
-        if (box.getItem() instanceof PocketCaseItem) {
+        if (box.getItem() instanceof PocketCaseItem && PocketCaseItem.isFilled(box)) {
             cir.setReturnValue(false);
         }
     }

@@ -4,6 +4,7 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.network.CompressionSyncPayload;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.CompressionStage;
+import com.misterblusky9.pocket.scale.ManualScaleOverride;
 import com.misterblusky9.pocket.scale.ScaleController;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.simibubi.create.content.equipment.armor.BacktankUtil;
@@ -110,6 +111,8 @@ public final class CompressionSessions {
             }
         }
 
+        ManualScaleOverride.engage(subLevel, now);
+
         session = new Session(id, player.getUUID(), hitLocalPos.immutable(), acquireTicks, airCost, floor, now);
         session.blocked = cellLimit > 0;
         session.hand = hand;
@@ -144,6 +147,7 @@ public final class CompressionSessions {
             }
         }
 
+        ManualScaleOverride.engage(subLevel, now);
         ScaleController.forceStage(subLevel, requested, now, null, propagateJoints);
 
         final Session session = new Session(
@@ -192,6 +196,7 @@ public final class CompressionSessions {
 
             session.illuminated = session.sealed || session.subLevelId.equals(aimedSubLevelId);
             session.lastHeldTick = now;
+            ManualScaleOverride.sustain(session.subLevelId, now);
             held = true;
         }
 

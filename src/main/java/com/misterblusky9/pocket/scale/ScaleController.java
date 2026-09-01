@@ -195,7 +195,10 @@ public final class ScaleController {
             if (choice != null && !choice.source().stepwiseTransitions()
                     && state.transitionStage() != null
                     && state.transitionStage() != state.requestedStage()) {
-                state.beginTransition(state.requestedStage(), state.currentScale());
+                state.beginTransition(
+                        state.requestedStage(),
+                        state.currentScale(),
+                        choice.source().transitionSpeedFactor());
             }
 
             if (state.transitionStage() == null && choice != null
@@ -331,7 +334,7 @@ public final class ScaleController {
         PocketTrace.scale(
                 "beginStage {} from={} to={} requested={} fromScale={}",
                 PocketTrace.context(subLevel), from, to, state.requestedStage(), state.currentScale());
-        state.beginTransition(to, state.currentScale());
+        state.beginTransition(to, state.currentScale(), choice.source().transitionSpeedFactor());
     }
 
     public static void enforceClientScale(final ClientSubLevel subLevel) {
@@ -346,8 +349,11 @@ public final class ScaleController {
         ScaleCommandSource best = null;
         CompressionStage deepest = CompressionStage.NORMAL;
 
+        final boolean suspended = ManualScaleOverride.isSuspended(subLevel.getUniqueId(), gameTime);
+
         for (final BlockEntitySubLevelActor actor : subLevel.getPlot().getBlockEntityActors()) {
             if (!(actor instanceof final ScaleCommandSource source) || source.isRemoved()) continue;
+            if (suspended && source.yieldsToManualOverride()) continue;
 
             final CompressionStage command = source.commandedStage();
             if (command == null) continue;
@@ -363,7 +369,10 @@ public final class ScaleController {
             if (external.source().isRemoved() || gameTime > external.validUntilTick()) {
                 EXTERNAL_COMMANDS.remove(subLevel.getUniqueId(), external);
             } else {
-                final CompressionStage externalStage = external.source().commandedStage();
+                final CompressionStage externalStage =
+                        suspended && external.source().yieldsToManualOverride()
+                                ? null
+                                : external.source().commandedStage();
                 if (externalStage != null) {
                     return new CommandChoice(external.source(), externalStage);
                 }
@@ -395,13 +404,20 @@ public final class ScaleController {
 
         state.tickTransition();
 
-        final double ticks = STEP_TICKS / Math.max(0.05D, stepFactorFor(subLevel));
+        final double ticks = STEP_TICKS
+                / Math.max(0.05D,
+                        stepFactorFor(subLevel) * sanitizeSpeedFactor(state.transitionSpeedFactor()));
         final double progress = Math.min(1.0D, state.transitionTicks() / Math.max(1.0D, ticks));
         if (progress >= 1.0D) return target;
 
         final double eased = 1.0D - (1.0D - progress) * (1.0D - progress);
         final double from = state.transitionFrom();
         return PocketSized.clampScale(from + (target - from) * eased);
+    }
+
+    private static double sanitizeSpeedFactor(final double factor) {
+        if (!Double.isFinite(factor) || factor <= 0.0D) return 1.0D;
+        return Math.min(4.0D, factor);
     }
 
     private static double stepFactorFor(final ServerSubLevel subLevel) {
@@ -512,6 +528,7 @@ public final class ScaleController {
         }
 
         @Override public CompressionStage commandedStage() { return CompressionStage.NORMAL; }
+        @Override public boolean yieldsToManualOverride() { return false; }
         @Override public boolean isRemoved() { return this.subLevel.isRemoved(); }
     }
 
@@ -534,6 +551,7 @@ public final class ScaleController {
         }
 
         @Override public CompressionStage commandedStage() { return this.stage; }
+        @Override public boolean yieldsToManualOverride() { return false; }
         @Override public Vector3d anchorLocalPoint() {
             return this.anchor == null ? null : new Vector3d(this.anchor);
         }

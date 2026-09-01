@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.mixin.create;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.misterblusky9.pocket.PocketSized;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.ContraptionHandlerClient;
@@ -19,18 +20,19 @@ public abstract class ContraptionHandlerClientScaleMixin {
             method = "rightClickingOnContraptionsGetsHandledLocally",
             at = @At(
                     value = "INVOKE",
-                    target = "Lcom/simibubi/create/content/contraptions/AbstractContraptionEntity;getBoundingBox()Lnet/minecraft/world/phys/AABB;"
+                    target = "Lnet/minecraft/world/phys/AABB;intersects(Lnet/minecraft/world/phys/AABB;)Z"
             ),
             require = 1
     )
-    private static AABB pocket$useScaledContraptionInteractionBounds(
-            final AbstractContraptionEntity contraptionEntity,
-            final Operation<AABB> original
+    private static boolean pocket$testAuthoritativeScaledInteractionBounds(
+            final AABB sableProjectedBounds,
+            final AABB rayBounds,
+            final Operation<Boolean> original,
+            @Local(ordinal = 1) final AbstractContraptionEntity contraptionEntity
     ) {
-        final AABB originalBounds = original.call(contraptionEntity);
         final SubLevel subLevel = Sable.HELPER.getContaining(contraptionEntity);
         if (subLevel == null || subLevel.isRemoved()) {
-            return originalBounds;
+            return original.call(sableProjectedBounds, rayBounds);
         }
 
         final Vector3dc scale = subLevel.logicalPose().scale();
@@ -38,11 +40,11 @@ public abstract class ContraptionHandlerClientScaleMixin {
                 || Math.abs(scale.x() - scale.y()) > PocketSized.EPSILON
                 || Math.abs(scale.x() - scale.z()) > PocketSized.EPSILON
                 || Math.abs(scale.x() - 1.0D) <= PocketSized.EPSILON) {
-            return originalBounds;
+            return original.call(sableProjectedBounds, rayBounds);
         }
 
-        final BoundingBox3d worldBounds = new BoundingBox3d(originalBounds);
+        final BoundingBox3d worldBounds = new BoundingBox3d(contraptionEntity.getBoundingBox());
         worldBounds.transform(subLevel.logicalPose(), worldBounds);
-        return worldBounds.toMojang();
+        return worldBounds.toMojang().intersects(rayBounds);
     }
 }

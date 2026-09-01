@@ -171,6 +171,23 @@ public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
     }
 
     @Override
+    public void snapPersonalScale(final Entity entity, final double scale) {
+        final float value = sanitize(scale);
+        final ScaleData base = ScaleTypes.BASE.getScaleData(entity);
+
+        // Second write collapses prevBaseScale onto the new value so the
+        // handoff does not render a one-tick interpolation.
+        base.setScale(value);
+        base.setScale(value);
+
+        if (isNeutral(value)) {
+            this.baseScaledEntities.remove(entity);
+        } else {
+            this.baseScaledEntities.put(entity, Boolean.TRUE);
+        }
+    }
+
+    @Override
     public void clearPersonalScale(final Entity entity) {
         this.baseScaledEntities.remove(entity);
         ScaleTypes.BASE.getScaleData(entity).setScale(1.0F);

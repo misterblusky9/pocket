@@ -187,6 +187,7 @@ public final class ScaleState {
 
         private double transitionFrom;
         private int transitionTicks;
+        private double transitionSpeedFactor = 1.0D;
 
         private boolean persistenceDirty;
 
@@ -209,13 +210,23 @@ public final class ScaleState {
         public CompressionStage transitionStage() { return this.transitionStage; }
         public double transitionFrom() { return this.transitionFrom; }
         public int transitionTicks() { return this.transitionTicks; }
+        public double transitionSpeedFactor() { return this.transitionSpeedFactor; }
         public boolean needsPersistence() { return this.persistenceDirty; }
         public void tickTransition() { this.transitionTicks++; }
 
         public void beginTransition(final CompressionStage stage, final double fromScale) {
+            beginTransition(stage, fromScale, 1.0D);
+        }
+
+        public void beginTransition(
+                final CompressionStage stage,
+                final double fromScale,
+                final double speedFactor
+        ) {
             this.transitionStage = stage;
             this.transitionFrom = PocketSized.clampScale(fromScale);
             this.transitionTicks = 0;
+            this.transitionSpeedFactor = speedFactor;
             this.persistenceDirty = true;
         }
 
@@ -232,6 +243,7 @@ public final class ScaleState {
         }
         public void transitionStage(final CompressionStage value) {
             if (this.transitionStage == value) return;
+            if (value == null) this.transitionSpeedFactor = 1.0D;
             this.transitionStage = value;
             this.persistenceDirty = true;
         }

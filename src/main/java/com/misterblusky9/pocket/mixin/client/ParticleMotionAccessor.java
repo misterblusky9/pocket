@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.mixin.client;
 
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
@@ -32,6 +33,18 @@ public interface ParticleMotionAccessor {
 
     @Accessor("age")
     int pocket$getAge();
+
+    @Accessor("x")
+    double pocket$getX();
+
+    @Accessor("y")
+    double pocket$getY();
+
+    @Accessor("z")
+    double pocket$getZ();
+
+    @Accessor("level")
+    ClientLevel pocket$getLevel();
 
     @Accessor("stoppedByCollision")
     boolean pocket$getStoppedByCollision();

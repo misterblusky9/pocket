@@ -4,12 +4,12 @@
       "id": "pocket:compression_gun"
     },
     "title": {
-      "text": "Pocket Sized"
+      "text": "Create Pocket Sized"
     },
     "description": {
       "text": ""
     },
-    "background": "minecraft:textures/block/gray_concrete.png",
+    "background": "pocket:textures/block/blueprint_tile.png",
     "frame": "task",
     "show_toast": false,
     "announce_to_chat": false,

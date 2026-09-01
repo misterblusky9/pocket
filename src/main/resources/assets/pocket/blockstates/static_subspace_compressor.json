@@ -1,0 +1,30 @@
+{
+  "variants": {
+    "facing=up": {
+      "model": "pocket:block/static_subspace_compressor/block"
+    },
+    "facing=down": {
+      "model": "pocket:block/static_subspace_compressor/block",
+      "x": 180
+    },
+    "facing=north": {
+      "model": "pocket:block/static_subspace_compressor/block",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "pocket:block/static_subspace_compressor/block",
+      "x": 90,
+      "y": 90
+    },
+    "facing=south": {
+      "model": "pocket:block/static_subspace_compressor/block",
+      "x": 90,
+      "y": 180
+    },
+    "facing=west": {
+      "model": "pocket:block/static_subspace_compressor/block",
+      "x": 90,
+      "y": 270
+    }
+  }
+}

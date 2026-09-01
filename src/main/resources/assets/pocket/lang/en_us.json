@@ -1,6 +1,6 @@
 {
   "itemGroup.pocket": "Create: Pocket Sized",
-  "item.pocket.creative_shrink_ray": "Creative Shrink Ray",
+  "item.pocket.creative_shrink_ray": "Creative Shrinkray",
   "item.pocket.pocketed_sublevel": "Pocketed Sublevel",
   "item.pocket.empty_box": "Empty Box",
   "item.pocket.display_bottle": "Display Bottle",
@@ -12,8 +12,12 @@
   "item.pocket.collider_wand": "Collider Wand",
   "key.categories.pocket": "Create: Pocket Sized",
   "key.pocket.tweezer_rotate": "Tweezers: Rotate Held Craft",
-  "block.pocket.portable_subspace_compressor": "Portable Subspace Compressor ",
+  "block.pocket.portable_subspace_compressor": "Portable Subspace Compressor",
   "item.pocket.tweezers": "Tweezers",
-  "block.pocket.subspace_recycler": "Subspace Recycler (WIP!)",
-  "item.pocket.the_moon": "The Moon (WIP!)"
+  "block.pocket.subspace_recycler": "Subspace Recycler",
+  "item.pocket.the_moon": "The Moon (WIP!)",
+  "block.pocket.static_subspace_compressor": "Static Subspace Compressor",
+  "pocket.static_subspace_compressor.mode.shrink": "Reduce",
+  "pocket.static_subspace_compressor.mode.grow": "Enlarge",
+  "pocket.static_subspace_compressor.mode": "Mode"
 }

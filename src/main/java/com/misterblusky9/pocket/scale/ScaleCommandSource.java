@@ -9,6 +9,10 @@ public interface ScaleCommandSource {
 
     default boolean stepwiseTransitions() { return false; }
 
+    default boolean yieldsToManualOverride() { return true; }
+
+    default double transitionSpeedFactor() { return 1.0D; }
+
     default Vector3d anchorLocalPoint() { return null; }
 
     default boolean tryConsumeTransition(

@@ -133,6 +133,16 @@ neoForge {
 
 configurations {
     runtimeClasspath.extendsFrom localRuntime
+    aeronauticsBundle
+}
+
+tasks.register('extractSimulated', Copy) {
+    from({ zipTree(configurations.aeronauticsBundle.singleFile) }) {
+        include 'META-INF/jarjar/dev.simulated_team.simulated.*.jar'
+    }
+    into layout.buildDirectory.dir('simulated')
+    eachFile { it.path = it.name }
+    includeEmptyDirs = false
 }
 
 dependencies {
@@ -147,6 +157,9 @@ dependencies {
 
     // Aeronautics
     implementation "maven.modrinth:oWaK0Q19:w7zlLnea"
+    aeronauticsBundle "maven.modrinth:oWaK0Q19:w7zlLnea"
+    compileOnly fileTree(dir: layout.buildDirectory.dir('simulated'), include: '*.jar')
+            .builtBy('extractSimulated')
 
     // Sable
     implementation "maven.modrinth:T9PomCSv:NGuyFOeE"
@@ -155,7 +168,9 @@ dependencies {
 
     // Pehkui
     compileOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
-    localRuntime "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    if (!providers.gradleProperty('noPehkui').isPresent()) {
+        localRuntime "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    }
 
     // Spark, dev run only
     localRuntime "maven.modrinth:spark:v5qtqRQi"

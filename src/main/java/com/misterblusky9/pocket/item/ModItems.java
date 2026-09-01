@@ -6,6 +6,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.world.item.Rarity;
 
 public final class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(PocketSized.MOD_ID);
@@ -39,7 +40,7 @@ public final class ModItems {
     );
 
     public static final DeferredItem<CreativeShrinkRayItem> CREATIVE_SHRINK_RAY = ITEMS.register(
-            "creative_shrink_ray", () -> new CreativeShrinkRayItem(new Item.Properties().stacksTo(1))
+            "creative_shrink_ray", () -> new CreativeShrinkRayItem(new Item.Properties().stacksTo(1).rarity(Rarity.RARE))
     );
 
     public static final DeferredItem<CompressionGunItem> COMPRESSION_GUN = ITEMS.register(
@@ -56,6 +57,11 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> SUBSPACE_RECYCLER = ITEMS.register(
             "subspace_recycler",
             () -> new BlockItem(ModBlocks.SUBSPACE_RECYCLER.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<BlockItem> STATIC_SUBSPACE_COMPRESSOR = ITEMS.register(
+            "static_subspace_compressor",
+            () -> new BlockItem(ModBlocks.STATIC_SUBSPACE_COMPRESSOR.get(), new Item.Properties())
     );
 
     public static final DeferredItem<TweezersItem> TWEEZERS = ITEMS.register(

@@ -39,6 +39,7 @@ public final class PocketCreateIntegration {
 
     // Millstone parity: 4 SU per RPM.
     public static final double SUBSPACE_RECYCLER_STRESS_IMPACT = 4.0D;
+    public static final double STATIC_SUBSPACE_COMPRESSOR_STRESS_IMPACT = 8.0D;
 
     public static void register(final IEventBus modBus) {
         BLOCK_HIT_ACTIONS.register(modBus);
@@ -50,6 +51,10 @@ public final class PocketCreateIntegration {
     private static void onCommonSetup(final FMLCommonSetupEvent event) {
         BlockStressValues.IMPACTS.register(
                 ModBlocks.SUBSPACE_RECYCLER.get(), () -> SUBSPACE_RECYCLER_STRESS_IMPACT
+        );
+        BlockStressValues.IMPACTS.register(
+                ModBlocks.STATIC_SUBSPACE_COMPRESSOR.get(),
+                () -> STATIC_SUBSPACE_COMPRESSOR_STRESS_IMPACT
         );
     }
 

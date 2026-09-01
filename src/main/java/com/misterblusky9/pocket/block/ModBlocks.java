@@ -33,5 +33,15 @@ public final class ModBlocks {
                     )
             );
 
+    public static final DeferredHolder<Block, StaticSubspaceCompressorBlock> STATIC_SUBSPACE_COMPRESSOR =
+            BLOCKS.register(
+                    "static_subspace_compressor",
+                    () -> new StaticSubspaceCompressorBlock(
+                            BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK)
+                                    .mapColor(MapColor.METAL)
+                                    .noOcclusion()
+                    )
+            );
+
     private ModBlocks() {}
 }

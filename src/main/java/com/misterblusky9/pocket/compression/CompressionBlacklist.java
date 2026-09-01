@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.compression;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.config.PocketServerConfig;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
@@ -44,7 +45,8 @@ public final class CompressionBlacklist {
     }
 
     public static boolean isBlacklisted(final BlockState state) {
-        return state != null && state.is(TAG);
+        return state != null
+                && (state.is(TAG) || PocketServerConfig.isNoShrinkBlock(state.getBlock()));
     }
 
     public static ResourceLocation blockId(final BlockState state) {
@@ -53,6 +55,10 @@ public final class CompressionBlacklist {
 
     public static void invalidate(final UUID id) {
         if (id != null) CACHE.remove(id);
+    }
+
+    public static void invalidateAll() {
+        CACHE.clear();
     }
 
     private static Result scan(final ServerSubLevel subLevel) {

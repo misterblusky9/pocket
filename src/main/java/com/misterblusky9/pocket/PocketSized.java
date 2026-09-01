@@ -5,6 +5,7 @@ import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
+import com.misterblusky9.pocket.config.PocketConfigs;
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
 import com.misterblusky9.pocket.item.ModCreativeTabs;
 import com.misterblusky9.pocket.item.ModItems;
@@ -13,6 +14,7 @@ import com.misterblusky9.pocket.pocket.CannonDeploymentQueue;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelEvents;
 import com.misterblusky9.pocket.pocket.PocketPerformanceLimits;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 
@@ -27,7 +29,9 @@ public final class PocketSized {
 
     public static final int MAX_COMPRESSED_BLOCKS = 1_048_576;
 
-    public PocketSized(final IEventBus modBus) {
+    public PocketSized(final IEventBus modBus, final ModContainer modContainer) {
+        PocketConfigs.register(modBus, modContainer);
+
         PehkuiScaleBridge.initialize();
 
         ModBlocks.BLOCKS.register(modBus);

@@ -11,6 +11,7 @@ import com.misterblusky9.pocket.moon.MoonTargeting;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleController;
+import com.misterblusky9.pocket.scale.ScaleState;
 import com.simibubi.create.AllDataComponents;
 import com.simibubi.create.CreateClient;
 import com.simibubi.create.content.equipment.zapper.ShootableGadgetItemMethods;
@@ -229,6 +230,10 @@ public final class CreativeShrinkRayItem extends ZapperItem {
                 player.displayClientMessage(Component.literal("Pehkui integration unavailable"), true);
                 return false;
             }
+            if (com.misterblusky9.pocket.compression.SelfCompressionSessions
+                    .currentStage(serverPlayer) == target) {
+                return false;
+            }
             com.misterblusky9.pocket.compression.SelfCompressionSessions.instant(serverPlayer, target);
             return true;
         }
@@ -243,10 +248,15 @@ public final class CreativeShrinkRayItem extends ZapperItem {
             lockedOn = subLevel != null;
         }
 
-        if (!(subLevel instanceof final ServerSubLevel serverSubLevel)) return false;
+        if (!(subLevel instanceof final ServerSubLevel serverSubLevel)) return true;
 
         final net.minecraft.core.BlockPos contact =
                 lockedOn ? centreOf(serverSubLevel) : raytrace.getBlockPos();
+
+        if (ScaleState.isSettled(serverSubLevel.getUniqueId())
+                && ScaleState.getStage(serverSubLevel) == target) {
+            return false;
+        }
 
         if (target.isCompressed()) {
             final int blocks = PocketMetrics.measureForCompression(serverSubLevel, level.getGameTime()).blocks();

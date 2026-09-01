@@ -33,7 +33,8 @@ public final class MoonCompressionSessions {
     private static final int REBOUND_QUARTER_TICKS = 100;
     private static final int REBOUND_EIGHTH_TICKS = 80;
     private static final int REBOUND_SIXTEENTH_TICKS = 200;
-    private static final int NEFARIO_ADVANCEMENT_LEAD_TICKS = 10;
+    private static final float NEFARIO_REGROWTH_MID_SCALE =
+            (float) ((CompressionStage.SIXTEENTH.scale() + CompressionStage.NORMAL.scale()) * 0.5D);
 
     private static Session session;
     private static MinecraftServer reboundServer;
@@ -140,7 +141,13 @@ public final class MoonCompressionSessions {
         );
         MoonScale.transitionTo(server, stage);
         if (stage.isCompressed()) {
-            scheduleRebound(session, stage, player.level().getGameTime(), REBOUND_SETTLE_TICKS, false);
+            scheduleRebound(
+                    session,
+                    stage,
+                    player.level().getGameTime(),
+                    REBOUND_SETTLE_TICKS,
+                    stage == CompressionStage.SIXTEENTH
+            );
         }
     }
 
@@ -282,6 +289,13 @@ public final class MoonCompressionSessions {
         if (reboundServer != server) return;
 
         if (reboundActive) {
+            if (reboundOwner != null
+                    && !reboundAdvancementAwarded
+                    && MoonScale.isTransitioning(server)
+                    && MoonScale.get(server) >= NEFARIO_REGROWTH_MID_SCALE) {
+                reboundAdvancementAwarded = awardNefarioPrinciple(server, reboundOwner);
+            }
+
             if (!MoonScale.isTransitioning(server) && MoonScale.stage(server) == CompressionStage.NORMAL) {
                 MoonScaleNetwork.broadcastEffectRelease();
                 clearRebound();
@@ -292,12 +306,6 @@ public final class MoonCompressionSessions {
         if (reboundAt == Long.MIN_VALUE) return;
 
         final long now = server.overworld().getGameTime();
-        if (reboundOwner != null
-                && !reboundAdvancementAwarded
-                && now >= reboundAt - NEFARIO_ADVANCEMENT_LEAD_TICKS) {
-            reboundAdvancementAwarded = awardNefarioPrinciple(server, reboundOwner);
-        }
-
         if (now < reboundAt) return;
         if (MoonScale.stage(server) == CompressionStage.NORMAL) {
             clearRebound();

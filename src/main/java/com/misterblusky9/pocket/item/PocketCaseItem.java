@@ -14,6 +14,7 @@ import com.misterblusky9.pocket.scale.ScaleController;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.misterblusky9.pocket.scale.SubLevelParentage;
 import com.misterblusky9.pocket.client.PocketedSubLevelItemRenderer;
+import com.simibubi.create.AllDataComponents;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
@@ -117,6 +118,8 @@ public class PocketCaseItem extends PackageItem {
 
     public PocketCaseItem(final Properties properties) {
         super(properties, STYLE);
+        PackageStyles.ALL_BOXES.remove(this);
+        PackageStyles.STANDARD_BOXES.remove(this);
     }
 
     @Override
@@ -300,10 +303,7 @@ public class PocketCaseItem extends PackageItem {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
         if (level.isClientSide) return;
 
-        if (!isFilled(stack)) {
-            markOrphaned(stack, entity, slotId, "no payload token on the carrier");
-            return;
-        }
+        if (!isFilled(stack)) return;
 
         if (!(level instanceof final ServerLevel currentLevel)) return;
 
@@ -371,7 +371,7 @@ public class PocketCaseItem extends PackageItem {
     public InteractionResultHolder<ItemStack> use(final Level level, final Player player, final InteractionHand hand) {
         final ItemStack stack = player.getItemInHand(hand);
 
-        if (!isFilled(stack)) return InteractionResultHolder.pass(stack);
+        if (!isFilled(stack)) return super.use(level, player, hand);
 
         if (player.isShiftKeyDown()) {
             if (!level.isClientSide) rotatePreferredYaw(stack, Math.PI * 0.5D);
@@ -389,6 +389,11 @@ public class PocketCaseItem extends PackageItem {
             final LivingEntity entity,
             final int remainingUseTicks
     ) {
+        if (!isFilled(stack)) {
+            super.releaseUsing(stack, level, entity, remainingUseTicks);
+            return;
+        }
+
         if (!(entity instanceof final Player player)) return;
 
         final int elapsed = getUseDuration(stack, entity) - remainingUseTicks;
@@ -430,7 +435,8 @@ public class PocketCaseItem extends PackageItem {
     public InteractionResult useOn(final UseOnContext context) {
         final Player player = context.getPlayer();
         final ItemStack stack = context.getItemInHand();
-        if (player == null || !isFilled(stack)) return InteractionResult.PASS;
+        if (player == null) return InteractionResult.PASS;
+        if (!isFilled(stack)) return super.useOn(context);
 
         if (!player.isShiftKeyDown()) return super.useOn(context);
 
@@ -1612,6 +1618,11 @@ public class PocketCaseItem extends PackageItem {
         }
 
         if (tag == null || !tag.hasUUID(TOKEN_KEY)) {
+            if (stack.has(AllDataComponents.PACKAGE_CONTENTS)) {
+                super.appendHoverText(stack, context, tooltip, flag);
+                return;
+            }
+
             tooltip.add(Component.literal(
                     "Sneak-use a 1/16× contraption while holding an Empty Cardboard Box.")
                     .withStyle(ChatFormatting.GRAY));

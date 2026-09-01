@@ -8,6 +8,7 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.Vec3;
@@ -30,6 +31,22 @@ public final class EntityScaleTracker {
     private static final Map<Entity, State> STATES =
             Collections.synchronizedMap(new WeakHashMap<>());
 
+    public static void forget(final Entity entity) {
+        if (entity == null) return;
+
+        final State previous = STATES.remove(entity);
+
+        if (PehkuiScaleBridge.ownsScaling()) {
+            PehkuiScaleBridge.clear(entity);
+            if (previous != null && previous.personalScaleOwned) {
+                PehkuiScaleBridge.clearPersonalScale(entity);
+            }
+        } else if (previous != null
+                && Math.abs(previous.dimensionScale - 1.0D) > 1.0E-5D) {
+            entity.refreshDimensions();
+        }
+    }
+
     public static void tick(final Entity entity) {
         if (entity == null) return;
 
@@ -42,11 +59,7 @@ public final class EntityScaleTracker {
         }
 
         if (entity instanceof final Player player) {
-            if (PehkuiScaleBridge.ownsScaling()) {
-                tickPehkuiPlayer(player);
-            } else {
-                tickPlayer(player);
-            }
+            tickPlayer(player);
             return;
         }
 
@@ -131,7 +144,13 @@ public final class EntityScaleTracker {
     }
 
     public static double dimensionScale(final Entity entity) {
-        if (PehkuiScaleBridge.ownsScaling()) return 1.0D;
+        if (PehkuiScaleBridge.ownsScaling()) {
+            if (!(entity instanceof final Player player)) return 1.0D;
+
+            final SubLevel ridden = riddenSubLevel(player);
+            if (ridden == null || ridden.isRemoved()) return 1.0D;
+            return sanitize(scaleOf(ridden));
+        }
 
         final State state = STATES.get(entity);
         if (state == null) return 1.0D;
@@ -158,9 +177,16 @@ public final class EntityScaleTracker {
         final SubLevel ridden = riddenSubLevel(player);
 
         if (ridden == null) {
-            final State previous = STATES.remove(player);
+            final State previous = STATES.get(player);
+
+            if (PehkuiScaleBridge.ownsScaling()) {
+                if (!tickDismountedPehkuiScale(player, previous)) STATES.remove(player);
+            } else {
+                STATES.remove(player);
+            }
 
             if (previous != null && Math.abs(previous.dimensionScale - 1.0D) > 1.0E-5D) {
+                previous.dimensionScale = 1.0D;
                 player.refreshDimensions();
             }
             return;
@@ -171,73 +197,46 @@ public final class EntityScaleTracker {
 
         state.mode = Mode.TRACKING;
         state.subLevel = ridden;
+        state.seatSubLevel = ridden;
         state.missingTicks = 0;
         clearCandidate(state);
         state.dimensionScale = sanitize(scaleOf(ridden));
+
+        releasePersonalScale(player, state);
 
         if (Math.abs(before - state.dimensionScale) > 1.0E-5D) {
             player.refreshDimensions();
         }
     }
 
-    private static void tickPehkuiPlayer(final Player player) {
-        final SubLevel ridden = riddenSubLevel(player);
-        State state = STATES.get(player);
+    private static boolean tickDismountedPehkuiScale(final Player player, final State state) {
+        if (state == null) return false;
+        if (player.level().isClientSide) return state.seatSubLevel != null;
 
-        if (ridden != null) {
-            if (state == null) {
-                state = new State();
-                STATES.put(player, state);
-            }
-
-            final double scale = sanitize(scaleOf(ridden));
-            final boolean changed = !state.seatScaled
-                    || state.subLevel != ridden
-                    || Math.abs(state.dimensionScale - scale) > PocketSized.EPSILON;
-
-            state.mode = Mode.TRACKING;
-            state.subLevel = ridden;
-            state.missingTicks = 0;
-            state.dimensionScale = scale;
-            state.seatScaled = true;
-            clearCandidate(state);
-
-            if (changed) {
-                PehkuiScaleBridge.setPersonalScale(player, scale);
-            }
-            return;
+        final SubLevel bound = state.seatSubLevel;
+        if (bound == null || bound.isRemoved() || !isNear(player, bound)) {
+            state.seatSubLevel = null;
+            releasePersonalScale(player, state);
+            return false;
         }
 
-        if (state == null || !state.seatScaled) {
-            STATES.remove(player);
-            return;
+        final double scale = sanitize(scaleOf(bound));
+        if (!state.personalScaleOwned
+                || Math.abs(state.personalScale - scale) > PocketSized.EPSILON) {
+            PehkuiScaleBridge.snapPersonalScale(player, scale);
+            state.personalScaleOwned = true;
+            state.personalScale = scale;
         }
-
-        if (state.subLevel == null || state.subLevel.isRemoved()) {
-            PehkuiScaleBridge.clearPersonalScale(player);
-            STATES.remove(player);
-            return;
-        }
-
-        final Association immediate = resolveImmediate(player);
-        if (immediate.subLevel == state.subLevel || shouldKeepPreviousBinding(player, state)) {
-            state.mode = Mode.TRACKING;
-            state.missingTicks = 0;
-            return;
-        }
-
-        state.missingTicks++;
-        if (state.missingTicks <= LOST_TRACKING_GRACE_TICKS) return;
-
-        PehkuiScaleBridge.clearPersonalScale(player);
-        STATES.remove(player);
+        return true;
     }
 
-    public static double pehkuiRidingScale(final Entity entity, final SubLevel subLevel) {
-        if (!(entity instanceof final Player player) || !PehkuiScaleBridge.ownsScaling()) return 1.0D;
-        final SubLevel ridden = riddenSubLevel(player);
-        if (ridden == null || ridden != subLevel || ridden.isRemoved()) return 1.0D;
-        return sanitize(scaleOf(ridden));
+    private static void releasePersonalScale(final Player player, final State state) {
+        if (state == null || !state.personalScaleOwned) return;
+        if (player.level().isClientSide) return;
+
+        PehkuiScaleBridge.snapPersonalScale(player, 1.0D);
+        state.personalScaleOwned = false;
+        state.personalScale = 1.0D;
     }
 
     private static SubLevel riddenSubLevel(final Player player) {
@@ -258,7 +257,12 @@ public final class EntityScaleTracker {
     }
 
     public static double renderScale(final Entity entity, final float partialTick) {
-        if (PehkuiScaleBridge.ownsScaling()) return 1.0D;
+        if (PehkuiScaleBridge.ownsScaling() && !(entity instanceof HangingEntity)) {
+            if (!(entity instanceof final Player player)) return 1.0D;
+
+            final SubLevel ridden = riddenSubLevel(player);
+            if (ridden == null || ridden.isRemoved()) return 1.0D;
+        }
 
         if (entity instanceof final Player player) {
             final SubLevel ridden = riddenSubLevel(player);
@@ -324,28 +328,26 @@ public final class EntityScaleTracker {
 
     private static boolean shouldKeepPreviousBinding(final Entity entity, final State state) {
         if (state.subLevel == null || state.subLevel.isRemoved()) return false;
+        if (!isNear(entity, state.subLevel)) return false;
 
+        state.missingTicks = 0;
+        return true;
+    }
+
+    private static boolean isNear(final Entity entity, final SubLevel subLevel) {
         final Vec3 p = entity.position();
-        final var bounds = state.subLevel.boundingBox();
+        final var bounds = subLevel.boundingBox();
 
-        final double scale = scaleOf(state.subLevel);
+        final double scale = scaleOf(subLevel);
         final double horizontal = Math.max(MIN_NEAR_MARGIN, NEAR_HORIZONTAL_MARGIN * scale);
         final double vertical = Math.max(MIN_NEAR_MARGIN, NEAR_VERTICAL_MARGIN * scale);
 
-        final boolean near =
-                p.x >= bounds.minX() - horizontal
-                        && p.x <= bounds.maxX() + horizontal
-                        && p.z >= bounds.minZ() - horizontal
-                        && p.z <= bounds.maxZ() + horizontal
-                        && p.y >= bounds.minY() - vertical
-                        && p.y <= bounds.maxY() + vertical;
-
-        if (near) {
-            state.missingTicks = 0;
-            return true;
-        }
-
-        return false;
+        return p.x >= bounds.minX() - horizontal
+                && p.x <= bounds.maxX() + horizontal
+                && p.z >= bounds.minZ() - horizontal
+                && p.z <= bounds.maxZ() + horizontal
+                && p.y >= bounds.minY() - vertical
+                && p.y <= bounds.maxY() + vertical;
     }
 
     private static boolean hasSubLevels(final Entity entity) {
@@ -432,7 +434,9 @@ public final class EntityScaleTracker {
         private SubLevel candidateSubLevel;
         private int candidateTicks;
         private double dimensionScale = 1.0D;
-        private boolean seatScaled;
+        private SubLevel seatSubLevel;
+        private boolean personalScaleOwned;
+        private double personalScale = 1.0D;
     }
 
     private EntityScaleTracker() {

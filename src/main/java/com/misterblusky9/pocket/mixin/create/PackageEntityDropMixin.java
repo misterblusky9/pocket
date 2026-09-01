@@ -26,7 +26,12 @@ public abstract class PackageEntityDropMixin {
     ) {
         final PackageEntity self = (PackageEntity) (Object) this;
         final ItemStack box = self.box;
-        if (box == null || box.isEmpty() || !(box.getItem() instanceof PocketCaseItem)) return;
+        if (box == null
+                || box.isEmpty()
+                || !(box.getItem() instanceof PocketCaseItem)
+                || !PocketCaseItem.isFilled(box)) {
+            return;
+        }
 
         ci.cancel();
         final ItemStack recovery = box.copy();

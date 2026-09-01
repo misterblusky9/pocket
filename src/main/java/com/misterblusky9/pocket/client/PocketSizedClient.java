@@ -35,6 +35,7 @@ public final class PocketSizedClient {
         modBus.addListener(TheMoonPackageRenderer::register);
         modBus.addListener(PocketShaders::register);
         modBus.addListener(PortableSubspaceCompressorRenderer::register);
+        modBus.addListener(StaticSubspaceCompressorRenderer::register);
         modBus.addListener(SubspaceRecyclerRenderer::register);
         modBus.addListener(SubspaceRecyclerRenderer::registerVisual);
         modBus.addListener(PocketKeys::register);

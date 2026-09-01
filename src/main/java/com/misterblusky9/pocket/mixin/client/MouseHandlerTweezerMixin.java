@@ -43,6 +43,12 @@ public abstract class MouseHandlerTweezerMixin {
             return;
         }
 
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT
+                && MoonPunchClient.tryPunch()) {
+            ci.cancel();
+            return;
+        }
+
         if (TweezerDrag.acceptingInput()) {
             if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
                 TweezerDrag.toggleDrag();
@@ -54,11 +60,6 @@ public abstract class MouseHandlerTweezerMixin {
                 TweezerDrag.punch();
                 ci.cancel();
             }
-            return;
-        }
-
-        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && MoonPunchClient.tryPunch()) {
-            ci.cancel();
         }
     }
 

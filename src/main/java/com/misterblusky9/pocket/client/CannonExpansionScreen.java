@@ -2,7 +2,6 @@ package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.network.CannonExpansionPayload;
 import com.misterblusky9.pocket.pocket.CannonExpansionMode;
-import com.simibubi.create.foundation.gui.AllGuiTextures;
 import com.simibubi.create.foundation.gui.AllIcons;
 import com.simibubi.create.foundation.gui.widget.IconButton;
 import net.createmod.catnip.gui.AbstractSimiScreen;
@@ -17,16 +16,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CannonExpansionScreen extends AbstractSimiScreen {
-    private final PocketGuiTexture background = PocketGuiTexture.CANNON;
+    private static final int GUI_WIDTH = 234;
+    private static final int SLOT_ROW_TOP = 28;
+    private static final int BUTTON_SIZE = 18;
+    private static final int SLOT_PITCH = 18;
+
+    private final PocketGuiTexture background = PocketGuiTexture.POTATO_CANNON;
     private final ItemStack cannon;
     private final InteractionHand hand;
     private final Component title = Component.literal("Projectile Expansion");
-
-    private static final int SLOT_ROW_LEFT = 63;
-    private static final int SLOT_ROW_TOP = 28;
-    private static final int SLOT_PITCH = 18;
-
     private final List<IconButton> modeButtons = new ArrayList<>(CannonExpansionMode.values().length);
+
     private CannonExpansionMode selected;
 
     public CannonExpansionScreen(final ItemStack cannon, final InteractionHand hand) {
@@ -37,7 +37,7 @@ public class CannonExpansionScreen extends AbstractSimiScreen {
 
     @Override
     protected void init() {
-        setWindowSize(this.background.getWidth(), this.background.getHeight());
+        setWindowSize(GUI_WIDTH, this.background.getHeight());
         setWindowOffset(-10, 0);
         super.init();
 
@@ -45,16 +45,26 @@ public class CannonExpansionScreen extends AbstractSimiScreen {
         final int y = this.guiTop;
 
         final IconButton confirm = new IconButton(
-                x + this.background.getWidth() - 33, y + this.background.getHeight() - 24, AllIcons.I_CONFIRM);
+                x + GUI_WIDTH - 33,
+                y + this.background.getHeight() - 24,
+                AllIcons.I_CONFIRM
+        );
         confirm.withCallback(this::onClose);
         addRenderableWidget(confirm);
 
         this.modeButtons.clear();
-        for (final CannonExpansionMode mode : CannonExpansionMode.values()) {
-            final int index = this.modeButtons.size();
 
+        final CannonExpansionMode[] modes = CannonExpansionMode.values();
+        final int rowWidth = BUTTON_SIZE + (modes.length - 1) * SLOT_PITCH;
+        final int rowLeft = (this.background.getWidth() - rowWidth) / 2;
+
+        for (int i = 0; i < modes.length; i++) {
+            final CannonExpansionMode mode = modes[i];
             final IconButton button = new IconButton(
-                    x + SLOT_ROW_LEFT + index * SLOT_PITCH, y + SLOT_ROW_TOP, iconFor(mode));
+                    x + rowLeft + i * SLOT_PITCH,
+                    y + SLOT_ROW_TOP,
+                    iconFor(mode)
+            );
 
             button.withCallback(() -> {
                 this.modeButtons.forEach(other -> other.green = false);
@@ -70,19 +80,28 @@ public class CannonExpansionScreen extends AbstractSimiScreen {
     }
 
     @Override
-    protected void renderWindow(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTicks) {
+    protected void renderWindow(
+            final GuiGraphics graphics,
+            final int mouseX,
+            final int mouseY,
+            final float partialTicks
+    ) {
         final int x = this.guiLeft;
         final int y = this.guiTop;
 
         this.background.render(graphics, x, y);
         graphics.drawString(
-                this.font, this.title,
-                x + (this.background.getWidth() - this.font.width(this.title)) / 2, y + 4,
-                0x54_1F_4F, false);
+                this.font,
+                this.title,
+                x + (this.background.getWidth() - this.font.width(this.title)) / 2,
+                y + 4,
+                0xFF_FF_FF,
+                false
+        );
 
         GuiGameElement.of(this.cannon)
                 .scale(4.0D)
-                .at(x + this.background.getWidth(), y + this.background.getHeight() - 48, -200.0F)
+                .at(x + GUI_WIDTH, y + this.background.getHeight() - 48, -200.0F)
                 .render(graphics);
     }
 

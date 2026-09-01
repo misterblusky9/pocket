@@ -28,5 +28,14 @@ public final class ModBlockEntities {
                     ).build(null)
             );
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<StaticSubspaceCompressorBlockEntity>>
+            STATIC_SUBSPACE_COMPRESSOR = BLOCK_ENTITIES.register(
+                    "static_subspace_compressor",
+                    () -> BlockEntityType.Builder.of(
+                            StaticSubspaceCompressorBlockEntity::new,
+                            ModBlocks.STATIC_SUBSPACE_COMPRESSOR.get()
+                    ).build(null)
+            );
+
     private ModBlockEntities() {}
 }

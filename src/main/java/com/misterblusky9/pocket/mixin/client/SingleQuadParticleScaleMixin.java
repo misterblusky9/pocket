@@ -2,102 +2,67 @@ package com.misterblusky9.pocket.mixin.client;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.scale.ScaleState;
-import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.SingleQuadParticle;
-import net.minecraft.core.Position;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.particle.TerrainParticle;
 import org.joml.Vector3dc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import org.spongepowered.asm.mixin.injection.Redirect;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.Map;
 import java.util.UUID;
 
 @Mixin(SingleQuadParticle.class)
 public abstract class SingleQuadParticleScaleMixin {
-    @Unique private double pocket$bornScale;
-
-    @Inject(method = "<init>(Lnet/minecraft/client/multiplayer/ClientLevel;DDD)V", at = @At("TAIL"))
-    private void pocket$captureBornScale(
-            final ClientLevel level, final double x, final double y, final double z, final CallbackInfo ci
-    ) {
-        this.pocket$bornScale = pocket$scaleAtBirth(level, x, y, z);
-    }
-
-    @Inject(method = "<init>(Lnet/minecraft/client/multiplayer/ClientLevel;DDDDDD)V", at = @At("TAIL"))
-    private void pocket$captureBornScaleWithVelocity(
-            final ClientLevel level,
-            final double x, final double y, final double z,
-            final double xSpeed, final double ySpeed, final double zSpeed,
-            final CallbackInfo ci
-    ) {
-        this.pocket$bornScale = pocket$scaleAtBirth(level, x, y, z);
-    }
-
-    @Unique
-    private static boolean pocket$sizeScaledByCaller;
-
-    @Redirect(
-            method = "renderRotatedQuad(Lcom/mojang/blaze3d/vertex/VertexConsumer;Lorg/joml/Quaternionf;FFFF)V",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Lnet/minecraft/client/particle/SingleQuadParticle;getQuadSize(F)F"
-            )
-    )
-    private float pocket$scaleParticleQuad(final SingleQuadParticle particle, final float partialTick) {
-        final float vanillaSize;
-        pocket$sizeScaledByCaller = true;
-        try {
-            vanillaSize = particle.getQuadSize(partialTick);
-        } finally {
-            pocket$sizeScaledByCaller = false;
-        }
-
-        final double scale = this.pocket$bornScale;
-        if (scale <= 0.0D || Math.abs(scale - 1.0D) <= PocketSized.EPSILON) return vanillaSize;
-
-        return vanillaSize * (float) scale;
-    }
+    @Unique private double pocket$scale = 1.0D;
+    @Unique private int pocket$scaleStamp = Integer.MIN_VALUE;
 
     @Inject(method = "getQuadSize", at = @At("RETURN"), cancellable = true)
-    private void pocket$scaleQuadSizeAtSource(
-            final float partialTick, final CallbackInfoReturnable<Float> cir
+    private void pocket$scaleQuadSize(
+            final float partialTick,
+            final CallbackInfoReturnable<Float> cir
     ) {
-        if (pocket$sizeScaledByCaller) return;
-
-        final double scale = this.pocket$bornScale;
-        if (scale <= 0.0D || Math.abs(scale - 1.0D) <= PocketSized.EPSILON) return;
-
+        final double scale = pocket$currentScale();
+        if (Math.abs(scale - 1.0D) <= PocketSized.EPSILON) return;
         cir.setReturnValue(cir.getReturnValueF() * (float) scale);
     }
 
     @Unique
-    private static double pocket$scaleAtBirth(
-            final ClientLevel level, final double x, final double y, final double z
-    ) {
-        if (level == null) return 0.0D;
+    private double pocket$currentScale() {
+        final ParticleMotionAccessor particle = (ParticleMotionAccessor) this;
+        final int age = particle.pocket$getAge();
+        if (this.pocket$scaleStamp == age) return this.pocket$scale;
 
-        final SubLevel plotOwner = Sable.HELPER.getContainingClient((Position) new Vec3(x, y, z));
-        if (plotOwner instanceof final ClientSubLevel subLevel && !subLevel.isRemoved()) {
-            return pocket$uniformScale(subLevel);
-        }
+        this.pocket$scaleStamp = age;
+        this.pocket$scale = pocket$enclosingScale(particle);
+        return this.pocket$scale;
+    }
+
+    @Unique
+    private double pocket$enclosingScale(final ParticleMotionAccessor particle) {
+        // Terrain particles already inherit their sub-level's scale on spawn.
+        if ((Object) this instanceof TerrainParticle) return 1.0D;
+
+        final ClientLevel level = particle.pocket$getLevel();
+        if (level == null) return 1.0D;
 
         final Map<UUID, Double> scaled = ScaleState.clientScaledView();
-        if (scaled.isEmpty()) return 0.0D;
+        if (scaled.isEmpty()) return 1.0D;
 
         final SubLevelContainer container = SubLevelContainer.getContainer(level);
-        if (container == null) return 0.0D;
+        if (container == null) return 1.0D;
 
-        double best = 0.0D;
+        final double px = particle.pocket$getX();
+        final double py = particle.pocket$getY();
+        final double pz = particle.pocket$getZ();
+
+        double best = 1.0D;
         double bestVolume = Double.MAX_VALUE;
 
         for (final UUID id : scaled.keySet()) {
@@ -106,9 +71,9 @@ public abstract class SingleQuadParticleScaleMixin {
 
             final var bounds = subLevel.boundingBox();
             if (bounds == null) continue;
-            if (x < bounds.minX() || x > bounds.maxX()
-                    || y < bounds.minY() || y > bounds.maxY()
-                    || z < bounds.minZ() || z > bounds.maxZ()) {
+            if (px < bounds.minX() || px > bounds.maxX()
+                    || py < bounds.minY() || py > bounds.maxY()
+                    || pz < bounds.minZ() || pz > bounds.maxZ()) {
                 continue;
             }
 
@@ -117,8 +82,11 @@ public abstract class SingleQuadParticleScaleMixin {
                     * (bounds.maxZ() - bounds.minZ());
             if (volume >= bestVolume) continue;
 
+            final double uniform = pocket$uniformScale(subLevel);
+            if (uniform <= 0.0D) continue;
+
             bestVolume = volume;
-            best = pocket$uniformScale(subLevel);
+            best = uniform;
         }
 
         return best;
@@ -131,6 +99,7 @@ public abstract class SingleQuadParticleScaleMixin {
                 || Math.abs(scale.x() - scale.z()) > PocketSized.EPSILON) {
             return 0.0D;
         }
+
         final double uniform = scale.x();
         return Double.isFinite(uniform) && uniform > 0.0D ? uniform : 0.0D;
     }

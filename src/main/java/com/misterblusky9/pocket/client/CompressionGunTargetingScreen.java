@@ -20,8 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
-    private static final int BUTTON_LEFT = 58;
-    private static final int BUTTON_TOP = 22;
+    private static final int BUTTON_TOP = 28;
     private static final int BUTTON_PITCH = 18;
 
     private final PocketGuiTexture background;
@@ -37,7 +36,7 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
         this.tool = tool;
         this.hand = hand;
         this.creativeRay = tool.getItem() instanceof CreativeShrinkRayItem;
-        this.background = this.creativeRay ? PocketGuiTexture.CANNON : PocketGuiTexture.compressionGun();
+        this.background = PocketGuiTexture.SHRINKRAY;
         this.selected = this.creativeRay
                 ? CreativeShrinkRayItem.targetingMode(tool)
                 : CompressionGunItem.targetingMode(tool);
@@ -65,20 +64,33 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
         addRenderableWidget(confirm);
 
         this.modeButtons.clear();
-        addModeButton(CompressionGunTargetingMode.SUBLEVEL, AllIcons.I_TARGET);
-        addModeButton(CompressionGunTargetingMode.CONNECTED_SUBLEVELS, AllIcons.I_ACTIVE);
+
+        final List<CompressionGunTargetingMode> availableModes = new ArrayList<>(3);
+        availableModes.add(CompressionGunTargetingMode.SUBLEVEL);
+        availableModes.add(CompressionGunTargetingMode.CONNECTED_SUBLEVELS);
         if (PehkuiScaleBridge.ownsScaling()) {
-            addModeButton(CompressionGunTargetingMode.SELF, AllIcons.I_CONFIRM);
+            availableModes.add(CompressionGunTargetingMode.SELF);
+        }
+
+        final int rowWidth = availableModes.size() * BUTTON_PITCH;
+        final int rowLeft = (this.background.getWidth() - rowWidth) / 2 - 4;
+
+        for (int i = 0; i < availableModes.size(); i++) {
+            final CompressionGunTargetingMode mode = availableModes.get(i);
+            addModeButton(mode, iconFor(mode), rowLeft + i * BUTTON_PITCH);
         }
 
         refreshSelection();
     }
 
-    private void addModeButton(final CompressionGunTargetingMode mode, final AllIcons icon) {
-        final int index = this.modeButtons.size();
+    private void addModeButton(
+            final CompressionGunTargetingMode mode,
+            final AllIcons icon,
+            final int left
+    ) {
         final IconButton button = new IconButton(
-                this.guiLeft + BUTTON_LEFT,
-                this.guiTop + BUTTON_TOP + index * BUTTON_PITCH,
+                this.guiLeft + left,
+                this.guiTop + BUTTON_TOP,
                 icon
         );
 
@@ -114,21 +126,9 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
                 this.title,
                 x + (this.background.getWidth() - this.font.width(this.title)) / 2,
                 y + 4,
-                0x54_1F_4F,
+                0xFF_FF_FF,
                 false
         );
-
-        for (int i = 0; i < this.modeButtons.size(); i++) {
-            final Component label = Component.literal(this.modeButtons.get(i).mode().label());
-            graphics.drawString(
-                    this.font,
-                    label,
-                    x + BUTTON_LEFT + 24,
-                    y + BUTTON_TOP + 5 + i * BUTTON_PITCH,
-                    0xFF_FF_FF,
-                    true
-            );
-        }
 
         GuiGameElement.of(this.tool)
                 .scale(3.25D)
@@ -150,6 +150,14 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
                 this.selected,
                 CompressionGunItem.isGrowing(this.tool)
         ));
+    }
+
+    private static AllIcons iconFor(final CompressionGunTargetingMode mode) {
+        return switch (mode) {
+            case SUBLEVEL -> AllIcons.I_TARGET;
+            case CONNECTED_SUBLEVELS -> AllIcons.I_ACTIVE;
+            case SELF -> AllIcons.I_CONFIRM;
+        };
     }
 
     private record ModeButton(CompressionGunTargetingMode mode, IconButton button) {}

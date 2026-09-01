@@ -21,6 +21,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.COMPRESSION_GUN.get());
                         output.accept(ModItems.CREATIVE_SHRINK_RAY.get());
                         output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
+                        output.accept(ModItems.STATIC_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.EMPTY_BOX.get());
                         output.accept(ModItems.DISPLAY_BOTTLE.get());
                         output.accept(ModItems.BRASS_DISPLAY_CASE.get());

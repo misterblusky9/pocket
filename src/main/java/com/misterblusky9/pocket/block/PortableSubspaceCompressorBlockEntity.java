@@ -6,6 +6,7 @@ import com.misterblusky9.pocket.compression.CompressionSessions;
 import com.misterblusky9.pocket.network.CompressionSyncPayload;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.CompressionStage;
+import com.misterblusky9.pocket.scale.ManualScaleOverride;
 import com.misterblusky9.pocket.scale.ScaleCommandSource;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
@@ -53,6 +54,16 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
         }
 
         remember(subLevel);
+
+        if (ManualScaleOverride.isSuspended(
+                subLevel.getUniqueId(), subLevel.getLevel().getGameTime())) {
+            this.commandedTarget = null;
+            this.sealed = false;
+            this.fieldActive = false;
+            clearAcquisition();
+            return;
+        }
+
         this.operational = Math.abs(getSpeed()) >= MIN_OPERATING_RPM;
         this.desiredStage = stageForSignal(readRedstoneSignal());
 
