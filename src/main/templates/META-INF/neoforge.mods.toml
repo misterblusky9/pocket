@@ -17,9 +17,6 @@ recover wrecks, manipulate miniatures, and fire unprotected pocketed contraption
 [[mixins]]
 config="pocket.mixins.json"
 
-[[mixins]]
-config="pocket.helm.mixins.json"
-
 # Optional
 [[mixins]]
 config="pocket.aeronautics.mixins.json"
