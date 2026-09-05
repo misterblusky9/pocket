@@ -53,6 +53,16 @@ public final class ModBlocks {
                     )
             );
 
+    public static final DeferredHolder<Block, HelmBearingBlock> HELM_BEARING =
+            BLOCKS.register(
+                    "helm_bearing",
+                    () -> new HelmBearingBlock(
+                            BlockBehaviour.Properties.ofFullCopy(Blocks.ANDESITE)
+                                    .mapColor(MapColor.PODZOL)
+                                    .noOcclusion()
+                    )
+            );
+
     public static final DeferredHolder<Block, SwitchPistonBlock> SWITCH_PISTON =
             BLOCKS.register(
                     "switch_piston",

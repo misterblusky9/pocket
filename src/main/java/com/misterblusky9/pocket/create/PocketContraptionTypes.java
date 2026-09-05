@@ -16,6 +16,12 @@ public final class PocketContraptionTypes {
             new ContraptionType(SwitchBearingContraption::new)
     );
 
+    public static final Holder.Reference<ContraptionType> HELM_BEARING = Registry.registerForHolder(
+            CreateBuiltInRegistries.CONTRAPTION_TYPE,
+            ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "helm_bearing"),
+            new ContraptionType(HelmBearingContraption::new)
+    );
+
     public static final Holder.Reference<ContraptionType> SWITCH_PISTON = Registry.registerForHolder(
             CreateBuiltInRegistries.CONTRAPTION_TYPE,
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "switch_piston"),
@@ -27,8 +33,10 @@ public final class PocketContraptionTypes {
     public static void register(final RegisterEvent event) {
         if (!announced) {
             announced = true;
-            SwitchBearingDebug.info("Contraption type bootstrap loaded: {}:switch_bearing, {}:switch_piston",
-                    PocketSized.MOD_ID, PocketSized.MOD_ID);
+            SwitchBearingDebug.info(
+                    "Contraption type bootstrap loaded: {}:switch_bearing, {}:helm_bearing, {}:switch_piston",
+                    PocketSized.MOD_ID, PocketSized.MOD_ID, PocketSized.MOD_ID
+            );
         }
     }
 

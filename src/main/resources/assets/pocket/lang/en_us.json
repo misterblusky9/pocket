@@ -20,6 +20,8 @@
   "pocket.static_subspace_compressor.mode.grow": "Enlarge",
   "pocket.static_subspace_compressor.mode": "Mode",
   "block.pocket.switch_bearing": "Switch Bearing",
+  "block.pocket.helm_bearing": "Helm Bearing",
+  "pocket.helm_bearing.angle_limit": "Steering Range",
   "pocket.switch.control_mode": "Control Mode",
   "pocket.switch.control_mode.impulse": "Impulse",
   "pocket.switch.control_mode.toggle": "Toggle",

@@ -1,0 +1,36 @@
+diff --git a/src/main/java/com/misterblusky9/pocket/config/PocketServerConfig.java b/src/main/java/com/misterblusky9/pocket/config/PocketServerConfig.java
+--- a/src/main/java/com/misterblusky9/pocket/config/PocketServerConfig.java
++++ b/src/main/java/com/misterblusky9/pocket/config/PocketServerConfig.java
+@@ -25,10 +25,11 @@ public final class PocketServerConfig {
+         SCALE_PLAYER_IN_SHRUNKEN_SEAT = builder
+                 .comment(
+                         "Scale the player while they ride a seat inside a shrunken sublevel.",
+-                        "When false Pocket Sized leaves the player full-size, keeps Create seat",
+-                        "placement unchanged, and removes only sublevel scale from Sable's rider",
+-                        "eye offset so first-person eye height stays at the player's normal scale.",
++                        "When false Pocket Sized leaves the player full-size while keeping their",
++                        "riding anchor attached to scaled Create seats, and removes only sublevel",
++                        "scale from Sable's rider eye offset so first-person eye height stays at",
++                        "the player's normal scale.",
+                         "Sublevel rotation is preserved. Pehkui scaling from other mods is untouched."
+                 )
+                 .define("scalePlayerInShrunkenSeat", true);
+diff --git a/src/main/java/com/misterblusky9/pocket/mixin/create/ScaledSubLevelSeatPositionMixin.java b/src/main/java/com/misterblusky9/pocket/mixin/create/ScaledSubLevelSeatPositionMixin.java
+--- a/src/main/java/com/misterblusky9/pocket/mixin/create/ScaledSubLevelSeatPositionMixin.java
++++ b/src/main/java/com/misterblusky9/pocket/mixin/create/ScaledSubLevelSeatPositionMixin.java
+@@ -1,7 +1,6 @@
+ package com.misterblusky9.pocket.mixin.create;
+
+ import com.misterblusky9.pocket.PocketSized;
+-import com.misterblusky9.pocket.config.PocketServerConfig;
+ import com.simibubi.create.content.contraptions.actors.seat.SeatEntity;
+ import dev.ryanhcode.sable.Sable;
+ import dev.ryanhcode.sable.sublevel.SubLevel;
+@@ -27,7 +26,6 @@ public abstract class ScaledSubLevelSeatPositionMixin {
+             final Entity.MoveFunction callback,
+             final CallbackInfo ci
+     ) {
+-        if (!PocketServerConfig.scalePlayerInShrunkenSeat()) return;
+         if (!(passenger instanceof Player)) return;
+
+         final SeatEntity seat = (SeatEntity) (Object) this;

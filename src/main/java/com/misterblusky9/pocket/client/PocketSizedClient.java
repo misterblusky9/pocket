@@ -30,8 +30,11 @@ public final class PocketSizedClient {
             final net.minecraft.world.item.ItemStack carrier) {
         return CONTAINER_MODELS.get(com.misterblusky9.pocket.item.PocketContainer.of(carrier));
     }
+
     public PocketSizedClient(final IEventBus modBus) {
         SwitchBearingPartials.init();
+        HelmBearingPartials.init();
+        HelmBearingHandler.register();
         modBus.addListener(PocketPackageModels::register);
         modBus.addListener(TheMoonPackageRenderer::register);
         modBus.addListener(PocketShaders::register);
@@ -39,6 +42,8 @@ public final class PocketSizedClient {
         modBus.addListener(StaticSubspaceCompressorRenderer::register);
         modBus.addListener(SwitchBearingRenderer::register);
         modBus.addListener(SwitchBearingRenderer::registerVisual);
+        modBus.addListener(HelmBearingRenderer::register);
+        modBus.addListener(HelmBearingRenderer::registerVisual);
         modBus.addListener(SwitchPistonRenderer::register);
         modBus.addListener(SwitchPistonRenderer::registerVisual);
         modBus.addListener(SubspaceRecyclerRenderer::register);
