@@ -56,6 +56,8 @@ public final class PocketedSubLevelEvents {
         if (!(event.getLevel() instanceof final ServerLevel serverLevel)
                 || !(found instanceof final ServerSubLevel subLevel)) return;
 
+        PocketedEntities.disassembleContraptions(serverLevel, subLevel);
+
         final PocketMetrics metrics = PocketMetrics.measureForCompression(subLevel, serverLevel.getGameTime());
         if (metrics.blocks() > PocketSized.MAX_COMPRESSED_BLOCKS) {
             player.displayClientMessage(Component.literal("Pocket Sized hard limit: "

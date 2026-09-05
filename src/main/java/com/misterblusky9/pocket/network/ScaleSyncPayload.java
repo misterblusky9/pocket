@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public record ScaleSyncPayload(
         UUID subLevelId,
+        int interpolationTick,
         double currentScale,
         double targetScale,
         boolean snapInterpolation
@@ -22,13 +23,14 @@ public record ScaleSyncPayload(
             StreamCodec.of(
                     (buf, packet) -> {
                         buf.writeUUID(packet.subLevelId());
-
+                        buf.writeVarInt(packet.interpolationTick());
                         buf.writeFloat((float) packet.currentScale());
                         buf.writeFloat((float) packet.targetScale());
                         buf.writeBoolean(packet.snapInterpolation());
                     },
                     buf -> new ScaleSyncPayload(
                             buf.readUUID(),
+                            buf.readVarInt(),
                             buf.readFloat(),
                             buf.readFloat(),
                             buf.readBoolean()

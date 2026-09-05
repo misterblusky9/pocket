@@ -3,6 +3,7 @@ package com.misterblusky9.pocket.mixin.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.entity.EntityScaleTracker;
+import com.misterblusky9.pocket.entity.PrimedTntScaleAccess;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.world.entity.Entity;
@@ -39,7 +40,9 @@ public abstract class SubLevelEntityRenderScaleMixin {
             final CallbackInfo ci
     ) {
         final ArrayDeque<Boolean> stack = pocket$SCALE_STACK.get();
-        final double scale = EntityScaleTracker.renderScale(entity, partialTick);
+        final double scale = entity instanceof final PrimedTntScaleAccess tnt
+                ? tnt.pocket$renderScale(partialTick)
+                : EntityScaleTracker.renderScale(entity, partialTick);
 
         if (!Double.isFinite(scale)
                 || Math.abs(scale - 1.0D) <= PocketSized.EPSILON) {
@@ -77,11 +80,7 @@ public abstract class SubLevelEntityRenderScaleMixin {
             final CallbackInfo ci
     ) {
         final ArrayDeque<Boolean> stack = pocket$SCALE_STACK.get();
-        if (!stack.isEmpty() && stack.pop()) {
-            poseStack.popPose();
-        }
-        if (stack.isEmpty()) {
-            pocket$SCALE_STACK.remove();
-        }
+        if (!stack.isEmpty() && stack.pop()) poseStack.popPose();
+        if (stack.isEmpty()) pocket$SCALE_STACK.remove();
     }
 }

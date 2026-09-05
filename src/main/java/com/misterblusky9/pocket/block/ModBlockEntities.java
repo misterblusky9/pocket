@@ -37,5 +37,23 @@ public final class ModBlockEntities {
                     ).build(null)
             );
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SwitchBearingBlockEntity>>
+            SWITCH_BEARING = BLOCK_ENTITIES.register(
+                    "switch_bearing",
+                    () -> BlockEntityType.Builder.of(
+                            SwitchBearingBlockEntity::new,
+                            ModBlocks.SWITCH_BEARING.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SwitchPistonBlockEntity>>
+            SWITCH_PISTON = BLOCK_ENTITIES.register(
+                    "switch_piston",
+                    () -> BlockEntityType.Builder.of(
+                            SwitchPistonBlockEntity::new,
+                            ModBlocks.SWITCH_PISTON.get()
+                    ).build(null)
+            );
+
     private ModBlockEntities() {}
 }

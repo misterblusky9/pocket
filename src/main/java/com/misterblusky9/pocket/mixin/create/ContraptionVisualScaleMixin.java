@@ -2,9 +2,9 @@ package com.misterblusky9.pocket.mixin.create;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.debug.PocketTrace;
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.render.ContraptionVisual;
-import com.mojang.blaze3d.vertex.PoseStack;
 import dev.engine_room.flywheel.api.visual.DynamicVisual;
 import dev.engine_room.flywheel.api.visualization.VisualEmbedding;
 import dev.engine_room.flywheel.api.visualization.VisualizationContext;
@@ -15,8 +15,7 @@ import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.Vec3i;
 import net.minecraft.util.Mth;
-import org.joml.Matrix3f;
-import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 import org.spongepowered.asm.mixin.Final;
@@ -30,7 +29,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = ContraptionVisual.class, remap = false)
 public abstract class ContraptionVisualScaleMixin extends AbstractEntityVisual<AbstractContraptionEntity> {
     @Shadow @Final protected VisualEmbedding embedding;
-
     @Shadow @Final private PoseStack contraptionMatrix;
 
     private ContraptionVisualScaleMixin(
@@ -49,7 +47,6 @@ public abstract class ContraptionVisualScaleMixin extends AbstractEntityVisual<A
                             + "setEmbeddingMatrices(F)V",
                     shift = At.Shift.AFTER
             ),
-
             require = 1
     )
     private void pocket$scaleContraptionEmbedding(
@@ -78,23 +75,20 @@ public abstract class ContraptionVisualScaleMixin extends AbstractEntityVisual<A
         final Vec3i origin = this.renderOrigin();
         anchor.sub(origin.getX(), origin.getY(), origin.getZ());
 
-        final PoseStack.Pose pose = this.contraptionMatrix.last();
         final float s = (float) scale;
+        this.contraptionMatrix.setIdentity();
+        this.contraptionMatrix.translate(anchor.x, anchor.y, anchor.z);
+        this.contraptionMatrix.mulPose(new Quaternionf(renderPose.orientation()));
+        this.contraptionMatrix.scale(s, s, s);
+        host.applyLocalTransforms(this.contraptionMatrix, partialTick);
 
-        final Matrix4f scaled = new Matrix4f()
-                .translation((float) anchor.x, (float) anchor.y, (float) anchor.z)
-                .scale(s)
-                .translate((float) -anchor.x, (float) -anchor.y, (float) -anchor.z)
-                .mul(pose.pose());
-
-        final Matrix3f normal = new Matrix3f(pose.normal()).scale(1.0F / s);
+        final PoseStack.Pose pose = this.contraptionMatrix.last();
+        this.embedding.transforms(pose.pose(), pose.normal());
 
         PocketTrace.render(
                 "contraption:" + host.getId(),
                 "contraptionEmbedding entity={} id={} scale={} anchor={}",
                 host.getClass().getSimpleName(), host.getId(), scale, anchor);
-
-        this.embedding.transforms(scaled, normal);
     }
 
     @Unique

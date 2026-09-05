@@ -75,5 +75,15 @@ public final class ModItems {
     public static final DeferredItem<TheMoonItem> THE_MOON =
             ITEMS.register("the_moon", () -> new TheMoonItem(new Item.Properties().stacksTo(1)));
 
+    public static final DeferredItem<BlockItem> SWITCH_BEARING = ITEMS.register(
+            "switch_bearing",
+            () -> new BlockItem(ModBlocks.SWITCH_BEARING.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<BlockItem> SWITCH_PISTON = ITEMS.register(
+            "switch_piston",
+            () -> new BlockItem(ModBlocks.SWITCH_PISTON.get(), new Item.Properties())
+    );
+
     private ModItems() {}
 }

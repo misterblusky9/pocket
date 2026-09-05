@@ -23,11 +23,13 @@ public final class PocketIcon extends AllIcons {
     );
 
     private static final int ICON_SIZE = 16;
-    private static final int ATLAS_WIDTH = 32;
+    private static final int ATLAS_WIDTH = 64;
     private static final int ATLAS_HEIGHT = 16;
 
-    public static final PocketIcon GROW = new PocketIcon(0, 0);
-    public static final PocketIcon SHRINK = new PocketIcon(16, 0);
+    public static final PocketIcon GROW = cell(0);
+    public static final PocketIcon SHRINK = cell(1);
+    public static final PocketIcon SWITCH_IMPULSE = cell(2);
+    public static final PocketIcon SWITCH_TOGGLE = cell(3);
 
     private final int u;
     private final int v;
@@ -36,6 +38,10 @@ public final class PocketIcon extends AllIcons {
         super(0, 0);
         this.u = u;
         this.v = v;
+    }
+
+    private static PocketIcon cell(final int index) {
+        return new PocketIcon(index * ICON_SIZE, 0);
     }
 
     @Override

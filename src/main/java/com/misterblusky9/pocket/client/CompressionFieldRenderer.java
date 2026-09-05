@@ -138,7 +138,7 @@ public final class CompressionFieldRenderer {
         if (existing != null && existing.phase != Phase.RELEASING) {
             if (!existing.seed.equals(hitLocalPos)) existing.pendingSeed = hitLocalPos.immutable();
 
-            existing.growing = growing;
+            if (existing.phase == Phase.ACQUIRING) existing.growing = growing;
             existing.cellLimit = cellLimit;
             return;
         }

@@ -49,7 +49,8 @@ public final class MoonCompressionSessions {
             final ServerPlayer player,
             final CompressionStage floor,
             final InteractionHand hand,
-            final MoonTargeting.Hit hit
+            final MoonTargeting.Hit hit,
+            final boolean growingIntent
     ) {
         if (player == null || floor == null || hit == null) return false;
         if (reboundActive && reboundServer == player.serverLevel().getServer()) return true;
@@ -66,8 +67,7 @@ public final class MoonCompressionSessions {
             }
         }
 
-        final CompressionStage current = MoonScale.stage(player.serverLevel().getServer());
-        final boolean growing = floor.depth() < current.depth();
+        final boolean growing = growingIntent;
         if (growing) cancelRebound();
         session = new Session(
                 player.serverLevel().getServer(),

@@ -6,6 +6,7 @@ import com.mojang.serialization.MapCodec;
 import com.simibubi.create.api.equipment.potatoCannon.PotatoProjectileBlockHitAction;
 import com.simibubi.create.api.equipment.potatoCannon.PotatoProjectileEntityHitAction;
 import com.simibubi.create.api.registry.CreateRegistries;
+import com.simibubi.create.api.behaviour.movement.MovementBehaviour;
 import com.simibubi.create.api.stress.BlockStressValues;
 import com.simibubi.create.content.kinetics.mechanicalArm.ArmInteractionPointType;
 import net.neoforged.bus.api.IEventBus;
@@ -40,6 +41,10 @@ public final class PocketCreateIntegration {
     // Millstone parity: 4 SU per RPM.
     public static final double SUBSPACE_RECYCLER_STRESS_IMPACT = 4.0D;
     public static final double STATIC_SUBSPACE_COMPRESSOR_STRESS_IMPACT = 8.0D;
+    // Mechanical Bearing parity.
+    public static final double SWITCH_BEARING_STRESS_IMPACT = 4.0D;
+    // Mechanical Piston parity.
+    public static final double SWITCH_PISTON_STRESS_IMPACT = 4.0D;
 
     public static void register(final IEventBus modBus) {
         BLOCK_HIT_ACTIONS.register(modBus);
@@ -55,6 +60,15 @@ public final class PocketCreateIntegration {
         BlockStressValues.IMPACTS.register(
                 ModBlocks.STATIC_SUBSPACE_COMPRESSOR.get(),
                 () -> STATIC_SUBSPACE_COMPRESSOR_STRESS_IMPACT
+        );
+        BlockStressValues.IMPACTS.register(
+                ModBlocks.SWITCH_BEARING.get(), () -> SWITCH_BEARING_STRESS_IMPACT
+        );
+        BlockStressValues.IMPACTS.register(
+                ModBlocks.SWITCH_PISTON.get(), () -> SWITCH_PISTON_STRESS_IMPACT
+        );
+        MovementBehaviour.REGISTRY.register(
+                ModBlocks.SWITCH_BEARING.get(), new SwitchBearingMovementBehaviour()
         );
     }
 

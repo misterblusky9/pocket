@@ -4,10 +4,9 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.misterblusky9.pocket.PocketSized;
-import com.misterblusky9.pocket.compat.create.ContraptionCollisionScaleContext;
+import com.misterblusky9.pocket.compat.create.ScaledContraptionCollider;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.ContraptionCollider;
-import com.simibubi.create.content.trains.entity.CarriageContraptionEntity;
 import com.simibubi.create.foundation.collision.CollisionList;
 import com.simibubi.create.foundation.collision.ContinuousOBBCollider;
 import com.simibubi.create.foundation.collision.OrientedBB;
@@ -79,43 +78,27 @@ public abstract class ContraptionColliderScaleMixin {
             return original.call(collidableBBs, denseViableColliders, obb, motion, entityMaxStep, doHorizontalPass);
         }
 
-        final CollisionList scaledColliders = pocket$scaledCopy(collidableBBs, scale);
-        final double previousScale = ContraptionCollisionScaleContext.swap(scale);
-        final ContinuousOBBCollider.CollisionResponse response;
-        try {
-            response = original.call(
-                    scaledColliders,
-                    denseViableColliders,
-                    obb,
-                    motion,
-                    (float) (entityMaxStep * scale),
-                    doHorizontalPass
-            );
-        } finally {
-            ContraptionCollisionScaleContext.restore(previousScale);
-        }
-
-        if (contraptionEntity instanceof CarriageContraptionEntity && response.surfaceCollision) {
-            final double upwardResponse = response.collisionResponse.y;
-            final double upwardNormal = response.normal.y;
-            if (upwardResponse <= 1.0E-9D && upwardNormal <= 1.0E-9D) {
-                response.surfaceCollision = false;
-            }
-        }
-
-        return response;
+        return ScaledContraptionCollider.collideMany(
+                pocket$scaledCopy(collidableBBs, scale),
+                denseViableColliders,
+                obb,
+                motion,
+                entityMaxStep,
+                doHorizontalPass,
+                scale
+        );
     }
 
     @ModifyConstant(
             method = "collideEntities",
-            constant = @Constant(floatValue = 0.0078125F),
+            constant = @Constant(doubleValue = 0.0078125D),
             require = 1
     )
-    private static float pocket$scaleHorizontalResponseEpsilon(
-            final float original,
+    private static double pocket$scaleHorizontalResponseEpsilon(
+            final double original,
             @Local(argsOnly = true) final AbstractContraptionEntity contraptionEntity
     ) {
-        return (float) (original * pocket$scaleOf(contraptionEntity));
+        return original * pocket$scaleOf(contraptionEntity);
     }
 
     @Unique

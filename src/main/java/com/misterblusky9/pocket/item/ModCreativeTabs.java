@@ -29,6 +29,8 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.ANDESITE_DISPLAY_CASE.get());
                         output.accept(ModItems.ANDESITE_DISPLAY_PLATE.get());
                         //output.accept(ModItems.SUBSPACE_RECYCLER.get());
+                        output.accept(ModItems.SWITCH_BEARING.get());
+                        output.accept(ModItems.SWITCH_PISTON.get());
                         output.accept(ModItems.THE_MOON.get());
                     })
                     .build()

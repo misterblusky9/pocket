@@ -8,6 +8,7 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -18,6 +19,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.List;
 
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.track.cart.CoasterCartTrackSnap", remap = false)
@@ -41,6 +44,13 @@ public abstract class CoasterCartTrackSnapScaleMixin {
                     + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;"
                     + "Lnet/minecraft/world/phys/Vec3;"
                     + "Lnet/minecraft/world/phys/Vec3;Z)V";
+
+    private static final String POCKET$OPEN_END =
+            "shouldDisengageAtOpenEndHit("
+                    + "Lnet/minecraft/world/level/Level;"
+                    + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathGraph;"
+                    + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;"
+                    + "Ljava/util/List;)Z";
 
     @ModifyExpressionValue(
             method = POCKET$PRE_TICK,
@@ -138,6 +148,40 @@ public abstract class CoasterCartTrackSnapScaleMixin {
             final Vec3 bearingPlotCenter,
             final boolean negateEdgeTangent,
             final CallbackInfo ci
+    ) {
+        SimulatedCoastersCartScaleContext.pop();
+    }
+
+    @Inject(method = POCKET$OPEN_END, at = @At("HEAD"), remap = false, require = 1)
+    private static void pocket$enterOpenEnd(
+            final Level level,
+            @Coerce final Object graph,
+            @Coerce final Object graphHit,
+            final List<?> openEnds,
+            final CallbackInfoReturnable<Boolean> cir
+    ) {
+        SimulatedCoastersCartScaleContext.push(
+                SimulatedCoastersScaleLookup.scaleForGraphHit(level, graphHit, null));
+    }
+
+    @ModifyConstant(
+            method = POCKET$OPEN_END,
+            constant = @Constant(doubleValue = 0.019600000000000003D),
+            remap = false,
+            require = 1
+    )
+    private static double pocket$scaleOpenEndMatchDistanceSq(final double original) {
+        final double scale = SimulatedCoastersCartScaleContext.current();
+        return original * scale * scale;
+    }
+
+    @Inject(method = POCKET$OPEN_END, at = @At("RETURN"), remap = false, require = 1)
+    private static void pocket$exitOpenEnd(
+            final Level level,
+            @Coerce final Object graph,
+            @Coerce final Object graphHit,
+            final List<?> openEnds,
+            final CallbackInfoReturnable<Boolean> cir
     ) {
         SimulatedCoastersCartScaleContext.pop();
     }

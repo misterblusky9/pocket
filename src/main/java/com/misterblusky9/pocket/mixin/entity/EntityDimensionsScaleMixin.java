@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.mixin.entity;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.entity.EntityScaleTracker;
+import com.misterblusky9.pocket.entity.PrimedTntScaleAccess;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.Pose;
@@ -19,7 +20,9 @@ public abstract class EntityDimensionsScaleMixin {
             final CallbackInfoReturnable<EntityDimensions> cir
     ) {
         final Entity self = (Entity) (Object) this;
-        final double scale = EntityScaleTracker.dimensionScale(self);
+        final double scale = self instanceof final PrimedTntScaleAccess tnt
+                ? tnt.pocket$dimensionScale()
+                : EntityScaleTracker.dimensionScale(self);
         if (Math.abs(scale - 1.0D) <= PocketSized.EPSILON) return;
         cir.setReturnValue(EntityScaleTracker.applyScale(self, cir.getReturnValue(), scale));
     }

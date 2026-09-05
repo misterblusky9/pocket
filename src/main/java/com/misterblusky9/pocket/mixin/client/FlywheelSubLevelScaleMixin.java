@@ -1,5 +1,8 @@
 package com.misterblusky9.pocket.mixin.client;
 
+import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.client.PocketClientFrame;
+import com.mojang.logging.LogUtils;
 import dev.engine_room.flywheel.api.backend.RenderContext;
 import dev.engine_room.flywheel.api.visualization.VisualEmbedding;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
@@ -8,8 +11,6 @@ import dev.ryanhcode.sable.neoforge.mixinhelper.compatibility.flywheel.SubLevelE
 import dev.ryanhcode.sable.neoforge.mixinterface.compatibility.flywheel.BlockEntityStorageExtension;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
-import com.misterblusky9.pocket.PocketSized;
-import com.misterblusky9.pocket.client.PocketClientFrame;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Vec3i;
@@ -18,14 +19,13 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
+import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.slf4j.Logger;
-import com.mojang.logging.LogUtils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -42,7 +42,6 @@ public abstract class FlywheelSubLevelScaleMixin {
     @Unique private static volatile Method pocket$blockEntitiesMethod;
     @Unique private static volatile Method pocket$renderOriginMethod;
     @Unique private static volatile Method pocket$getStorageMethod;
-
     @Unique private static volatile long pocket$retryAfterFrame;
     @Unique private static volatile int pocket$consecutiveFailures;
     @Unique private static final int pocket$MAX_FAILURES = 5;
@@ -64,16 +63,13 @@ public abstract class FlywheelSubLevelScaleMixin {
         final Object outer = this.pocket$getOuterManager();
         if (outer == null) return;
 
-        final Object visualManager = pocket$invoke(
-                pocket$getBlockEntitiesMethod(outer), outer);
+        final Object visualManager = pocket$invoke(pocket$getBlockEntitiesMethod(outer), outer);
         if (visualManager == null) return;
 
-        final Object storageObject = pocket$invoke(
-                pocket$getStorageMethod(visualManager), visualManager);
+        final Object storageObject = pocket$invoke(pocket$getStorageMethod(visualManager), visualManager);
         if (!(storageObject instanceof final BlockEntityStorageExtension storage)) return;
 
-        final Object renderOriginObject = pocket$invoke(
-                pocket$getRenderOriginMethod(outer), outer);
+        final Object renderOriginObject = pocket$invoke(pocket$getRenderOriginMethod(outer), outer);
         if (!(renderOriginObject instanceof final Vec3i parentOrigin)) return;
 
         for (final SubLevel rawSubLevel : container.getAllSubLevels()) {
@@ -91,17 +87,20 @@ public abstract class FlywheelSubLevelScaleMixin {
             final VisualEmbedding embedding = info.embedding();
             final Vec3i localOrigin = embedding.renderOrigin();
             final Vector3dc position = renderPose.position();
-            final Vector3d localOffset = renderPose.rotationPoint().sub(
+            final Vector3d translation = renderPose.rotationPoint().sub(
                     localOrigin.getX(), localOrigin.getY(), localOrigin.getZ(), new Vector3d());
 
+            translation.mul(-scale.x(), -scale.y(), -scale.z());
+            renderPose.orientation().transform(translation);
+            translation.add(
+                    position.x() - parentOrigin.getX(),
+                    position.y() - parentOrigin.getY(),
+                    position.z() - parentOrigin.getZ());
+
             final Matrix4f transform = new Matrix4f()
-                    .translation(
-                            (float) (position.x() - parentOrigin.getX()),
-                            (float) (position.y() - parentOrigin.getY()),
-                            (float) (position.z() - parentOrigin.getZ()))
-                    .rotate(new Quaternionf(renderPose.orientation()))
+                    .rotation(new Quaternionf(renderPose.orientation()))
                     .scale((float) scale.x(), (float) scale.y(), (float) scale.z())
-                    .translate((float) -localOffset.x, (float) -localOffset.y, (float) -localOffset.z);
+                    .setTranslation((float) translation.x, (float) translation.y, (float) translation.z);
 
             final Matrix3f normal = transform.normal(new Matrix3f());
             embedding.transforms(transform, normal);
@@ -199,8 +198,7 @@ public abstract class FlywheelSubLevelScaleMixin {
         pocket$retryAfterFrame = PocketClientFrame.frame() + pocket$BACKOFF_FRAMES;
 
         if (failures == 1) {
-            pocket$LOGGER.warn(
-                    "Could not access Flywheel visualization manager; retrying shortly", ex);
+            pocket$LOGGER.warn("Could not access Flywheel visualization manager; retrying shortly", ex);
         } else if (failures == pocket$MAX_FAILURES) {
             pocket$LOGGER.error(
                     "Flywheel visualization manager unreachable after {} attempts; scaled Create visuals disabled",

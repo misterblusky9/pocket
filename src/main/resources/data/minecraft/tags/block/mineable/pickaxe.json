@@ -2,6 +2,8 @@
   "replace": false,
   "values": [
     "pocket:subspace_recycler",
-    "pocket:static_subspace_compressor"
+    "pocket:static_subspace_compressor",
+    "pocket:switch_bearing",
+    "pocket:switch_piston"
   ]
 }

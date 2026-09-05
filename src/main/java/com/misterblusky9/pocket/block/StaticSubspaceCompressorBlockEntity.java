@@ -34,7 +34,10 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntity
         implements ScaleCommandSource {
@@ -49,6 +52,9 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
     private static final double TRANSITION_SPEED_FACTOR = 0.35D;
     private static final int AIM_GRACE_TICKS = 10;
     private static final double BEAM_RADIUS = 0.5D;
+
+    private static final Map<UUID, Set<StaticSubspaceCompressorBlockEntity>> DRIVERS =
+            new ConcurrentHashMap<>();
 
     private LaserBehaviour laser;
     private ScrollOptionBehaviour<CompressorMode> mode;
@@ -247,6 +253,7 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
                 CompressionSessions.estimateAcquireTicks(hit.subLevel()) * ACQUIRE_SLOWDOWN;
         this.fieldActive = true;
         this.aimMissTicks = 0;
+        DRIVERS.computeIfAbsent(this.targetId, id -> ConcurrentHashMap.newKeySet()).add(this);
 
         CompressionSyncPayload.sendMachineBegin(
                 hit.subLevel(),
@@ -294,6 +301,13 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
             return;
         }
 
+        if (isOpposed(current)) {
+            this.stepAge = 0;
+            this.pulseSent = false;
+            ScaleController.registerExternalCommand(this.target, this, level.getGameTime());
+            return;
+        }
+
         this.stepAge++;
         final int delay = stepDelay(this.completedSteps, current, targetStage());
 
@@ -310,6 +324,24 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         }
 
         ScaleController.registerExternalCommand(this.target, this, level.getGameTime());
+    }
+
+    private boolean isOpposed(final CompressionStage current) {
+        if (this.targetId == null) return false;
+
+        final Set<StaticSubspaceCompressorBlockEntity> drivers = DRIVERS.get(this.targetId);
+        if (drivers == null) return false;
+
+        final int direction = Integer.signum(targetStage().depth() - current.depth());
+        if (direction == 0) return false;
+
+        for (final StaticSubspaceCompressorBlockEntity other : drivers) {
+            if (other == this || other.isRemoved() || !other.sealed) continue;
+            if (Integer.signum(other.targetStage().depth() - current.depth()) == -direction) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int stepDelay(
@@ -422,7 +454,13 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
     }
 
     private void clearTarget(final boolean releaseVisuals) {
-        if (this.targetId != null) ScaleController.clearExternalCommand(this.targetId);
+        if (this.targetId != null) {
+            ScaleController.clearExternalCommand(this.targetId);
+            DRIVERS.computeIfPresent(this.targetId, (id, drivers) -> {
+                drivers.remove(this);
+                return drivers.isEmpty() ? null : drivers;
+            });
+        }
 
         if (releaseVisuals && this.fieldActive) {
             if (this.target != null && !this.target.isRemoved()) {

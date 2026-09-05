@@ -31,11 +31,16 @@ public final class PocketSizedClient {
         return CONTAINER_MODELS.get(com.misterblusky9.pocket.item.PocketContainer.of(carrier));
     }
     public PocketSizedClient(final IEventBus modBus) {
+        SwitchBearingPartials.init();
         modBus.addListener(PocketPackageModels::register);
         modBus.addListener(TheMoonPackageRenderer::register);
         modBus.addListener(PocketShaders::register);
         modBus.addListener(PortableSubspaceCompressorRenderer::register);
         modBus.addListener(StaticSubspaceCompressorRenderer::register);
+        modBus.addListener(SwitchBearingRenderer::register);
+        modBus.addListener(SwitchBearingRenderer::registerVisual);
+        modBus.addListener(SwitchPistonRenderer::register);
+        modBus.addListener(SwitchPistonRenderer::registerVisual);
         modBus.addListener(SubspaceRecyclerRenderer::register);
         modBus.addListener(SubspaceRecyclerRenderer::registerVisual);
         modBus.addListener(PocketKeys::register);
@@ -43,6 +48,7 @@ public final class PocketSizedClient {
         NeoForge.EVENT_BUS.addListener(MoonPhysicsRenderer::render);
         NeoForge.EVENT_BUS.addListener(CompressionBeamRenderer::render);
         NeoForge.EVENT_BUS.addListener(ColliderOutlineRenderer::render);
+        NeoForge.EVENT_BUS.addListener(SwitchBearingOutlineRenderer::render);
         NeoForge.EVENT_BUS.addListener(TweezerBeamRenderer::render);
         NeoForge.EVENT_BUS.addListener(
                 (net.neoforged.neoforge.client.event.ClientTickEvent.Post event) -> {

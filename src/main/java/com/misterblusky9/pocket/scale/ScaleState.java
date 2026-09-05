@@ -1,15 +1,18 @@
 package com.misterblusky9.pocket.scale;
 
 import com.misterblusky9.pocket.PocketSized;
+import dev.ryanhcode.sable.api.sublevel.ClientSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 
+import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ScaleState {
+    private static final int CLIENT_HISTORY_LIMIT = 16;
     private static final Map<UUID, ServerState> SERVER = new ConcurrentHashMap<>();
     private static final java.util.Set<UUID> SERVER_IDS_VIEW =
             java.util.Collections.unmodifiableSet(SERVER.keySet());
@@ -17,6 +20,7 @@ public final class ScaleState {
     private static final Map<UUID, Double> CLIENT_CURRENT_VIEW =
             java.util.Collections.unmodifiableMap(CLIENT_CURRENT);
     private static final Map<UUID, Double> CLIENT_TARGET = new ConcurrentHashMap<>();
+    private static final Map<UUID, ClientScaleHistory> CLIENT_HISTORY = new ConcurrentHashMap<>();
     private static final java.util.Set<UUID> CLIENT_KNOWN = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, BoundsKey> LAST_SERVER_BOUNDS = new ConcurrentHashMap<>();
     private static final Map<UUID, Boolean> CLIENT_SNAP_INTERPOLATION = new ConcurrentHashMap<>();
@@ -100,7 +104,19 @@ public final class ScaleState {
     }
 
     public static double getClientScale(final ClientSubLevel subLevel) {
-        return subLevel == null ? 1.0D : getClientScale(subLevel.getUniqueId());
+        if (subLevel == null || subLevel.getUniqueId() == null) return 1.0D;
+
+        final UUID id = subLevel.getUniqueId();
+        final ClientScaleHistory history = CLIENT_HISTORY.get(id);
+        if (history == null) return getClientScale(id);
+
+        final ClientSubLevelContainer container = ClientSubLevelContainer.getContainer(subLevel.getLevel());
+        final double scale = container == null || container.getInterpolation().isStopped()
+                ? history.latest()
+                : history.sample(container.getInterpolation().getTickPointer());
+
+        putOrRemove(CLIENT_CURRENT, id, scale);
+        return scale;
     }
 
     public static double getClientScale(final UUID id) {
@@ -117,14 +133,25 @@ public final class ScaleState {
 
     public static void acceptClientSnapshot(
             final UUID id,
+            final int interpolationTick,
             final double current,
             final double target,
             final boolean snapInterpolation
     ) {
         if (id == null) return;
-        putOrRemove(CLIENT_CURRENT, id, PocketSized.clampScale(current));
-        putOrRemove(CLIENT_TARGET, id, PocketSized.clampScale(target));
-        CLIENT_KNOWN.add(id);
+
+        final double clampedCurrent = PocketSized.clampScale(current);
+        final double clampedTarget = PocketSized.clampScale(target);
+        final boolean first = CLIENT_KNOWN.add(id);
+
+        final double previous = getClientScale(id);
+        CLIENT_HISTORY.computeIfAbsent(id, ignored -> new ClientScaleHistory())
+                .accept(interpolationTick, clampedCurrent, previous, snapInterpolation);
+        putOrRemove(CLIENT_TARGET, id, clampedTarget);
+
+        if (first || snapInterpolation) {
+            putOrRemove(CLIENT_CURRENT, id, clampedCurrent);
+        }
         if (snapInterpolation) CLIENT_SNAP_INTERPOLATION.put(id, Boolean.TRUE);
     }
 
@@ -137,6 +164,7 @@ public final class ScaleState {
         CLIENT_KNOWN.remove(id);
         CLIENT_CURRENT.remove(id);
         CLIENT_TARGET.remove(id);
+        CLIENT_HISTORY.remove(id);
         CLIENT_SNAP_INTERPOLATION.remove(id);
     }
 
@@ -144,6 +172,7 @@ public final class ScaleState {
         CLIENT_KNOWN.clear();
         CLIENT_CURRENT.clear();
         CLIENT_TARGET.clear();
+        CLIENT_HISTORY.clear();
         CLIENT_SNAP_INTERPOLATION.clear();
     }
 
@@ -177,6 +206,76 @@ public final class ScaleState {
 
     public static void clearServerBounds(final UUID id) {
         if (id != null) LAST_SERVER_BOUNDS.remove(id);
+    }
+
+    private record ClientScaleSample(int tick, double scale) {}
+
+    private static final class ClientScaleHistory {
+        private final ArrayDeque<ClientScaleSample> samples = new ArrayDeque<>();
+        private double latest = 1.0D;
+
+        private synchronized void accept(
+                final int tick,
+                final double scale,
+                final double previousScale,
+                final boolean snap
+        ) {
+            if (snap) {
+                this.samples.clear();
+                this.samples.addLast(new ClientScaleSample(tick, scale));
+                this.latest = scale;
+                return;
+            }
+
+            if (this.samples.isEmpty()) {
+                this.samples.addLast(new ClientScaleSample(tick - 1, previousScale));
+                this.samples.addLast(new ClientScaleSample(tick, scale));
+                this.latest = scale;
+                return;
+            }
+
+            final ClientScaleSample last = this.samples.getLast();
+            if (tick < last.tick()) return;
+
+            if (tick == last.tick()) {
+                this.samples.removeLast();
+            } else if (tick > last.tick() + 1) {
+                this.samples.clear();
+                this.samples.addLast(new ClientScaleSample(tick - 1, last.scale()));
+            }
+
+            this.samples.addLast(new ClientScaleSample(tick, scale));
+            this.latest = scale;
+
+            while (this.samples.size() > CLIENT_HISTORY_LIMIT) {
+                this.samples.removeFirst();
+            }
+        }
+
+        private synchronized double latest() {
+            return this.latest;
+        }
+
+        private synchronized double sample(final double tick) {
+            if (this.samples.isEmpty()) return this.latest;
+
+            final var iterator = this.samples.iterator();
+            ClientScaleSample before = iterator.next();
+            if (tick <= before.tick()) return before.scale();
+
+            while (iterator.hasNext()) {
+                final ClientScaleSample after = iterator.next();
+                if (tick <= after.tick()) {
+                    final double span = after.tick() - before.tick();
+                    if (span <= 0.0D) return after.scale();
+                    final double alpha = (tick - before.tick()) / span;
+                    return PocketSized.clampScale(before.scale() + (after.scale() - before.scale()) * alpha);
+                }
+                before = after;
+            }
+
+            return this.latest;
+        }
     }
 
     public static final class ServerState {
