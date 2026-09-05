@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.mixin.create;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.config.PocketServerConfig;
 import com.simibubi.create.content.contraptions.actors.seat.SeatEntity;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -27,6 +28,7 @@ public abstract class ScaledSubLevelSeatPositionMixin {
             final Entity.MoveFunction callback,
             final CallbackInfo ci
     ) {
+        if (!PocketServerConfig.scalePlayerInShrunkenSeat()) return;
         if (!(passenger instanceof Player)) return;
 
         final SeatEntity seat = (SeatEntity) (Object) this;

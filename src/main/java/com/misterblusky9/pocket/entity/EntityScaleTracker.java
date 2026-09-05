@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.entity;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.config.PocketServerConfig;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
@@ -30,6 +31,10 @@ public final class EntityScaleTracker {
 
     private static final Map<Entity, State> STATES =
             Collections.synchronizedMap(new WeakHashMap<>());
+
+    private static boolean seatScalingEnabled() {
+        return PocketServerConfig.scalePlayerInShrunkenSeat();
+    }
 
     public static void forget(final Entity entity) {
         if (entity == null) return;
@@ -144,6 +149,8 @@ public final class EntityScaleTracker {
     }
 
     public static double dimensionScale(final Entity entity) {
+        if (entity instanceof Player && !seatScalingEnabled()) return 1.0D;
+
         if (PehkuiScaleBridge.ownsScaling()) {
             if (!(entity instanceof final Player player)) return 1.0D;
 
@@ -174,7 +181,7 @@ public final class EntityScaleTracker {
     }
 
     private static void tickPlayer(final Player player) {
-        final SubLevel ridden = riddenSubLevel(player);
+        final SubLevel ridden = seatScalingEnabled() ? riddenSubLevel(player) : null;
 
         if (ridden == null) {
             final State previous = STATES.get(player);
@@ -211,6 +218,13 @@ public final class EntityScaleTracker {
 
     private static boolean tickDismountedPehkuiScale(final Player player, final State state) {
         if (state == null) return false;
+
+        if (!seatScalingEnabled()) {
+            state.seatSubLevel = null;
+            releasePersonalScale(player, state);
+            return false;
+        }
+
         if (player.level().isClientSide) return state.seatSubLevel != null;
 
         final SubLevel bound = state.seatSubLevel;
@@ -257,6 +271,8 @@ public final class EntityScaleTracker {
     }
 
     public static double renderScale(final Entity entity, final float partialTick) {
+        if (entity instanceof Player && !seatScalingEnabled()) return 1.0D;
+
         if (PehkuiScaleBridge.ownsScaling() && !(entity instanceof HangingEntity)) {
             if (!(entity instanceof final Player player)) return 1.0D;
 

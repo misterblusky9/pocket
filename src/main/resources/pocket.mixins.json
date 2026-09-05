@@ -49,6 +49,7 @@
     "simulated.SimAssemblyGlueLookupMixin",
     "simulated.LaunchedPlungerMoonMixin",
     "createbigcannons.CannonSurfaceNormalMixin",
+    "sable.SableRiderEyeScaleMixin",
     "sable.MoonSubLevelLookupMixin",
     "sable.MoonPlotLookupMixin",
     "sable.SubLevelInclusiveGlueLookupMixin",
