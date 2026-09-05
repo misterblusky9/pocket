@@ -1,19 +1,20 @@
 package com.misterblusky9.pocket;
 
-import com.misterblusky9.pocket.entity.ModEntities;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
+import com.misterblusky9.pocket.config.PocketConfigs;
 import com.misterblusky9.pocket.create.PocketContraptionTypes;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
-import com.misterblusky9.pocket.config.PocketConfigs;
+import com.misterblusky9.pocket.entity.ModEntities;
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
 import com.misterblusky9.pocket.item.ModCreativeTabs;
 import com.misterblusky9.pocket.item.ModItems;
+import com.misterblusky9.pocket.network.HelmBearingNetwork;
 import com.misterblusky9.pocket.network.ScaleNetwork;
 import com.misterblusky9.pocket.pocket.CannonDeploymentQueue;
-import com.misterblusky9.pocket.pocket.PocketedSubLevelEvents;
 import com.misterblusky9.pocket.pocket.PocketPerformanceLimits;
+import com.misterblusky9.pocket.pocket.PocketedSubLevelEvents;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -45,6 +46,7 @@ public final class PocketSized {
         ModCreativeTabs.TABS.register(modBus);
         PocketCreateIntegration.register(modBus);
         modBus.addListener(ScaleNetwork::register);
+        modBus.addListener(HelmBearingNetwork::register);
 
         NeoForge.EVENT_BUS.addListener(PocketedSubLevelEvents::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(CannonDeploymentQueue::onServerTick);

@@ -46,6 +46,15 @@ public final class ModBlockEntities {
                     ).build(null)
             );
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HelmBearingBlockEntity>>
+            HELM_BEARING = BLOCK_ENTITIES.register(
+                    "helm_bearing",
+                    () -> BlockEntityType.Builder.of(
+                            HelmBearingBlockEntity::new,
+                            ModBlocks.HELM_BEARING.get()
+                    ).build(null)
+            );
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SwitchPistonBlockEntity>>
             SWITCH_PISTON = BLOCK_ENTITIES.register(
                     "switch_piston",

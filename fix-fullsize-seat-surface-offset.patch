@@ -1,0 +1,56 @@
+--- a/src/main/java/com/misterblusky9/pocket/mixin/create/ScaledSubLevelSeatPositionMixin.java
++++ b/src/main/java/com/misterblusky9/pocket/mixin/create/ScaledSubLevelSeatPositionMixin.java
+@@ -1,7 +1,8 @@
+ package com.misterblusky9.pocket.mixin.create;
+ 
+ import com.misterblusky9.pocket.PocketSized;
++import com.misterblusky9.pocket.config.PocketServerConfig;
+ import com.simibubi.create.content.contraptions.actors.seat.SeatEntity;
+ import dev.ryanhcode.sable.Sable;
+ import dev.ryanhcode.sable.sublevel.SubLevel;
+ import net.minecraft.world.entity.Entity;
+@@ -57,25 +58,35 @@
+ 
+         final Vec3 passengerPoint = seat.getPassengerRidingPosition(passenger);
+         final Vec3 riderAttachment = passenger.getVehicleAttachmentPoint(seat);
+ 
+-        final Vector3d localOffset = new Vector3d(
+-                passengerPoint.x - seat.getX() - riderAttachment.x,
+-                passengerPoint.y - seat.getY() - riderAttachment.y
++        final Vector3d seatOffset = new Vector3d(
++                passengerPoint.x - seat.getX(),
++                passengerPoint.y - seat.getY()
+                         + 1.0D / 16.0D
+                         + SeatEntity.getCustomEntitySeatOffset(passenger),
+-                passengerPoint.z - seat.getZ() - riderAttachment.z
++                passengerPoint.z - seat.getZ()
++        ).mul(poseScale);
++
++        final Vector3d riderOffset = new Vector3d(
++                riderAttachment.x,
++                riderAttachment.y,
++                riderAttachment.z
+         );
+ 
+-        localOffset.mul(poseScale);
++        if (PocketServerConfig.scalePlayerInShrunkenSeat()) {
++            riderOffset.mul(poseScale);
++        }
+ 
+-        subLevel.logicalPose().orientation().transform(localOffset);
++        subLevel.logicalPose().orientation().transform(seatOffset);
++        subLevel.logicalPose().orientation().transform(riderOffset);
++        seatOffset.sub(riderOffset);
+ 
+         callback.accept(
+                 passenger,
+-                seat.getX() + localOffset.x,
+-                seat.getY() + localOffset.y,
+-                seat.getZ() + localOffset.z
++                seat.getX() + seatOffset.x,
++                seat.getY() + seatOffset.y,
++                seat.getZ() + seatOffset.z
+         );
+         ci.cancel();
+     }
+ }
