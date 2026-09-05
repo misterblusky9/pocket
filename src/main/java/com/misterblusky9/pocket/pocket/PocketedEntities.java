@@ -1,6 +1,12 @@
 package com.misterblusky9.pocket.pocket;
 
+import com.misterblusky9.pocket.block.SwitchBearingBlockEntity;
 import com.misterblusky9.pocket.debug.PocketTrace;
+import com.misterblusky9.pocket.mixin.create.ControlledContraptionEntityControllerInvoker;
+import com.simibubi.create.content.contraptions.ControlledContraptionEntity;
+import com.simibubi.create.content.contraptions.IControlContraption;
+import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
+import com.simibubi.create.content.contraptions.piston.LinearActuatorBlockEntity;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.nbt.CompoundTag;
@@ -101,16 +107,48 @@ public final class PocketedEntities {
         }
     }
 
+    public static int disassembleContraptions(final ServerLevel level, final ServerSubLevel subLevel) {
+        final List<Entity> contraptions = level.getEntities(
+                (Entity) null,
+                region(subLevel),
+                entity -> entity instanceof ControlledContraptionEntity && !entity.isRemoved()
+        );
+
+        for (final Entity entity : contraptions) {
+            final ControlledContraptionEntity contraption = (ControlledContraptionEntity) entity;
+            final IControlContraption controller =
+                    ((ControlledContraptionEntityControllerInvoker) contraption).pocket$invokeGetController();
+
+            if (controller instanceof final LinearActuatorBlockEntity actuator) {
+                actuator.disassemble();
+            } else if (controller instanceof final SwitchBearingBlockEntity bearing) {
+                bearing.disassemble();
+            } else if (controller instanceof final MechanicalBearingBlockEntity bearing) {
+                bearing.disassemble();
+            } else {
+                contraption.disassemble();
+            }
+        }
+
+        if (!contraptions.isEmpty()) {
+            PocketTrace.scale("disassembled {} contraptions before pocketing sub-level uuid={}",
+                    contraptions.size(), subLevel.getUniqueId());
+        }
+        return contraptions.size();
+    }
+
     private static List<Entity> collect(final ServerLevel level, final ServerSubLevel subLevel) {
+        return level.getEntities((Entity) null, region(subLevel), PocketedEntities::isCapturable);
+    }
+
+    private static AABB region(final ServerSubLevel subLevel) {
         final BoundingBox3ic bounds = subLevel.getPlot().getBoundingBox();
-        final AABB region = new AABB(
+        return new AABB(
                 bounds.minX() - CAPTURE_MARGIN, bounds.minY() - CAPTURE_MARGIN, bounds.minZ() - CAPTURE_MARGIN,
                 bounds.maxX() + 1.0D + CAPTURE_MARGIN,
                 bounds.maxY() + 1.0D + CAPTURE_MARGIN,
                 bounds.maxZ() + 1.0D + CAPTURE_MARGIN
         );
-
-        return level.getEntities((Entity) null, region, PocketedEntities::isCapturable);
     }
 
     private static boolean isCapturable(final Entity entity) {

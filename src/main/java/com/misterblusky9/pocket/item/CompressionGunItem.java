@@ -127,7 +127,7 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem 
                 RANGE
         );
         if (moonHit != null) {
-            MoonCompressionSessions.hold(player, goal, player.getUsedItemHand(), moonHit);
+            MoonCompressionSessions.hold(player, goal, player.getUsedItemHand(), moonHit, growing);
             return;
         }
 

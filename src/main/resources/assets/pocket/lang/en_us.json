@@ -1,6 +1,6 @@
 {
   "itemGroup.pocket": "Create: Pocket Sized",
-  "item.pocket.creative_shrink_ray": "Creative Shrinkray",
+  "item.pocket.creative_shrink_ray": "Toy Shrinkray",
   "item.pocket.pocketed_sublevel": "Pocketed Sublevel",
   "item.pocket.empty_box": "Empty Box",
   "item.pocket.display_bottle": "Display Bottle",
@@ -9,15 +9,20 @@
   "item.pocket.andesite_display_case": "Andesite Display Case",
   "item.pocket.andesite_display_plate": "Andesite Display Plate",
   "item.pocket.compression_gun": "Compression Cannon",
-  "item.pocket.collider_wand": "Collider Wand",
+  "item.pocket.collider_wand": "Debug Wand",
   "key.categories.pocket": "Create: Pocket Sized",
-  "key.pocket.tweezer_rotate": "Tweezers: Rotate Held Craft",
   "block.pocket.portable_subspace_compressor": "Portable Subspace Compressor",
-  "item.pocket.tweezers": "Tweezers",
+  "item.pocket.tweezers": "Tweezers (WIP!)",
   "block.pocket.subspace_recycler": "Subspace Recycler",
   "item.pocket.the_moon": "The Moon (WIP!)",
   "block.pocket.static_subspace_compressor": "Static Subspace Compressor",
   "pocket.static_subspace_compressor.mode.shrink": "Reduce",
   "pocket.static_subspace_compressor.mode.grow": "Enlarge",
-  "pocket.static_subspace_compressor.mode": "Mode"
+  "pocket.static_subspace_compressor.mode": "Mode",
+  "block.pocket.switch_bearing": "Switch Bearing",
+  "pocket.switch.control_mode": "Control Mode",
+  "pocket.switch.control_mode.impulse": "Impulse",
+  "pocket.switch.control_mode.toggle": "Toggle",
+  "pocket.switch.control_mode.analog": "Analog",
+  "block.pocket.switch_piston": "Switch Piston"
 }

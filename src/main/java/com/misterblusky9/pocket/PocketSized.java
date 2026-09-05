@@ -4,6 +4,7 @@ import com.misterblusky9.pocket.entity.ModEntities;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
+import com.misterblusky9.pocket.create.PocketContraptionTypes;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
 import com.misterblusky9.pocket.config.PocketConfigs;
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
@@ -31,6 +32,7 @@ public final class PocketSized {
 
     public PocketSized(final IEventBus modBus, final ModContainer modContainer) {
         PocketConfigs.register(modBus, modContainer);
+        modBus.addListener(PocketContraptionTypes::register);
 
         PehkuiScaleBridge.initialize();
 

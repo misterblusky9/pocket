@@ -43,5 +43,25 @@ public final class ModBlocks {
                     )
             );
 
+    public static final DeferredHolder<Block, SwitchBearingBlock> SWITCH_BEARING =
+            BLOCKS.register(
+                    "switch_bearing",
+                    () -> new SwitchBearingBlock(
+                            BlockBehaviour.Properties.ofFullCopy(Blocks.ANDESITE)
+                                    .mapColor(MapColor.PODZOL)
+                                    .noOcclusion()
+                    )
+            );
+
+    public static final DeferredHolder<Block, SwitchPistonBlock> SWITCH_PISTON =
+            BLOCKS.register(
+                    "switch_piston",
+                    () -> new SwitchPistonBlock(
+                            BlockBehaviour.Properties.ofFullCopy(Blocks.ANDESITE)
+                                    .mapColor(MapColor.PODZOL)
+                                    .noOcclusion()
+                    )
+            );
+
     private ModBlocks() {}
 }

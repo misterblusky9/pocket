@@ -9,6 +9,7 @@ import com.misterblusky9.pocket.moon.MoonCompressionSessions;
 import com.misterblusky9.pocket.moon.MoonScale;
 import com.misterblusky9.pocket.moon.MoonTargeting;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
+import com.misterblusky9.pocket.network.ShrinkRayBeamColourPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleController;
 import com.misterblusky9.pocket.scale.ScaleState;
@@ -143,7 +144,11 @@ public final class CreativeShrinkRayItem extends ZapperItem {
                 }
 
                 if (player instanceof final ServerPlayer serverPlayer) {
-                    MoonCompressionSessions.instant(serverPlayer, selectedStage(stack), moonHit);
+                    final CompressionStage moonTarget = selectedStage(stack);
+                    final CompressionStage moonCurrent =
+                            MoonScale.stage(serverPlayer.serverLevel().getServer());
+
+                    MoonCompressionSessions.instant(serverPlayer, moonTarget, moonHit);
                     ShootableGadgetItemMethods.applyCooldown(
                             player,
                             stack,
@@ -156,6 +161,14 @@ public final class CreativeShrinkRayItem extends ZapperItem {
                             hand == InteractionHand.MAIN_HAND,
                             new Vec3(0.35D, -0.1D, 1.0D)
                     );
+                    ShrinkRayBeamColourPayload.send(
+                            serverPlayer,
+                            moonHit.worldPoint(),
+                            moonCurrent == moonTarget
+                                    ? ShrinkRayBeamColourPayload.INERT_COLOUR
+                                    : moonTarget.depth() < moonCurrent.depth()
+                                            ? ShrinkRayBeamColourPayload.GROW_COLOUR
+                                            : ShrinkRayBeamColourPayload.SHRINK_COLOUR);
                     ShootableGadgetItemMethods.sendPackets(
                             player,
                             local -> new ZapperBeamPacket(barrel, hand, local, moonHit.worldPoint())
@@ -253,10 +266,19 @@ public final class CreativeShrinkRayItem extends ZapperItem {
         final net.minecraft.core.BlockPos contact =
                 lockedOn ? centreOf(serverSubLevel) : raytrace.getBlockPos();
 
-        if (ScaleState.isSettled(serverSubLevel.getUniqueId())
-                && ScaleState.getStage(serverSubLevel) == target) {
-            return false;
+        final CompressionStage currentStage = ScaleState.getStage(serverSubLevel);
+        final boolean inert = ScaleState.isSettled(serverSubLevel.getUniqueId())
+                && currentStage == target;
+
+        if (player instanceof final ServerPlayer beamHolder) {
+            ShrinkRayBeamColourPayload.send(beamHolder, raytrace.getLocation(), inert
+                    ? ShrinkRayBeamColourPayload.INERT_COLOUR
+                    : target.depth() < currentStage.depth()
+                            ? ShrinkRayBeamColourPayload.GROW_COLOUR
+                            : ShrinkRayBeamColourPayload.SHRINK_COLOUR);
         }
+
+        if (inert) return true;
 
         if (target.isCompressed()) {
             final int blocks = PocketMetrics.measureForCompression(serverSubLevel, level.getGameTime()).blocks();

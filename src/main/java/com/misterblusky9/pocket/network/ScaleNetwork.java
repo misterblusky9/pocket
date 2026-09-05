@@ -15,12 +15,13 @@ import java.util.UUID;
 
 public final class ScaleNetwork {
     public static void register(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("8");
+        final PayloadRegistrar registrar = event.registrar("10");
         registrar.playToClient(
                 ScaleSyncPayload.TYPE,
                 ScaleSyncPayload.STREAM_CODEC,
                 (payload, context) -> ScaleState.acceptClientSnapshot(
                         payload.subLevelId(),
+                        payload.interpolationTick(),
                         payload.currentScale(),
                         payload.targetScale(),
                         payload.snapInterpolation()
@@ -38,6 +39,13 @@ public final class ScaleNetwork {
                 CompressionBeamPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(
                         () -> com.misterblusky9.pocket.client.CompressionClientHooks.acceptBeam(payload)
+                )
+        );
+        registrar.playToClient(
+                ShrinkRayBeamColourPayload.TYPE,
+                ShrinkRayBeamColourPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.PocketBeamColours.push(payload.colour(), payload.target())
                 )
         );
         registrar.playToClient(
@@ -183,7 +191,13 @@ public final class ScaleNetwork {
             target = current;
         }
 
-        PacketDistributor.sendToPlayer(player, new ScaleSyncPayload(id, current, target, true));
+        PacketDistributor.sendToPlayer(player, new ScaleSyncPayload(
+                id,
+                container.trackingSystem().getInterpolationTick(),
+                current,
+                target,
+                true
+        ));
     }
 
     public static void sendScale(final ServerSubLevel subLevel, final double current, final double target) {
@@ -196,9 +210,20 @@ public final class ScaleNetwork {
             final double target,
             final boolean snapInterpolation
     ) {
+        final ServerSubLevelContainer container = ServerSubLevelContainer.getContainer(subLevel.getLevel());
+        final int interpolationTick = container == null
+                ? (int) subLevel.getLevel().getGameTime()
+                : container.trackingSystem().getInterpolationTick();
+
         PacketDistributor.sendToPlayersInDimension(
                 subLevel.getLevel(),
-                new ScaleSyncPayload(subLevel.getUniqueId(), current, target, snapInterpolation)
+                new ScaleSyncPayload(
+                        subLevel.getUniqueId(),
+                        interpolationTick,
+                        current,
+                        target,
+                        snapInterpolation
+                )
         );
     }
 

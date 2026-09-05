@@ -90,7 +90,7 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
             this.commandedTarget = this.desiredStage;
 
             final boolean growing = this.desiredStage.depth() < current.depth();
-            if (this.fieldActive && growing != this.lastFieldGrowing) {
+            if (this.fieldActive && current != this.desiredStage && growing != this.lastFieldGrowing) {
                 CompressionSyncPayload.sendMachineBegin(
                         subLevel,
                         this.worldPosition,
