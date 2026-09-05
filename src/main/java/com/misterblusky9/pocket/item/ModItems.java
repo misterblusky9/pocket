@@ -4,9 +4,9 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.block.ModBlocks;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Rarity;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.minecraft.world.item.Rarity;
 
 public final class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(PocketSized.MOD_ID);
@@ -45,7 +45,6 @@ public final class ModItems {
 
     public static final DeferredItem<CompressionGunItem> COMPRESSION_GUN = ITEMS.register(
             "compression_gun",
-
             () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512))
     );
 
@@ -78,6 +77,11 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> SWITCH_BEARING = ITEMS.register(
             "switch_bearing",
             () -> new BlockItem(ModBlocks.SWITCH_BEARING.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<BlockItem> HELM_BEARING = ITEMS.register(
+            "helm_bearing",
+            () -> new BlockItem(ModBlocks.HELM_BEARING.get(), new Item.Properties())
     );
 
     public static final DeferredItem<BlockItem> SWITCH_PISTON = ITEMS.register(

@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.mixin.create;
 
 import com.misterblusky9.pocket.block.SwitchControllerBlockEntity;
+import com.misterblusky9.pocket.create.HelmBearingContraption;
 import com.misterblusky9.pocket.create.SwitchContraption;
 import com.misterblusky9.pocket.debug.SwitchBearingDebug;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
@@ -36,7 +37,7 @@ public abstract class SwitchBearingContraptionInteractionMixin {
             final InteractionHand hand,
             final CallbackInfoReturnable<Boolean> cir
     ) {
-        if (!(contraption instanceof SwitchContraption)) {
+        if (contraption instanceof HelmBearingContraption || !(contraption instanceof SwitchContraption)) {
             return;
         }
 

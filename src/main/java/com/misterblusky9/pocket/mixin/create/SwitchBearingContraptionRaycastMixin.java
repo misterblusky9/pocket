@@ -3,7 +3,7 @@ package com.misterblusky9.pocket.mixin.create;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.misterblusky9.pocket.create.SwitchContraption;
+import com.misterblusky9.pocket.create.InteractiveContraption;
 import com.misterblusky9.pocket.debug.SwitchBearingDebug;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.ContraptionHandlerClient;
@@ -38,11 +38,11 @@ public abstract class SwitchBearingContraptionRaycastMixin {
             @Local(argsOnly = true) final AbstractContraptionEntity contraptionEntity,
             @Local final MutableObject<BlockHitResult> mutableResult
     ) {
-        if (!(contraptionEntity.getContraption() instanceof SwitchContraption switchContraption)) {
+        if (!(contraptionEntity.getContraption() instanceof InteractiveContraption interactiveContraption)) {
             return original.call(localOrigin, localTarget, originalPredicate);
         }
 
-        final AABB bounds = switchContraption.getInteractionBounds();
+        final AABB bounds = interactiveContraption.getInteractionBounds();
         if (bounds == null) {
             final Predicate<BlockPos> neverHit = ignored -> false;
             return original.call(localOrigin, localTarget, neverHit);
