@@ -36,7 +36,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.function.Consumer;
 
-public final class CompressionGunItem extends Item implements CustomArmPoseItem {
+public final class CompressionGunItem extends Item implements CustomArmPoseItem, PriorityInteractionItem {
     private static final double RANGE = 160.0D;
 
     public static final int CHARGE_TICKS = 40;

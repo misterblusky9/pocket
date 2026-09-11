@@ -39,7 +39,7 @@ import java.util.List;
 
 public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
         implements IBearingBlockEntity, IDisplayAssemblyExceptions {
-    public static final int RPM = 16;
+    public static final int RPM = 32;
 
     public boolean held;
     public ScrollValueBehaviour angleInput;
@@ -58,6 +58,7 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
     private float logicalSpeed;
     private float clientAngleDiff;
     private double sequencedAngleLimit = -1;
+    private int lastOutputState = Integer.MIN_VALUE;
 
     public HelmBearingBlockEntity(final BlockPos pos, final BlockState state) {
         super(ModBlockEntities.HELM_BEARING.get(), pos, state);
@@ -84,13 +85,21 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
     }
 
     public void startHolding() {
+        if (held) {
+            return;
+        }
         held = true;
         notifyUpdate();
+        updateOutputState();
     }
 
     public void stopHolding() {
+        if (!held) {
+            return;
+        }
         held = false;
         notifyUpdate();
+        updateOutputState();
     }
 
     public float directionConvert(final float value) {
@@ -105,35 +114,43 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
     }
 
     public void updateTargetAngle(float absoluteTarget) {
-        absoluteTarget = Mth.clamp(absoluteTarget, -angleInput.getValue(), angleInput.getValue());
-        if (targetAngle == absoluteTarget) {
+        if (!Float.isFinite(absoluteTarget) || angleInput == null) {
             return;
         }
 
+        absoluteTarget = Mth.clamp(absoluteTarget, -angleInput.getValue(), angleInput.getValue());
         targetAngle = absoluteTarget;
-        final float relativeAngle = absoluteTarget - angle;
 
-        if (Math.abs(relativeAngle) < 0.001F && inUse <= 0) {
-            stopGeneratedMotion();
+        final float relativeAngle = absoluteTarget - angle;
+        if (Math.abs(relativeAngle) < 0.001F) {
+            angle = absoluteTarget;
+            if (inUse != 0 || logicalSpeed != 0 || generatedSpeed != 0) {
+                stopGeneratedMotion();
+            }
             return;
         }
 
         final float rotationSpeed = RPM * Math.signum(relativeAngle);
-        if (rotationSpeed == 0) {
-            return;
-        }
-
-        final float relativeValue = relativeAngle / rotationSpeed;
-        if (relativeValue <= 0 && inUse <= 0) {
+        final double degreesPerTick = Math.abs(KineticBlockEntity.convertToAngular(rotationSpeed));
+        if (degreesPerTick <= 0 || !Double.isFinite(degreesPerTick)) {
             stopGeneratedMotion();
             return;
         }
 
-        final double degreesPerTick = KineticBlockEntity.convertToAngular(rotationSpeed);
-        inUse = (int) Math.ceil(relativeAngle / degreesPerTick) + 2;
-        sequenceContext = new SequencedGearshiftBlockEntity.SequenceContext(
-                SequencerInstructions.TURN_ANGLE, relativeValue);
+        final int ticksRemaining = (int) Math.ceil(Math.abs(relativeAngle) / degreesPerTick) + 2;
+        final boolean restart = inUse <= 0
+                || Math.signum(logicalSpeed) != Math.signum(rotationSpeed)
+                || sequenceContext == null;
+
         sequencedAngleLimit = Math.abs(relativeAngle);
+        inUse = Math.max(inUse, ticksRemaining);
+
+        if (!restart) {
+            return;
+        }
+
+        sequenceContext = new SequencedGearshiftBlockEntity.SequenceContext(
+                SequencerInstructions.TURN_ANGLE, relativeAngle / rotationSpeed);
         logicalSpeed = rotationSpeed;
         generatedSpeed = KineticBlockEntity.convertToDirection(
                 logicalSpeed, getBlockState().getValue(HelmBearingBlock.FACING));
@@ -227,11 +244,30 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
     }
 
     public float getInteractionAngle(final float partialTicks) {
+        if (angleInput != null && Float.isFinite(targetAngleToUpdate)) {
+            return Mth.clamp(targetAngleToUpdate, -angleInput.getValue(), angleInput.getValue());
+        }
         return getInterpolatedAngle(partialTicks);
     }
 
     public float getAngle() {
         return angle;
+    }
+
+    public int getAnalogAngleSignal() {
+        if (angleInput == null || !Float.isFinite(angle)) {
+            return 0;
+        }
+
+        final int limit = angleInput.getValue();
+        if (limit <= 0 || Math.abs(angle) < 0.99F) {
+            return 0;
+        }
+
+        final float frac = Mth.clamp(angle / limit, -1.0F, 1.0F);
+        int value = (int) (frac < 0.0F ? Math.floor(frac * 15.0F) : Math.ceil(frac * 15.0F));
+        value *= (int) directionConvert(1.0F);
+        return value;
     }
 
     public float getAngularSpeed() {
@@ -330,6 +366,7 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
         running = false;
         assembleNextTick = false;
         sendData();
+        updateOutputState();
     }
 
     @Override
@@ -348,17 +385,18 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
             }
         }
 
-        if (getGeneratedSpeed() != 0) {
-            integrateAngle();
+        final boolean stalled = movedContraption != null && movedContraption.isStalled();
+        final boolean reachedTarget = !stalled && getGeneratedSpeed() != 0 && integrateAngle();
+
+        if (!stalled && inUse > 0) {
+            inUse--;
         }
 
-        if (inUse > 0) {
-            inUse--;
-            if (inUse == 0 && !level.isClientSide) {
-                angle = targetAngle;
-                stopGeneratedMotion();
-            }
-        } else if (!level.isClientSide && angleInput != null) {
+        if (!level.isClientSide && reachedTarget) {
+            stopGeneratedMotion();
+        }
+
+        if (!level.isClientSide && angleInput != null) {
             updateTargetAngle(targetAngleToUpdate);
         }
 
@@ -367,13 +405,31 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
         }
     }
 
-    private void integrateAngle() {
-        float angularSpeed = getAngularSpeed();
-        if (sequencedAngleLimit >= 0) {
-            angularSpeed = (float) Mth.clamp(angularSpeed, -sequencedAngleLimit, sequencedAngleLimit);
-            sequencedAngleLimit = Math.max(0, sequencedAngleLimit - Math.abs(angularSpeed));
+    private boolean integrateAngle() {
+        final float remaining = targetAngle - angle;
+        if (Math.abs(remaining) < 0.001F) {
+            angle = targetAngle;
+            sequencedAngleLimit = 0;
+            return true;
         }
+
+        float angularSpeed = getAngularSpeed();
+        if (!Float.isFinite(angularSpeed) || angularSpeed == 0
+                || Math.signum(angularSpeed) != Math.signum(remaining)) {
+            return false;
+        }
+
+        angularSpeed = (float) Mth.clamp(angularSpeed, -Math.abs(remaining), Math.abs(remaining));
         angle += angularSpeed;
+
+        final float error = targetAngle - angle;
+        sequencedAngleLimit = Math.abs(error);
+        if (Math.abs(error) < 0.001F) {
+            angle = targetAngle;
+            sequencedAngleLimit = 0;
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -393,6 +449,21 @@ public class HelmBearingBlockEntity extends GeneratingKineticBlockEntity
         if (state.hasProperty(BlockStateProperties.FACING)) {
             movedContraption.setRotationAxis(state.getValue(BlockStateProperties.FACING).getAxis());
         }
+        updateOutputState();
+    }
+
+    private void updateOutputState() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+
+        final int outputState = getAnalogAngleSignal() * 2 + (held ? 1 : 0);
+        if (outputState == lastOutputState) {
+            return;
+        }
+
+        lastOutputState = outputState;
+        level.updateNeighbourForOutputSignal(worldPosition, getBlockState().getBlock());
     }
 
     @Override

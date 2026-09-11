@@ -35,6 +35,12 @@ public abstract class ConstraintHandleRepointMixin implements RepointableConstra
     @Unique
     private boolean pocket$replayingMotors;
 
+    @Unique
+    private boolean pocket$contactsEnabled = true;
+
+    @Unique
+    private boolean pocket$replayingContacts;
+
     @Shadow
     public abstract boolean isValid();
 
@@ -47,6 +53,9 @@ public abstract class ConstraintHandleRepointMixin implements RepointableConstra
             boolean hasForceLimit,
             double maxForce
     );
+
+    @Shadow
+    public abstract void setContactsEnabled(boolean enabled);
 
     @Inject(method = "setMotor", at = @At("RETURN"), remap = false)
     private void pocket$captureMotor(
@@ -89,6 +98,22 @@ public abstract class ConstraintHandleRepointMixin implements RepointableConstra
             }
         } finally {
             this.pocket$replayingMotors = false;
+        }
+    }
+
+    @Inject(method = "setContactsEnabled", at = @At("RETURN"), remap = false)
+    private void pocket$captureContacts(final boolean enabled, final CallbackInfo ci) {
+        if (!this.pocket$replayingContacts) this.pocket$contactsEnabled = enabled;
+    }
+
+    @Override
+    public void pocket$replayContacts() {
+        if (!this.isValid()) return;
+        this.pocket$replayingContacts = true;
+        try {
+            this.setContactsEnabled(this.pocket$contactsEnabled);
+        } finally {
+            this.pocket$replayingContacts = false;
         }
     }
 

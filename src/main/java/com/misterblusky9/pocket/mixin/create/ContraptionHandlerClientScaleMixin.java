@@ -3,14 +3,13 @@ package com.misterblusky9.pocket.mixin.create;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.client.IntegratedContraptionRaycast;
+import com.misterblusky9.pocket.create.InteractiveContraption;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.ContraptionHandlerClient;
-import dev.ryanhcode.sable.Sable;
-import dev.ryanhcode.sable.companion.math.BoundingBox3d;
-import dev.ryanhcode.sable.sublevel.SubLevel;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.phys.AABB;
-import org.joml.Vector3dc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
@@ -24,27 +23,23 @@ public abstract class ContraptionHandlerClientScaleMixin {
             ),
             require = 1
     )
-    private static boolean pocket$testAuthoritativeScaledInteractionBounds(
+    private static boolean pocket$keepIntegratedInteractionCandidates(
             final AABB sableProjectedBounds,
             final AABB rayBounds,
             final Operation<Boolean> original,
             @Local(ordinal = 1) final AbstractContraptionEntity contraptionEntity
     ) {
-        final SubLevel subLevel = Sable.HELPER.getContaining(contraptionEntity);
-        if (subLevel == null || subLevel.isRemoved()) {
+        if (!(contraptionEntity.getContraption() instanceof final InteractiveContraption interactiveContraption)) {
             return original.call(sableProjectedBounds, rayBounds);
         }
 
-        final Vector3dc scale = subLevel.logicalPose().scale();
-        if (!PocketSized.isValidScale(scale.x())
-                || Math.abs(scale.x() - scale.y()) > PocketSized.EPSILON
-                || Math.abs(scale.x() - scale.z()) > PocketSized.EPSILON
-                || Math.abs(scale.x() - 1.0D) <= PocketSized.EPSILON) {
-            return original.call(sableProjectedBounds, rayBounds);
+        final LocalPlayer player = Minecraft.getInstance().player;
+        final IntegratedContraptionRaycast.Ray ray = IntegratedContraptionRaycast.capture(player);
+        if (ray != null
+                && IntegratedContraptionRaycast.rayTrace(contraptionEntity, interactiveContraption, ray).isPresent()) {
+            return true;
         }
 
-        final BoundingBox3d worldBounds = new BoundingBox3d(contraptionEntity.getBoundingBox());
-        worldBounds.transform(subLevel.logicalPose(), worldBounds);
-        return worldBounds.toMojang().intersects(rayBounds);
+        return original.call(sableProjectedBounds, rayBounds);
     }
 }

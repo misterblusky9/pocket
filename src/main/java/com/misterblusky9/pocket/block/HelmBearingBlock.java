@@ -121,14 +121,10 @@ public final class HelmBearingBlock extends DirectionalKineticBlock
             return be.held ? 15 : 0;
         }
 
-        if (Math.abs(be.getAngle()) < 0.99F) {
+        final int value = be.getAnalogAngleSignal();
+        if (value == 0) {
             return 0;
         }
-
-        final float frac = net.minecraft.util.Mth.clamp(
-                be.targetAngleToUpdate / be.angleInput.getValue(), -1.0F, 1.0F);
-        int value = (int) (frac < 0 ? Math.floor(frac * 15.0F) : Math.ceil(frac * 15.0F));
-        value *= (int) be.directionConvert(1.0F);
 
         final Direction right = rightSide(facing);
         final Direction left = right.getOpposite();

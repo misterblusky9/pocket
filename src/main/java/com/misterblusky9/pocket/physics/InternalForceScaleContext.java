@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.physics;
 
+import com.misterblusky9.pocket.compat.simulated.WeldedAssembly;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import com.misterblusky9.pocket.PocketSized;
@@ -56,7 +57,7 @@ public final class InternalForceScaleContext {
 
         final var tracker = subLevel.getMassTracker();
         final double rawMass = tracker == null ? 0.0D : tracker.getMass();
-        return ScaledMassData.forceFactors(rawMass, scale);
+        return ScaledMassData.forceFactors(rawMass, scale, WeldedAssembly.solverFloor(subLevel));
     }
 
     private static final double[] IDENTITY = {1.0D, 1.0D};

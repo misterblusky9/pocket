@@ -10,7 +10,10 @@
   "item.pocket.andesite_display_plate": "Andesite Display Plate",
   "item.pocket.compression_gun": "Compression Cannon",
   "item.pocket.collider_wand": "Debug Wand",
+  "item.pocket.pocket_knife": "Pocket Knife",
+  "item.pocket.glue_gun": "Hot Glue Gun",
   "key.categories.pocket": "Create: Pocket Sized",
+  "key.pocket.weld_rotate": "Rotate Weld Preview",
   "block.pocket.portable_subspace_compressor": "Portable Subspace Compressor",
   "item.pocket.tweezers": "Tweezers (WIP!)",
   "block.pocket.subspace_recycler": "Subspace Recycler",
@@ -26,5 +29,7 @@
   "pocket.switch.control_mode.impulse": "Impulse",
   "pocket.switch.control_mode.toggle": "Toggle",
   "pocket.switch.control_mode.analog": "Analog",
-  "block.pocket.switch_piston": "Switch Piston"
+  "block.pocket.switch_piston": "Switch Piston",
+  "block.pocket.blueprint_tile": "Blueprint Tile",
+  "block.pocket.diagram_tile": "Diagram Tile"
 }

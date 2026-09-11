@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.mixin.physics;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.compression.CompressionBlacklist;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.physics.PlotShapeCache;
@@ -53,6 +54,7 @@ public abstract class RapierPhysicsPipelineMixin {
     @Inject(method = "dispose", at = @At("HEAD"), remap = false)
     private void pocket$invalidateSceneGenerationBeforeNativeFree(final CallbackInfo ci) {
         ScaledRebuildCollisionEffectFilter.forgetScene(this.getSceneHandle());
+        WeldRuntime.forget(this.level);
         RapierSceneLifetime.closing(this.level);
     }
 

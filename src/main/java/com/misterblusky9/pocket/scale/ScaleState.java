@@ -74,6 +74,13 @@ public final class ScaleState {
         return state == null || state.transitionStage() == null;
     }
 
+    public static boolean isSettled(final SubLevel subLevel) {
+        if (subLevel == null) return true;
+        if (subLevel instanceof final ServerSubLevel server) return isSettled(server.getUniqueId());
+        final double scale = getScale(subLevel);
+        return Math.abs(scale - CompressionStage.nearest(scale).scale()) <= PocketSized.EPSILON;
+    }
+
     public static java.util.Set<UUID> trackedIds() {
         return SERVER_IDS_VIEW;
     }

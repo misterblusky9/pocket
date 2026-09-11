@@ -25,6 +25,18 @@ public final class ScaledColliderRebuildQueue {
         }
     }
 
+    public static void forget(final ServerSubLevel subLevel) {
+        if (subLevel == null || subLevel.getUniqueId() == null) return;
+        final SubLevelContainer container = SubLevelContainer.getContainer(subLevel.getLevel());
+        if (container == null) return;
+        synchronized (DIRTY) {
+            final LinkedHashMap<UUID, ServerSubLevel> dirty = DIRTY.get(container);
+            if (dirty == null) return;
+            dirty.remove(subLevel.getUniqueId(), subLevel);
+            if (dirty.isEmpty()) DIRTY.remove(container);
+        }
+    }
+
     public static void flush(final ServerSubLevelContainer container) {
         final List<ServerSubLevel> pending;
         synchronized (DIRTY) {

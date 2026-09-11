@@ -64,7 +64,7 @@ public abstract class CoasterAnchorSelectionScaleMixin {
             final int[] edge = POCKET$EDGES[i];
             outliner.showLine(Pair.of("pocket_coaster_anchor_" + key, i), corners[edge[0]], corners[edge[1]])
                     .colored(color)
-                    .lineWidth(0.0625F);
+                    .lineWidth((float) (0.0625D * PocketSized.clampScale(scale)));
         }
         ci.cancel();
     }

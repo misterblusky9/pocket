@@ -8,6 +8,7 @@ import com.misterblusky9.pocket.create.PocketContraptionTypes;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
 import com.misterblusky9.pocket.entity.ModEntities;
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
+import com.misterblusky9.pocket.item.HeldInteractionPriority;
 import com.misterblusky9.pocket.item.ModCreativeTabs;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.network.HelmBearingNetwork;
@@ -48,6 +49,9 @@ public final class PocketSized {
         modBus.addListener(ScaleNetwork::register);
         modBus.addListener(HelmBearingNetwork::register);
 
+        NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onEntityInteract);
+        NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onEntityInteractSpecific);
         NeoForge.EVENT_BUS.addListener(PocketedSubLevelEvents::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(CannonDeploymentQueue::onServerTick);
         NeoForge.EVENT_BUS.addListener(PocketPerformanceLimits::onBlockPlaced);

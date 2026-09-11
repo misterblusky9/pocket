@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.compression;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.network.CompressionSyncPayload;
+import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ManualScaleOverride;
@@ -70,6 +71,12 @@ public final class CompressionSessions {
         if (id == null) return false;
 
         final long now = player.level().getGameTime();
+        final CrossScaleWelds.ScalePlan weldPlan = CrossScaleWelds.planScale(subLevel, floor, now);
+        if (weldPlan.welded() && !weldPlan.allowed()) {
+            player.displayClientMessage(Component.literal(CrossScaleWelds.SCALE_LIMIT), true);
+            return false;
+        }
+
         Session session = SESSIONS.get(id);
 
         if (session != null && session.holder.equals(player.getUUID())) {
@@ -138,6 +145,11 @@ public final class CompressionSessions {
 
         final CompressionStage current = ScaleState.getStage(subLevel);
         final long now = player.level().getGameTime();
+        final CrossScaleWelds.ScalePlan weldPlan = CrossScaleWelds.planScale(subLevel, requested, now);
+        if (weldPlan.welded() && !weldPlan.allowed()) {
+            player.displayClientMessage(Component.literal(CrossScaleWelds.SCALE_LIMIT), true);
+            return;
+        }
 
         if (requested.depth() > current.depth()) {
             final CompressionBlacklist.Result blocked = CompressionBlacklist.find(subLevel, now);
@@ -247,6 +259,16 @@ public final class CompressionSessions {
         }
     }
 
+    public static void releaseSubLevel(final ServerSubLevel subLevel) {
+        if (subLevel == null || subLevel.getUniqueId() == null) return;
+        final Session session = SESSIONS.remove(subLevel.getUniqueId());
+        if (session == null) return;
+        try {
+            CompressionSyncPayload.sendRelease(subLevel);
+        } catch (final RuntimeException ignored) {
+        }
+    }
+
     public static void onServerTick(final ServerTickEvent.Post event) {
         if (SESSIONS.isEmpty()) return;
 
@@ -321,6 +343,12 @@ public final class CompressionSessions {
 
         final int direction = session.floor.depth() > current.depth() ? 1 : -1;
         final CompressionStage next = CompressionStage.fromDepth(current.depth() + direction);
+        final CrossScaleWelds.ScalePlan weldPlan = CrossScaleWelds.planScale(
+                subLevel, next, subLevel.getLevel().getGameTime());
+        if (weldPlan.welded() && !weldPlan.allowed()) {
+            holder.displayClientMessage(Component.literal(CrossScaleWelds.SCALE_LIMIT), true);
+            return false;
+        }
 
         ScaleController.forceStage(
                 subLevel,

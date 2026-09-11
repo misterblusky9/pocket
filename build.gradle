@@ -129,6 +129,8 @@ neoForge {
             sourceSet(sourceSets.main)
         }
     }
+
+    addModdingDependenciesTo sourceSets.test
 }
 
 configurations {
@@ -174,6 +176,8 @@ dependencies {
 
     // Spark, dev run only
     localRuntime "maven.modrinth:spark:v5qtqRQi"
+
+    testImplementation "org.joml:joml:${joml_version}"
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
@@ -260,6 +264,14 @@ tasks.register('moonSubLevelContractTest', JavaExec) {
     mainClass = 'com.misterblusky9.pocket.moon.MoonSubLevelContractTest'
 }
 
+tasks.register('weldSnapTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the cross-scale weld divisor, footprint and snapping checks.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.compat.WeldSnapTest'
+}
+
 tasks.named('check') {
     dependsOn tasks.named('scaleTransitionTest')
     dependsOn tasks.named('colliderBudgetTest')
@@ -267,6 +279,7 @@ tasks.named('check') {
     dependsOn tasks.named('expansionClearanceBudgetTest')
     dependsOn tasks.named('surfaceNormalTest')
     dependsOn tasks.named('moonSubLevelContractTest')
+    dependsOn tasks.named('weldSnapTest')
 }
 
 idea {

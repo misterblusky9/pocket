@@ -4,8 +4,7 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.debug.PocketTrace;
-import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
-import com.misterblusky9.pocket.physics.ScaledFluidForces;
+import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.misterblusky9.pocket.scale.SubLevelParentage;
@@ -14,7 +13,6 @@ import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
-import dev.ryanhcode.sable.sublevel.storage.SubLevelOccupancySavedData;
 import dev.ryanhcode.sable.sublevel.storage.SubLevelRemovalReason;
 import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelData;
 import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer;
@@ -46,15 +44,19 @@ public final class PocketedSubLevelEvents {
                 || ScaleState.getStage(found) != CompressionStage.SIXTEENTH) return;
 
         final ItemStack held = event.getItemStack();
-        final boolean packaged = PocketCaseItem.isContainer(held);
-        final boolean creativeEmptyHanded = player.isCreative() && held.isEmpty();
-        if (!packaged && !creativeEmptyHanded) return;
+        if (!PocketCaseItem.isContainer(held)) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
 
         if (!(event.getLevel() instanceof final ServerLevel serverLevel)
                 || !(found instanceof final ServerSubLevel subLevel)) return;
+
+        final ServerSubLevelContainer container = SubLevelContainer.getContainer(serverLevel);
+        if (container != null && CrossScaleWelds.isWelded(container, subLevel)) {
+            player.displayClientMessage(Component.literal(CrossScaleWelds.POCKET_BLOCKED), true);
+            return;
+        }
 
         PocketedEntities.disassembleContraptions(serverLevel, subLevel);
 
@@ -83,6 +85,11 @@ public final class PocketedSubLevelEvents {
         final ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         if (container == null) return;
 
+        if (CrossScaleWelds.isWelded(container, subLevel)) {
+            player.displayClientMessage(Component.literal(CrossScaleWelds.POCKET_BLOCKED), true);
+            return;
+        }
+
         if (SubLevelParentage.isJoinedToAnother(container, subLevel)) {
             player.displayClientMessage(Component.literal(
                     "Cannot pocket a sublevel while it is joined to another sublevel."), true);
@@ -91,6 +98,7 @@ public final class PocketedSubLevelEvents {
 
         final SubLevelData serialized = SubLevelSerializer.toData(subLevel, List.of());
         final CompoundTag fullTag = serialized.fullTag().copy();
+        PocketCaseItem.markDetachedPayload(fullTag);
         final CompoundTag plotTag = fullTag.getCompound("plot");
         final int plotX = plotTag.getInt("plot_x");
         final int plotZ = plotTag.getInt("plot_z");
@@ -133,31 +141,22 @@ public final class PocketedSubLevelEvents {
             container.removeSubLevel(subLevel, SubLevelRemovalReason.REMOVED);
             removedFromWorld = true;
 
-            container.getOccupancy().set(container.getIndex(plotX, plotZ));
-            SubLevelOccupancySavedData.getOrLoad(level).setDirty();
-
-            ScaleState.clearServerState(id);
-            ScaleState.clearServerBounds(id);
-            ScaledBoundsCollider.forgetSubLevel(id);
-            ScaledFluidForces.forget(id);
-            PocketMetrics.invalidate(id);
-
             giveResult(player, result);
             resultGiven = true;
 
             storage.commitCapture(level, token,
                     player instanceof final ServerPlayer sp ? sp : null);
             final boolean payloadStored = storage.contains(token);
-            final boolean sourceReserved = container.getOccupancy().get(container.getIndex(plotX, plotZ));
+            final boolean sourceFree = !container.getOccupancy().get(container.getIndex(plotX, plotZ));
             final boolean sourceGone = container.getSubLevel(plotX, plotZ) == null;
             PocketTrace.logger().info(
                     "[PocketTransfer] capture commit token={} source={} plot=({}, {}) uuid={} "
-                            + "payloadStored={} sourceReserved={} liveRemoved={} blocks={} blockEntities={} "
+                            + "payloadStored={} sourceFree={} liveRemoved={} blocks={} blockEntities={} "
                             + "entities={} backendValid={}",
                     token, level.dimension().location(), plotX, plotZ, id,
-                    payloadStored, sourceReserved, sourceGone,
+                    payloadStored, sourceFree, sourceGone,
                     canonicalMetrics.blocks(), canonicalMetrics.blockEntities(),
-                    PocketedEntities.count(fullTag), payloadStored && sourceReserved && sourceGone);
+                    PocketedEntities.count(fullTag), payloadStored && sourceFree && sourceGone);
         } catch (final RuntimeException exception) {
             if (!removedFromWorld) {
                 storage.remove(token);

@@ -24,7 +24,7 @@ public abstract class CoasterCartPlacementCollisionScaleMixin {
     @WrapMethod(
             method = "hasSubLevelObstruction(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/phys/Vec3;Lorg/joml/Quaterniond;Ljava/lang/Float;)Z"
     )
-    private static boolean pocket$serializeCollisionScratchAndScopeScale(
+    private static boolean pocket$scopeCollisionScale(
             final Level level,
             final Vec3 plotOriginWorld,
             final Quaterniond orientation,
@@ -32,15 +32,36 @@ public abstract class CoasterCartPlacementCollisionScaleMixin {
             final Operation<Boolean> original
     ) {
         synchronized (POCKET$COLLISION_LOCK) {
-            final double scale = SimulatedCoastersPlacementScaleContext.remembered();
-            SimulatedCoastersPlacementScaleContext.push(scale);
+            SimulatedCoastersPlacementScaleContext.push(SimulatedCoastersPlacementScaleContext.remembered());
             try {
                 return original.call(level, plotOriginWorld, orientation, partialTickForRender);
             } finally {
                 SimulatedCoastersPlacementScaleContext.pop();
-                SimulatedCoastersPlacementScaleContext.remember(1.0D);
             }
         }
+    }
+
+    @ModifyArg(
+            method = "obbForBodyCellBox([DLdev/ryanhcode/sable/companion/math/Pose3d;Lorg/joml/Quaterniondc;Ldev/ryanhcode/sable/api/math/LevelReusedVectors;)Ldev/ryanhcode/sable/api/math/OrientedBoundingBox3d;",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Ldev/ryanhcode/sable/companion/math/Pose3d;transformPosition(Lorg/joml/Vector3d;)Lorg/joml/Vector3d;"
+            ),
+            index = 0,
+            require = 1
+    )
+    private static Vector3d pocket$scaleProposedBogeyCenter(final Vector3d original) {
+        final double scale = SimulatedCoastersPlacementScaleContext.current();
+        if (!PocketSized.isValidScale(scale) || Math.abs(scale - 1.0D) <= PocketSized.EPSILON) {
+            return original;
+        }
+
+        final double s = PocketSized.clampScale(scale);
+        return new Vector3d(
+                0.5D + (original.x - 0.5D) * s,
+                0.5D + (original.y - 0.5D) * s,
+                0.5D + (original.z - 0.5D) * s
+        );
     }
 
     @ModifyArg(

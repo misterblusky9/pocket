@@ -9,31 +9,64 @@ import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import java.lang.reflect.Method;
 
 public final class SimulatedCoastersScaleLookup {
     private static volatile Class<?> pocket$hitClass;
     private static volatile Method pocket$edgeMethod;
+    private static volatile Class<?> pocket$pointHitClass;
+    private static volatile Method pocket$pointMethod;
     private static volatile Class<?> pocket$edgeClass;
     private static volatile Method pocket$fromMethod;
     private static volatile Method pocket$toMethod;
 
     public static double scaleForGraphHit(final Level level, final Object graphHit, final Double partialTick) {
-        if (level == null || graphHit == null) return 1.0D;
+        return scaleForGraphHit(level, graphHit, partialTick, 1.0D);
+    }
+
+    public static double scaleForGraphHit(
+            final Level level,
+            final Object graphHit,
+            final Double partialTick,
+            final double failureFallback
+    ) {
+        final double fallback = sanitizeFallback(failureFallback);
+        if (level == null || graphHit == null) return fallback;
 
         try {
             final Object edge = edge(graphHit);
-            if (edge == null) return 1.0D;
+            if (edge == null) return fallback;
 
             final BlockPos from = (BlockPos) from(edge);
             final BlockPos to = (BlockPos) to(edge);
 
             SubLevel subLevel = from == null ? null : Sable.HELPER.getContaining(level, from);
             if (subLevel == null && to != null) subLevel = Sable.HELPER.getContaining(level, to);
-            return scaleOf(subLevel, partialTick);
+            return subLevel == null ? 1.0D : scaleOf(subLevel, partialTick);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return 1.0D;
+            return fallback;
+        }
+    }
+
+    public static Vec3 pointForGraphHit(final Object graphHit) {
+        if (graphHit == null) return null;
+        try {
+            Method method = pocket$pointMethod;
+            if (method == null || pocket$pointHitClass != graphHit.getClass()) {
+                synchronized (SimulatedCoastersScaleLookup.class) {
+                    if (pocket$pointMethod == null || pocket$pointHitClass != graphHit.getClass()) {
+                        pocket$pointHitClass = graphHit.getClass();
+                        pocket$pointMethod = pocket$pointHitClass.getMethod("point");
+                    }
+                    method = pocket$pointMethod;
+                }
+            }
+            final Object point = method.invoke(graphHit);
+            return point instanceof Vec3 vec ? vec : null;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
         }
     }
 
@@ -64,6 +97,11 @@ public final class SimulatedCoastersScaleLookup {
             scale = subLevel.logicalPose().scale().x();
         }
 
+        if (!PocketSized.isValidScale(scale)) return 1.0D;
+        return PocketSized.clampScale(scale);
+    }
+
+    private static double sanitizeFallback(final double scale) {
         if (!PocketSized.isValidScale(scale)) return 1.0D;
         return PocketSized.clampScale(scale);
     }

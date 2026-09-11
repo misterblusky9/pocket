@@ -4,9 +4,6 @@ import com.misterblusky9.pocket.block.HelmBearingBlockEntity;
 import com.misterblusky9.pocket.create.HelmBearingContraption;
 import com.misterblusky9.pocket.mixin.create.ControlledContraptionEntityControllerPosAccessor;
 import com.misterblusky9.pocket.network.HelmBearingUpdatePayload;
-import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
-import com.simibubi.create.content.contraptions.ContraptionHandler;
-import com.simibubi.create.content.contraptions.ContraptionHandlerClient;
 import com.simibubi.create.content.contraptions.ControlledContraptionEntity;
 import com.simibubi.create.content.equipment.goggles.GogglesItem;
 import dev.simulated_team.simulated.Simulated;
@@ -14,7 +11,6 @@ import dev.simulated_team.simulated.index.SimClickInteractions;
 import dev.simulated_team.simulated.service.SimConfigService;
 import dev.simulated_team.simulated.util.hold_interaction.BlockHoldInteraction;
 import dev.simulated_team.simulated.util.hold_interaction.HoldInteractionManager;
-import net.createmod.catnip.data.Couple;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,14 +20,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
-
-import java.lang.ref.WeakReference;
-import java.util.Collection;
-import java.util.Optional;
 
 public final class HelmBearingHandler extends BlockHoldInteraction {
     public static final HelmBearingHandler INSTANCE = new HelmBearingHandler();
@@ -85,57 +75,14 @@ public final class HelmBearingHandler extends BlockHoldInteraction {
     }
 
     private static ControlledContraptionEntity findTargetHelm(final LocalPlayer player) {
-        final Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null) {
+        final IntegratedContraptionRaycast.Hit hit = IntegratedContraptionRaycast.pick(
+                player,
+                contraption -> contraption instanceof HelmBearingContraption
+        );
+        if (hit == null || !(hit.entity() instanceof final ControlledContraptionEntity controlled)) {
             return null;
         }
-
-        final Couple<Vec3> rayInputs = ContraptionHandlerClient.getRayInputs(player);
-        final Vec3 origin = rayInputs.getFirst();
-        final Vec3 target = rayInputs.getSecond();
-        final AABB rayBounds = new AABB(origin, target).inflate(1.0D);
-        final Collection<WeakReference<AbstractContraptionEntity>> contraptions =
-                ContraptionHandler.loadedContraptions.get(minecraft.level).values();
-
-        double bestDistance = Double.MAX_VALUE;
-        ControlledContraptionEntity best = null;
-
-        for (final WeakReference<AbstractContraptionEntity> ref : contraptions) {
-            final AbstractContraptionEntity entity = ref.get();
-            if (!(entity instanceof final ControlledContraptionEntity controlled)
-                    || !(controlled.getContraption() instanceof final HelmBearingContraption helm)
-                    || !entity.getBoundingBox().intersects(rayBounds)) {
-                continue;
-            }
-
-            final AABB bounds = helm.getInteractionBounds();
-            if (bounds == null) {
-                continue;
-            }
-
-            final Vec3 localOrigin = entity.toLocalVector(origin, 1.0F);
-            final Vec3 localTarget = entity.toLocalVector(target, 1.0F);
-            final Vec3 localHit;
-            if (bounds.contains(localOrigin)) {
-                localHit = localOrigin;
-            } else {
-                final Optional<Vec3> clipped = bounds.clip(localOrigin, localTarget);
-                if (clipped.isEmpty()) {
-                    continue;
-                }
-                localHit = clipped.get();
-            }
-
-            final double distance = entity.toGlobalVector(localHit, 1.0F).distanceTo(origin);
-            if (distance >= bestDistance) {
-                continue;
-            }
-
-            bestDistance = distance;
-            best = controlled;
-        }
-
-        return best;
+        return controlled;
     }
 
     @Override
@@ -146,6 +93,7 @@ public final class HelmBearingHandler extends BlockHoldInteraction {
         super.startHold(level, player, blockPos);
         blockEntity = be;
         rawAngle = blockEntity.getInteractionAngle(Minecraft.getInstance().getTimer().getGameTimeDeltaTicks());
+        effectiveAngle = rawAngle;
         angleSgn = (int) blockEntity.directionConvert(1);
         updated = true;
         wasShiftKeyDown = false;

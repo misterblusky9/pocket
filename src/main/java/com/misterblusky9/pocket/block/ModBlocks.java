@@ -73,5 +73,17 @@ public final class ModBlocks {
                     )
             );
 
+    public static final DeferredHolder<Block, Block> BLUEPRINT_TILE =
+            BLOCKS.register(
+                    "blueprint_tile",
+                    () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.STONE))
+            );
+
+    public static final DeferredHolder<Block, Block> DIAGRAM_TILE =
+            BLOCKS.register(
+                    "diagram_tile",
+                    () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.STONE))
+            );
+
     private ModBlocks() {}
 }

@@ -23,6 +23,18 @@ public final class PocketRenderTypes extends RenderType {
                             false, false))
                     .createCompositeState(true));
 
+    public static final RenderType WELD_PIVOT = create(
+            "pocket:weld_pivot",
+            DefaultVertexFormat.POSITION_COLOR,
+            VertexFormat.Mode.QUADS,
+            256,
+            false,
+            false,
+            RenderType.CompositeState.builder()
+                    .setShaderState(POSITION_COLOR_SHADER)
+                    .setCullState(NO_CULL)
+                    .createCompositeState(false));
+
     private PocketRenderTypes(
             final String name,
             final VertexFormat format,

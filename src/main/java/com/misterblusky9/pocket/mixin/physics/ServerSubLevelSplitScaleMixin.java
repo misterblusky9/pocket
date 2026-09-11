@@ -19,13 +19,14 @@ public abstract class ServerSubLevelSplitScaleMixin {
             final Pose3d originalPose,
             final CallbackInfo ci
     ) {
+        final ServerSubLevel child = (ServerSubLevel) (Object) this;
+        if (child.isRemoved() || parent == null || parent.isRemoved() || originalPose == null) return;
+
         final double scale = ScaleState.getServerScale(parent);
 
         PlotShapeCache.invalidate(parent);
 
         originalPose.scale().set(scale, scale, scale);
-
-        final ServerSubLevel child = (ServerSubLevel) (Object) this;
 
         ScaleController.adoptSplitScale(child, scale);
         PlotShapeCache.invalidate(child);

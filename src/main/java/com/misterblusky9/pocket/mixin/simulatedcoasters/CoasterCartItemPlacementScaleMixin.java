@@ -29,7 +29,7 @@ public abstract class CoasterCartItemPlacementScaleMixin {
             final BlockPos clicked,
             final CallbackInfoReturnable<InteractionResult> cir
     ) {
-        SimulatedCoastersPlacementScaleContext.remember(1.0D);
+        SimulatedCoastersPlacementScaleContext.reset();
     }
 
     @Inject(
@@ -45,6 +45,6 @@ public abstract class CoasterCartItemPlacementScaleMixin {
             final BlockPos clicked,
             final CallbackInfoReturnable<InteractionResult> cir
     ) {
-        SimulatedCoastersPlacementScaleContext.remember(1.0D);
+        SimulatedCoastersPlacementScaleContext.reset();
     }
 }
