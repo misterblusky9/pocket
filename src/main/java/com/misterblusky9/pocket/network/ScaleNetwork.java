@@ -5,6 +5,7 @@ import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -71,6 +72,22 @@ public final class ScaleNetwork {
 
                     CompressionGunItem.setTargetingMode(stack, payload.targetingMode());
                     CompressionGunItem.setGrowing(stack, payload.growing());
+                })
+        );
+        registrar.playToClient(
+                CrossScaleWeldListPayload.TYPE,
+                CrossScaleWeldListPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        com.misterblusky9.pocket.compat.simulated.CrossScaleWelds
+                                .acceptClientWelds(payload.welds()))
+        );
+        registrar.playToServer(
+                CrossScaleWeldPayload.TYPE,
+                CrossScaleWeldPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof final ServerPlayer player) {
+                        payload.handle(player);
+                    }
                 })
         );
         registrar.playToServer(
@@ -200,6 +217,32 @@ public final class ScaleNetwork {
         ));
     }
 
+    public static void sendTrackingScale(
+            final ServerPlayer player,
+            final ServerSubLevel subLevel,
+            final int interpolationTick
+    ) {
+        if (player == null || subLevel == null || subLevel.isRemoved()) return;
+
+        final double current = ScaleState.getServerScale(subLevel);
+        if (!com.misterblusky9.pocket.PocketSized.isValidScale(current)) return;
+
+        double target = current;
+        if (ScaleState.hasServerState(subLevel.getUniqueId())) {
+            final ScaleState.ServerState state = ScaleState.serverState(subLevel);
+            target = state.transitionStage() == null
+                    ? state.stableStage().scale()
+                    : state.transitionStage().scale();
+        }
+
+        player.connection.send(new ClientboundCustomPayloadPacket(new ScaleSyncPayload(
+                subLevel.getUniqueId(),
+                interpolationTick,
+                current,
+                target,
+                true
+        )));
+    }
     public static void sendScale(final ServerSubLevel subLevel, final double current, final double target) {
         sendScale(subLevel, current, target, false);
     }

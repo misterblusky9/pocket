@@ -14,9 +14,17 @@ public final class PocketKeys {
             GLFW.GLFW_KEY_TAB,
             "key.categories.pocket"
     );
+    public static final KeyMapping WELD_ROTATE = new KeyMapping(
+            "key.pocket.weld_rotate",
+            KeyConflictContext.IN_GAME,
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_R,
+            "key.categories.pocket"
+    );
 
     public static void register(final RegisterKeyMappingsEvent event) {
         event.register(ROTATE);
+        event.register(WELD_ROTATE);
     }
 
     public static boolean rotateHeld() {

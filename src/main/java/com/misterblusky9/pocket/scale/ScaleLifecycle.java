@@ -1,63 +1,70 @@
 package com.misterblusky9.pocket.scale;
 
+import com.misterblusky9.pocket.compression.CompressionBlacklist;
+import com.misterblusky9.pocket.compression.CompressionSessions;
+import com.misterblusky9.pocket.compat.simulated.CrossScaleWeldSync;
+import com.misterblusky9.pocket.compat.simulated.WeldRecord;
+import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
+import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.debug.PocketTrace;
+import com.misterblusky9.pocket.physics.ColliderDetail;
+import com.misterblusky9.pocket.physics.PivotDriftCompensation;
 import com.misterblusky9.pocket.physics.ScaledBoundsCollider;
+import com.misterblusky9.pocket.physics.ScaledColliderRebuildQueue;
+import com.misterblusky9.pocket.physics.ScaledFluidForces;
 import com.misterblusky9.pocket.physics.ScaledSweepGuard;
 import com.misterblusky9.pocket.physics.ScaledVelocityGuard;
-import com.misterblusky9.pocket.physics.ScaledFluidForces;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
-import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
+import com.misterblusky9.pocket.tweezers.TweezerLocks;
+import com.misterblusky9.pocket.tweezers.TweezerSessions;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.storage.SubLevelRemovalReason;
+import net.minecraft.server.level.ServerLevel;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 
 public final class ScaleLifecycle {
-    private static final long ABSENCE_GRACE_NANOS = 10_000_000_000L;
+    public static void release(
+            final ServerSubLevel subLevel,
+            final SubLevelRemovalReason reason
+    ) {
+        if (subLevel == null || subLevel.getUniqueId() == null) return;
 
-    private static final Map<UUID, Long> LAST_SEEN = new HashMap<>();
+        final UUID id = subLevel.getUniqueId();
+        PocketTrace.scale("release runtime state uuid={} reason={}", id, reason);
 
-    private static final Set<UUID> LIVE = new HashSet<>();
-
-    public static synchronized void reapDeparted(final ServerSubLevelContainer container) {
-        final long now = System.nanoTime();
-
-        LIVE.clear();
-        for (final ServerSubLevel subLevel : container.getAllSubLevels()) {
-            final UUID id = subLevel.getUniqueId();
-            if (id != null && !subLevel.isRemoved()) LIVE.add(id);
+        CompressionSessions.releaseSubLevel(subLevel);
+        TweezerSessions.releaseSubLevel(subLevel);
+        if (reason == SubLevelRemovalReason.REMOVED) {
+            TweezerLocks.remove(subLevel.getLevel(), subLevel);
+            releaseWelds(subLevel, id);
         }
 
-        for (final UUID id : LIVE) LAST_SEEN.put(id, now);
+        ScaleController.clearExternalCommand(id);
+        ManualScaleOverride.clear(id);
+        CompressionBlacklist.invalidate(id);
+        ScaledColliderRebuildQueue.forget(subLevel);
+        ScaledBoundsCollider.forgetSubLevel(id);
+        ScaledVelocityGuard.forget(id);
+        ScaledSweepGuard.forget(id);
+        ScaledFluidForces.forget(id);
+        ColliderDetail.forget(id);
+        PivotDriftCompensation.forget(id);
+        SubLevelParentage.forget(id);
+        PocketMetrics.invalidate(id);
+        ScaleState.clearServerBounds(id);
+        ScaleState.clearServerState(id);
+    }
 
-        final Set<UUID> tracked = ScaleState.trackedIds();
-        LAST_SEEN.keySet().retainAll(tracked);
-        for (final UUID id : tracked) LAST_SEEN.putIfAbsent(id, now);
-
-        final Iterator<Map.Entry<UUID, Long>> iterator = LAST_SEEN.entrySet().iterator();
-        while (iterator.hasNext()) {
-            final Map.Entry<UUID, Long> entry = iterator.next();
-            if (now - entry.getValue() < ABSENCE_GRACE_NANOS) continue;
-
-            final UUID id = entry.getKey();
-            PocketTrace.scale(
-                    "releasing state for departed sub-level uuid={} unseenForMs={}",
-                    id, (now - entry.getValue()) / 1_000_000L);
-
-            ScaleState.clearServerState(id);
-            ScaleState.clearServerBounds(id);
-            ScaledBoundsCollider.forgetSubLevel(id);
-            ScaledVelocityGuard.forget(id);
-            ScaledSweepGuard.forget(id);
-            ScaledFluidForces.forget(id);
-            SubLevelParentage.forget(id);
-            PocketMetrics.invalidate(id);
-            iterator.remove();
-        }
+    // Only a permanent removal cuts welds. An unload has to leave the record alone so the
+    // weld can be rebuilt when the craft comes back.
+    private static void releaseWelds(final ServerSubLevel subLevel, final UUID id) {
+        if (!(subLevel.getLevel() instanceof final ServerLevel serverLevel)) return;
+        final List<WeldRecord> cut = WeldStore.get(serverLevel).removeAllTouching(id);
+        if (cut.isEmpty()) return;
+        for (final WeldRecord record : cut) WeldRuntime.drop(record.weldId());
+        CrossScaleWeldSync.broadcast(serverLevel);
     }
 
     private ScaleLifecycle() {}

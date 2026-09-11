@@ -37,11 +37,17 @@ public abstract class SwitchBearingContraptionInteractionMixin {
             final InteractionHand hand,
             final CallbackInfoReturnable<Boolean> cir
     ) {
-        if (contraption instanceof HelmBearingContraption || !(contraption instanceof SwitchContraption)) {
+        final AbstractContraptionEntity self = (AbstractContraptionEntity) (Object) this;
+        if (contraption instanceof HelmBearingContraption) {
+            if (!self.level().isClientSide) {
+                cir.setReturnValue(true);
+            }
+            return;
+        }
+        if (!(contraption instanceof SwitchContraption)) {
             return;
         }
 
-        final AbstractContraptionEntity self = (AbstractContraptionEntity) (Object) this;
         if (!(self instanceof ControlledContraptionEntity controlled)) {
             SwitchBearingDebug.warn(
                     "Switch contraption interaction reached unexpected entity type={} entityId={}",

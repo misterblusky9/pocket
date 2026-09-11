@@ -21,7 +21,6 @@ import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import dev.ryanhcode.sable.sublevel.storage.SubLevelOccupancySavedData;
 import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelData;
 import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer;
 import dev.ryanhcode.sable.util.SableNBTUtils;
@@ -84,6 +83,7 @@ public class PocketCaseItem extends PackageItem {
 
     private static final String TOKEN_KEY = "pocket_token";
     private static final String DIMENSION_KEY = "source_dimension";
+    private static final String DETACHED_CAPTURE_KEY = "pocket_detached_capture";
 
     private static final String ORPHANED_KEY = "pocket_orphaned";
     private static final String ORPHANED_REASON_KEY = "pocket_orphaned_reason";
@@ -828,28 +828,11 @@ public class PocketCaseItem extends PackageItem {
         com.misterblusky9.pocket.pocket.PocketedEntities.restore(serverLevel, fullTag);
 
         backend.storage().remove(token);
-        boolean sourceReservationReleased = false;
-        if (backend.crossDimension()) {
-            final int sourceIndex = backend.sourceContainer().getIndex(
-                    backend.sourcePlotX(), backend.sourcePlotZ());
-            if (backend.sourceContainer().getSubLevel(
-                    backend.sourcePlotX(), backend.sourcePlotZ()) == null) {
-                backend.sourceContainer().getOccupancy().clear(sourceIndex);
-                SubLevelOccupancySavedData.getOrLoad(backend.sourceLevel()).setDirty();
-                sourceReservationReleased = !backend.sourceContainer().getOccupancy().get(sourceIndex);
-            } else {
-                PocketTrace.logger().error(
-                        "[PocketTransfer] source cleanup refused token={} source={} plot=({}, {}) "
-                                + "reason=live sublevel appeared",
-                        token, backend.sourceLevel().dimension().location(),
-                        backend.sourcePlotX(), backend.sourcePlotZ());
-            }
-        }
         PocketTrace.logger().info(
                 "[PocketTransfer] commit token={} source={} target={} payloadRemoved=true "
-                        + "sourceReservationReleased={} backendValid=true",
+                        + "legacyReservation={} backendValid=true",
                 token, backend.sourceLevel().dimension().location(), serverLevel.dimension().location(),
-                sourceReservationReleased);
+                backend.legacyReservation());
         return restored;
     }
 
@@ -858,6 +841,10 @@ public class PocketCaseItem extends PackageItem {
         if (sourceId == null) return null;
         final ResourceKey<Level> sourceKey = ResourceKey.create(Registries.DIMENSION, sourceId);
         return targetLevel.getServer().getLevel(sourceKey);
+    }
+
+    public static void markDetachedPayload(final CompoundTag fullTag) {
+        if (fullTag != null) fullTag.putBoolean(DETACHED_CAPTURE_KEY, true);
     }
 
     private static PayloadBackend resolvePayloadBackend(
@@ -916,14 +903,15 @@ public class PocketCaseItem extends PackageItem {
         }
 
         final boolean inBounds = plotInBounds(sourceContainer, sourcePlotX, sourcePlotZ);
-        final boolean reserved = inBounds
+        final boolean occupied = inBounds
                 && sourceContainer.getOccupancy().get(sourceContainer.getIndex(sourcePlotX, sourcePlotZ));
         final boolean live = inBounds && sourceContainer.getSubLevel(sourcePlotX, sourcePlotZ) != null;
+        final boolean legacyReservation = !fullTag.getBoolean(DETACHED_CAPTURE_KEY) && occupied && !live;
         PocketTrace.logger().info(
                 "[PocketTransfer] source validation token={} source={} target={} payload=true plot=({}, {}) "
-                        + "inBounds={} reserved={} live={} backendValid={}",
+                        + "inBounds={} occupied={} live={} legacyReservation={} backendValid={}",
                 token, sourceId, targetLevel.dimension().location(), sourcePlotX, sourcePlotZ,
-                inBounds, reserved, live, inBounds && !live);
+                inBounds, occupied, live, legacyReservation, inBounds);
 
         if (!inBounds) {
             fail(feedbackPlayer, "The stored sublevel plot is outside the source backend.");
@@ -939,16 +927,9 @@ public class PocketCaseItem extends PackageItem {
                     token, sourceId, sourcePlotX, sourcePlotZ);
         }
 
-        if (!reserved) {
-            PocketTrace.logger().warn(
-                    "[PocketTransfer] source reservation missing token={} source={} plot=({}, {}); "
-                            + "continuing from authoritative payload",
-                    token, sourceId, sourcePlotX, sourcePlotZ);
-        }
-
         return new PayloadBackend(
                 sourceLevel, sourceContainer, storage, fullTag, sourcePlotX, sourcePlotZ,
-                !sourceLevel.dimension().equals(targetLevel.dimension()));
+                !sourceLevel.dimension().equals(targetLevel.dimension()), legacyReservation);
     }
 
     private static PlotTransfer preparePlotTransfer(
@@ -982,11 +963,10 @@ public class PocketCaseItem extends PackageItem {
 
         int destinationX = backend.sourcePlotX();
         int destinationZ = backend.sourcePlotZ();
-        final boolean sameDimension = !backend.crossDimension();
         final boolean originalAvailable = plotInBounds(targetContainer, destinationX, destinationZ)
                 && targetContainer.getSubLevel(destinationX, destinationZ) == null
-                && (sameDimension || !targetContainer.getOccupancy().get(
-                        targetContainer.getIndex(destinationX, destinationZ)));
+                && !targetContainer.getOccupancy().get(
+                        targetContainer.getIndex(destinationX, destinationZ));
 
         if (!originalAvailable) {
             final int side = 1 << targetContainer.getLogSideLength();
@@ -1020,18 +1000,15 @@ public class PocketCaseItem extends PackageItem {
 
         final int deltaY = targetLevel.getMinBuildHeight() - backend.sourceLevel().getMinBuildHeight();
         final int deltaZ = (targetGlobalZ - sourceGlobalZ) * plotBlockSize;
-        final boolean destinationInitiallyReserved = targetContainer.getOccupancy().get(
-                targetContainer.getIndex(destinationX, destinationZ));
 
         PocketTrace.logger().info(
                 "[PocketTransfer] target validation token={} target={} preferredPlot=({}, {}) "
                         + "preferredAvailable={} destinationPlot=({}, {}) deltaY={} "
-                        + "destinationInitiallyReserved={} rebaseRequired={} backendValid=true",
+                        + "rebaseRequired={} backendValid=true",
                 token, targetLevel.dimension().location(), backend.sourcePlotX(), backend.sourcePlotZ(),
-                originalAvailable, destinationX, destinationZ, deltaY, destinationInitiallyReserved,
+                originalAvailable, destinationX, destinationZ, deltaY,
                 deltaX != 0 || deltaY != 0 || deltaZ != 0);
-        return new PlotTransfer(
-                destinationX, destinationZ, deltaX, deltaY, deltaZ, destinationInitiallyReserved);
+        return new PlotTransfer(destinationX, destinationZ, deltaX, deltaY, deltaZ);
     }
 
     private static RebaseStats rebasePlotPayload(
@@ -1413,28 +1390,22 @@ public class PocketCaseItem extends PackageItem {
             PocketMetrics.invalidate(identity);
         }
 
-        boolean reservationRestored = false;
-        if (removalSucceeded && container.getSubLevel(
-                transfer.destinationPlotX(), transfer.destinationPlotZ()) == null) {
-            final int index = container.getIndex(
-                    transfer.destinationPlotX(), transfer.destinationPlotZ());
-            if (transfer.destinationInitiallyReserved()) container.getOccupancy().set(index);
-            else container.getOccupancy().clear(index);
-            SubLevelOccupancySavedData.getOrLoad(level).setDirty();
-            reservationRestored = container.getOccupancy().get(index)
-                    == transfer.destinationInitiallyReserved();
-        }
-        final boolean rollbackComplete = removalSucceeded && reservationRestored;
+        final int destinationIndex = container.getIndex(
+                transfer.destinationPlotX(), transfer.destinationPlotZ());
+        final boolean destinationFree = removalSucceeded
+                && container.getSubLevel(transfer.destinationPlotX(), transfer.destinationPlotZ()) == null
+                && !container.getOccupancy().get(destinationIndex);
+        final boolean rollbackComplete = removalSucceeded && destinationFree;
         if (exception == null) {
             PocketTrace.logger().error(
                     "[PocketTransfer] load invalid token={} uuid={} rollbackComplete={} "
-                            + "reservationRestored={} reason={}",
-                    token, identity, rollbackComplete, reservationRestored, reason);
+                            + "destinationFree={} reason={}",
+                    token, identity, rollbackComplete, destinationFree, reason);
         } else {
             PocketTrace.logger().error(
                     "[PocketTransfer] load invalid token={} uuid={} rollbackComplete={} "
-                            + "reservationRestored={} reason={} exception={}",
-                    token, identity, rollbackComplete, reservationRestored, reason,
+                            + "destinationFree={} reason={} exception={}",
+                    token, identity, rollbackComplete, destinationFree, reason,
                     exception.toString(), exception);
         }
     }
@@ -1446,7 +1417,8 @@ public class PocketCaseItem extends PackageItem {
             CompoundTag fullTag,
             int sourcePlotX,
             int sourcePlotZ,
-            boolean crossDimension
+            boolean crossDimension,
+            boolean legacyReservation
     ) {}
 
     private record PlotTransfer(
@@ -1454,8 +1426,7 @@ public class PocketCaseItem extends PackageItem {
             int destinationPlotZ,
             int deltaBlocksX,
             int deltaBlocksY,
-            int deltaBlocksZ,
-            boolean destinationInitiallyReserved
+            int deltaBlocksZ
     ) {}
 
     private record RebaseStats(int blockEntities, int ticks, int entities) {}

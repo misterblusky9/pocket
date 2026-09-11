@@ -1,28 +1,29 @@
 package com.misterblusky9.pocket.mixin.interaction;
 
-import com.misterblusky9.pocket.scale.ScaleState;
-import dev.ryanhcode.sable.Sable;
-import dev.ryanhcode.sable.sublevel.SubLevel;
-import net.minecraft.core.BlockPos;
+import com.misterblusky9.pocket.interaction.ScaledPlacementGate;
 import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+// runs ahead of Sable's canPlace gate, which models every block as 1x1x1 world units
 @Mixin(value = BlockPlaceContext.class, priority = 500)
 public abstract class PlacementMarginMixin {
+    @Shadow protected boolean replaceClicked;
+
     @Inject(method = "canPlace", at = @At("HEAD"), cancellable = true)
-    private void pocket$skipFullSizeMarginForCompressedCraft(final CallbackInfoReturnable<Boolean> cir) {
+    private void pocket$scaleAwareCrossSubLevelGate(final CallbackInfoReturnable<Boolean> cir) {
         final BlockPlaceContext context = (BlockPlaceContext) (Object) this;
 
-        final Level level = context.getLevel();
-        final BlockPos clicked = context.getClickedPos();
+        if (!this.replaceClicked
+                && !context.getLevel().getBlockState(context.getClickedPos()).canBeReplaced(context)) {
+            cir.setReturnValue(false);
+            return;
+        }
 
-        final SubLevel subLevel = Sable.HELPER.getContaining(level, clicked);
-        if (subLevel == null || !ScaleState.isScaled(subLevel)) return;
-
-        cir.setReturnValue(level.getBlockState(clicked).canBeReplaced(context));
+        final Boolean decision = ScaledPlacementGate.evaluate(context);
+        if (decision != null) cir.setReturnValue(decision);
     }
 }

@@ -71,6 +71,10 @@ public final class ModItems {
             "collider_wand", () -> new ColliderWandItem(new Item.Properties().stacksTo(1))
     );
 
+    public static final DeferredItem<PocketKnifeItem> POCKET_KNIFE = ITEMS.register(
+            "pocket_knife", () -> new PocketKnifeItem(new Item.Properties().stacksTo(1))
+    );
+
     public static final DeferredItem<TheMoonItem> THE_MOON =
             ITEMS.register("the_moon", () -> new TheMoonItem(new Item.Properties().stacksTo(1)));
 
@@ -84,9 +88,23 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.HELM_BEARING.get(), new Item.Properties())
     );
 
+    public static final DeferredItem<HotGlueGunItem> GLUE_GUN = ITEMS.register(
+            "glue_gun", () -> new HotGlueGunItem(new Item.Properties().stacksTo(1))
+    );
+
     public static final DeferredItem<BlockItem> SWITCH_PISTON = ITEMS.register(
             "switch_piston",
             () -> new BlockItem(ModBlocks.SWITCH_PISTON.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<BlockItem> BLUEPRINT_TILE = ITEMS.register(
+            "blueprint_tile",
+            () -> new BlockItem(ModBlocks.BLUEPRINT_TILE.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<BlockItem> DIAGRAM_TILE = ITEMS.register(
+            "diagram_tile",
+            () -> new BlockItem(ModBlocks.DIAGRAM_TILE.get(), new Item.Properties())
     );
 
     private ModItems() {}

@@ -4,6 +4,8 @@
     "pocket:subspace_recycler",
     "pocket:static_subspace_compressor",
     "pocket:switch_bearing",
-    "pocket:switch_piston"
+    "pocket:switch_piston",
+    "pocket:blueprint_tile",
+    "pocket:diagram_tile"
   ]
 }

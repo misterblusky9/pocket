@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.physics;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.compat.simulated.WeldedAssembly;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
@@ -29,7 +30,7 @@ public final class ScaledImpulseLimits {
 
         final double scale = ScaleState.getServerScale(subLevel);
 
-        return raw * ScaledMassData.forceFactors(raw, scale)[0];
+        return raw * ScaledMassData.forceFactors(raw, scale, WeldedAssembly.solverFloor(subLevel))[0];
     }
 
     public static boolean bounds(final PhysicsPipelineBody body) {
@@ -83,7 +84,8 @@ public final class ScaledImpulseLimits {
 
         final double rawMass = tracker.getMass();
         final double scale = ScaleState.getServerScale(subLevel);
-        final double inertiaScale = ScaledMassData.forceFactors(rawMass, scale)[1];
+        final double inertiaScale =
+                ScaledMassData.forceFactors(rawMass, scale, WeldedAssembly.solverFloor(subLevel))[1];
 
         final double smallest = Math.min(raw.m00(), Math.min(raw.m11(), raw.m22()));
         final double inertia = smallest * inertiaScale;

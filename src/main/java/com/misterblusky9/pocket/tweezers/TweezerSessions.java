@@ -120,6 +120,20 @@ public final class TweezerSessions {
         return player != null && SESSIONS.containsKey(player.getUUID());
     }
 
+    public static void releaseSubLevel(final ServerSubLevel subLevel) {
+        if (subLevel == null) return;
+        for (final Map.Entry<UUID, Session> entry : SESSIONS.entrySet()) {
+            final Session session = entry.getValue();
+            if (session.subLevel != subLevel) continue;
+            if (!SESSIONS.remove(entry.getKey(), session)) continue;
+            try {
+                session.detach();
+            } catch (final RuntimeException ignored) {
+            }
+            markGripsDirty(subLevel.getLevel());
+        }
+    }
+
     // Driving
 
     private static final long LOCK_SYNC_INTERVAL = 20L;

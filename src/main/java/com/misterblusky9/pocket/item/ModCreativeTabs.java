@@ -20,6 +20,7 @@ public final class ModCreativeTabs {
                     .displayItems((parameters, output) -> {
                         output.accept(ModItems.COMPRESSION_GUN.get());
                         output.accept(ModItems.CREATIVE_SHRINK_RAY.get());
+                        output.accept(ModItems.POCKET_KNIFE.get());
                         output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.STATIC_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.EMPTY_BOX.get());
@@ -31,6 +32,9 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.SWITCH_BEARING.get());
                         output.accept(ModItems.HELM_BEARING.get());
                         output.accept(ModItems.SWITCH_PISTON.get());
+                        output.accept(ModItems.BLUEPRINT_TILE.get());
+                        output.accept(ModItems.DIAGRAM_TILE.get());
+                        output.accept(ModItems.GLUE_GUN.get());
                         output.accept(ModItems.THE_MOON.get());
                     })
                     .build()

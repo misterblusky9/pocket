@@ -55,6 +55,7 @@ public final class PocketSizedClient {
         NeoForge.EVENT_BUS.addListener(ColliderOutlineRenderer::render);
         NeoForge.EVENT_BUS.addListener(SwitchBearingOutlineRenderer::render);
         NeoForge.EVENT_BUS.addListener(TweezerBeamRenderer::render);
+        NeoForge.EVENT_BUS.addListener(WeldFaceRenderer::render);
         NeoForge.EVENT_BUS.addListener(
                 (net.neoforged.neoforge.client.event.ClientTickEvent.Post event) -> {
                     CompressionBeamRenderer.tick();
@@ -80,6 +81,10 @@ public final class PocketSizedClient {
                         ColliderOutlineRenderer.clear();
                         ScaleHandshake.clear();
                         MoonPhysicsClient.clear();
+                        HotGlueGunClient.clear();
+                        CrossScaleWeldSeams.clear();
+                        WeldSettleRenderer.clear();
+                        WeldFaceRenderer.clear();
                     }
                 }
         );

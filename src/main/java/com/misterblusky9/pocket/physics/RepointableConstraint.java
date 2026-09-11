@@ -22,4 +22,6 @@ public interface RepointableConstraint {
     void pocket$repoint(long nativeHandle);
 
     void pocket$replayMotors();
+
+    void pocket$replayContacts();
 }

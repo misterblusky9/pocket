@@ -2,9 +2,9 @@ package com.misterblusky9.pocket.mixin.simulatedcoasters;
 
 import com.misterblusky9.pocket.compat.simulatedcoasters.SimulatedCoastersCartScaleContext;
 import com.misterblusky9.pocket.compat.simulatedcoasters.SimulatedCoastersScaleLookup;
+import com.misterblusky9.pocket.compat.simulatedcoasters.SimulatedCoastersPlacementScaleContext;
 import com.misterblusky9.pocket.physics.ScaleFrame;
 import com.llamalad7.mixinextras.sugar.Local;
-import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import net.minecraft.server.level.ServerLevel;
@@ -52,23 +52,6 @@ public abstract class CoasterCartTrackSnapScaleMixin {
                     + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;"
                     + "Ljava/util/List;)Z";
 
-    @ModifyExpressionValue(
-            method = POCKET$PRE_TICK,
-            at = @At(
-                    value = "INVOKE",
-                    target = "Ldev/silvergold/simulatedcoasters/track/cart/CoasterCartTrackSnap;engagedTrackSearchDistSq(ZZ)D"
-            ),
-            remap = false,
-            require = 1
-    )
-    private static double pocket$scaleTrackSearchDistance(
-            final double original,
-            @Local(ordinal = 0) final ServerSubLevel cart
-    ) {
-        final double scale = ScaleFrame.scaleOf(cart);
-        return original * scale * scale;
-    }
-
     @ModifyConstant(
             method = POCKET$PRE_TICK,
             constant = @Constant(doubleValue = 0.0484D),
@@ -91,7 +74,12 @@ public abstract class CoasterCartTrackSnapScaleMixin {
             final CallbackInfoReturnable<Vec3> cir
     ) {
         SimulatedCoastersCartScaleContext.push(
-                SimulatedCoastersScaleLookup.scaleForGraphHit(level, graphHit, null));
+                SimulatedCoastersScaleLookup.scaleForGraphHit(
+                        level,
+                        graphHit,
+                        null,
+                        SimulatedCoastersPlacementScaleContext.remembered()
+                ));
     }
 
     @ModifyConstant(
@@ -125,7 +113,13 @@ public abstract class CoasterCartTrackSnapScaleMixin {
             final boolean negateEdgeTangent,
             final CallbackInfo ci
     ) {
-        SimulatedCoastersCartScaleContext.push(ScaleFrame.scaleOf(cart));
+        SimulatedCoastersCartScaleContext.push(
+                SimulatedCoastersScaleLookup.scaleForGraphHit(
+                        level,
+                        graphHit,
+                        null,
+                        SimulatedCoastersPlacementScaleContext.placementOr(ScaleFrame.scaleOf(cart))
+                ));
     }
 
     @ModifyConstant(

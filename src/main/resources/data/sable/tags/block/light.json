@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "pocket:blueprint_tile",
+    "pocket:diagram_tile"
+  ]
+}

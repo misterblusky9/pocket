@@ -2,7 +2,9 @@ package com.misterblusky9.pocket.physics;
 
 import com.misterblusky9.pocket.debug.PocketTrace;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
+import com.misterblusky9.pocket.compat.simulated.WeldedAssembly;
 import dev.ryanhcode.sable.api.physics.mass.MassData;
+import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.server.level.ServerLevel;
 import org.joml.Vector3d;
@@ -66,13 +68,21 @@ public final class RapierBridge {
     }
 
     public static int bodyId(final ServerSubLevel subLevel) {
-        if (subLevel == null) return NO_BODY;
+        if (!isLive(subLevel)) return NO_BODY;
         try {
             final Object id = GET_ID.invoke(null, subLevel);
             return id instanceof final Number number ? number.intValue() : NO_BODY;
         } catch (final ReflectiveOperationException | RuntimeException exception) {
             return NO_BODY;
         }
+    }
+
+    public static boolean isLive(final ServerSubLevel subLevel) {
+        if (subLevel == null || subLevel.isRemoved() || subLevel.getUniqueId() == null) return false;
+        final var container = SubLevelContainer.getContainer(subLevel.getLevel());
+        return container != null
+                && container.getSubLevel(subLevel.getUniqueId()) == subLevel
+                && sceneHandle(subLevel.getLevel()) != NO_SCENE;
     }
 
     public static void removeConstraint(final long sceneHandle, final long constraintHandle) {
@@ -145,8 +155,9 @@ public final class RapierBridge {
             final int[] data
     ) {
         try {
-            final long scene = scene(level);
-            final int id = ((Number) GET_ID.invoke(null, subLevel)).intValue();
+            final long scene = sceneHandle(level);
+            final int id = bodyId(subLevel);
+            if (scene == NO_SCENE || id == NO_BODY) return;
 
             if (PocketTrace.PHYSICS) {
                 PocketTrace.enter("Rapier3D.addChunk",
@@ -240,8 +251,9 @@ public final class RapierBridge {
             final boolean trace
     ) {
         try {
-            final long scene = scene(level);
-            final int id = ((Number) GET_ID.invoke(null, subLevel)).intValue();
+            final long scene = sceneHandle(level);
+            final int id = bodyId(subLevel);
+            if (scene == NO_SCENE || id == NO_BODY) return;
             if (trace) {
                 PocketTrace.enter("Rapier3D.setLocalBounds",
                         "scene=0x" + Long.toHexString(scene),
@@ -272,13 +284,15 @@ public final class RapierBridge {
         final MassData raw = subLevel.getMassTracker();
         if (raw == null) return;
         try {
-            final long scene = scene(subLevel.getLevel());
-            final int id = ((Number) GET_ID.invoke(null, subLevel)).intValue();
+            final long scene = sceneHandle(subLevel.getLevel());
+            final int id = bodyId(subLevel);
+            if (scene == NO_SCENE || id == NO_BODY) return;
             final Vector3dc center = raw.getCenterOfMass();
             if (updateCenterOfMass && center != null) {
                 SET_CENTER_OF_MASS.invoke(null, scene, id, center.x(), center.y(), center.z());
             }
-            SET_MASS_PROPERTIES_FROM.invoke(null, scene, id, new ScaledMassData(raw, scale));
+            SET_MASS_PROPERTIES_FROM.invoke(
+                    null, scene, id, new ScaledMassData(raw, scale, WeldedAssembly.solverFloor(subLevel)));
         } catch (final ReflectiveOperationException exception) {
             throw new IllegalStateException("Failed to sync scaled Sable Rapier mass properties", exception);
         }

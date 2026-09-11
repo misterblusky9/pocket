@@ -1,13 +1,15 @@
 package com.misterblusky9.pocket.mixin.physics;
 
-import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelData;
-import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.persistence.ScalePersistence;
 import com.misterblusky9.pocket.physics.SubLevelLoadGuard;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.misterblusky9.pocket.scale.SubLevelParentage;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelData;
+import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -33,27 +35,24 @@ public abstract class SubLevelSerializerScaleMixin {
                 state.requestedStage(), state.transitionStage());
     }
 
-    @Inject(method = "fullyLoad", at = @At("HEAD"), remap = false)
-    private static void pocket$markLoadInProgress(
+    @WrapMethod(method = "fullyLoad")
+    private static ServerSubLevel pocket$restoreScaleAfterLoad(
             final ServerLevel level,
             final SubLevelData data,
-            final CallbackInfoReturnable<ServerSubLevel> cir
+            final Operation<ServerSubLevel> original
     ) {
         SubLevelLoadGuard.beginLoad();
-    }
+        final ServerSubLevel subLevel;
+        try {
+            subLevel = original.call(level, data);
+        } finally {
+            SubLevelLoadGuard.endLoad();
+        }
 
-    @Inject(method = "fullyLoad", at = @At("RETURN"), remap = false)
-    private static void pocket$restoreScaleAfterLoad(
-            final ServerLevel level,
-            final SubLevelData data,
-            final CallbackInfoReturnable<ServerSubLevel> cir
-    ) {
-        SubLevelLoadGuard.endLoad();
-
-        final ServerSubLevel subLevel = cir.getReturnValue();
-        if (subLevel == null) return;
-
-        SubLevelParentage.restore(subLevel);
-        ScalePersistence.restore(subLevel, data.bounds());
+        if (subLevel != null) {
+            SubLevelParentage.restore(subLevel);
+            ScalePersistence.restore(subLevel, data.bounds());
+        }
+        return subLevel;
     }
 }

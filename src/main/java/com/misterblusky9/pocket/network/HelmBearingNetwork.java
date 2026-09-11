@@ -11,6 +11,9 @@ public final class HelmBearingNetwork {
                 HelmBearingUpdatePayload.TYPE,
                 HelmBearingUpdatePayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
+                    if (!Float.isFinite(payload.targetAngle())) {
+                        return;
+                    }
                     if (context.player().level().getBlockEntity(payload.pos())
                             instanceof final HelmBearingBlockEntity be) {
                         be.setTargetAngleToUpdate(payload.targetAngle());

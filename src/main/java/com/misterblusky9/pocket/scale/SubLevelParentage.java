@@ -145,8 +145,13 @@ public final class SubLevelParentage {
         return false;
     }
 
+    public static boolean areJoined(final ServerSubLevel first, final ServerSubLevel second) {
+        return first != null && second != null && first != second
+                && (declaresConnection(first, second) || declaresConnection(second, first));
+    }
+
     private static boolean stillJoined(final ServerSubLevel parent, final ServerSubLevel child) {
-        return declaresConnection(parent, child) || declaresConnection(child, parent);
+        return areJoined(parent, child);
     }
 
     private static final Set<UUID> RELEASE_REQUESTED = ConcurrentHashMap.newKeySet();

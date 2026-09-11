@@ -5,6 +5,7 @@ import com.misterblusky9.pocket.network.ScaleNetwork;
 import com.misterblusky9.pocket.scale.ScaleController;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
+import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.world.level.Level;
 import org.joml.Vector3d;
@@ -14,21 +15,24 @@ import java.util.ArrayDeque;
 
 public final class SimulatedCoastersPlacementScaleContext {
     private static final ThreadLocal<ArrayDeque<Double>> POCKET$STACK = ThreadLocal.withInitial(ArrayDeque::new);
-    private static final ThreadLocal<Double> POCKET$LAST = ThreadLocal.withInitial(() -> 1.0D);
+    private static final ThreadLocal<Double> POCKET$PLACEMENT = ThreadLocal.withInitial(() -> 1.0D);
     private static final Vector3d POCKET$BOGEY_BEARING_LOCAL = new Vector3d(0.5D, 0.5D, 0.5D);
 
+    public static void reset() {
+        POCKET$PLACEMENT.remove();
+        POCKET$STACK.remove();
+    }
+
     public static void remember(final double scale) {
-        POCKET$LAST.set(sanitize(scale));
+        POCKET$PLACEMENT.set(sanitize(scale));
     }
 
     public static double remembered() {
-        return sanitize(POCKET$LAST.get());
+        return sanitize(POCKET$PLACEMENT.get());
     }
 
     public static void push(final double scale) {
-        final double clean = sanitize(scale);
-        remember(clean);
-        POCKET$STACK.get().push(clean);
+        POCKET$STACK.get().push(sanitize(scale));
     }
 
     public static void pop() {
@@ -43,7 +47,13 @@ public final class SimulatedCoastersPlacementScaleContext {
 
     public static double current() {
         final ArrayDeque<Double> stack = POCKET$STACK.get();
-        return stack.isEmpty() ? 1.0D : stack.peek();
+        return stack.isEmpty() ? remembered() : stack.peek();
+    }
+
+    public static double placementOr(final double fallback) {
+        final double placement = remembered();
+        if (Math.abs(placement - 1.0D) > PocketSized.EPSILON) return placement;
+        return sanitize(fallback);
     }
 
     public static double scaleForPlacementPose(final Level level, final Object placementPose, final Double partialTick) {
@@ -52,7 +62,7 @@ public final class SimulatedCoastersPlacementScaleContext {
             final Method graphHit = placementPose.getClass().getMethod("graphHit");
             return SimulatedCoastersScaleLookup.scaleForGraphHit(level, graphHit.invoke(placementPose), partialTick);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return 1.0D;
+            return remembered();
         }
     }
 
@@ -61,7 +71,12 @@ public final class SimulatedCoastersPlacementScaleContext {
         final double scale = sanitize(requestedScale);
         if (Math.abs(scale - 1.0D) <= PocketSized.EPSILON) return;
 
-        final Vector3d bearingBefore = cart.logicalPose().transformPosition(new Vector3d(POCKET$BOGEY_BEARING_LOCAL));
+        final var raw = SubLevelContainer.getContainer(cart.getLevel());
+        if (!(raw instanceof final ServerSubLevelContainer container)) return;
+
+        final Pose3d unscaledPose = new Pose3d(cart.logicalPose());
+        unscaledPose.scale().set(1.0D, 1.0D, 1.0D);
+        final Vector3d bearingBefore = unscaledPose.transformPosition(new Vector3d(POCKET$BOGEY_BEARING_LOCAL));
 
         ScaleController.adoptRestoredScale(cart, scale);
 
@@ -70,14 +85,11 @@ public final class SimulatedCoastersPlacementScaleContext {
 
         if (correction.lengthSquared() > 1.0E-20D) {
             final Vector3d correctedPosition = new Vector3d(cart.logicalPose().position()).add(correction);
-            final var raw = SubLevelContainer.getContainer(cart.getLevel());
-            if (raw instanceof final ServerSubLevelContainer container) {
-                container.physicsSystem().getPipeline().teleport(
-                        cart,
-                        correctedPosition,
-                        cart.logicalPose().orientation()
-                );
-            }
+            container.physicsSystem().getPipeline().teleport(
+                    cart,
+                    correctedPosition,
+                    cart.logicalPose().orientation()
+            );
             cart.logicalPose().position().set(correctedPosition);
             cart.updateBoundingBox();
             cart.updateLastPose();

@@ -1,8 +1,5 @@
 package com.misterblusky9.pocket.compat.simulated;
 
-import com.misterblusky9.pocket.scale.ScaleState;
-import dev.ryanhcode.sable.companion.math.BoundingBox3dc;
-import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.SimulatedClient;
 import dev.simulated_team.simulated.content.physics_staff.PhysicsStaffClientHandler;
@@ -25,11 +22,12 @@ public final class PhysicsStaffScale {
     }
 
     public static double dragScale() {
-        if (!(dragTarget() instanceof final ClientSubLevel clientSubLevel)) {
+        final SubLevel target = dragTarget();
+        if (target == null) {
             return 1.0D;
         }
 
-        final double scale = ScaleState.getClientScale(clientSubLevel);
+        final double scale = WeldedAssembly.coarsestScale(target);
         return scale > 0.0D && scale < 1.0D ? scale : 1.0D;
     }
 
@@ -39,11 +37,7 @@ public final class PhysicsStaffScale {
             return vanillaMin;
         }
 
-        final BoundingBox3dc bounds = target.boundingBox();
-        final double sizeX = bounds.maxX() - bounds.minX();
-        final double sizeY = bounds.maxY() - bounds.minY();
-        final double sizeZ = bounds.maxZ() - bounds.minZ();
-        final double largest = Math.max(sizeX, Math.max(sizeY, sizeZ));
+        final double largest = WeldedAssembly.extent(target);
         if (!(largest > 0.0D)) {
             return vanillaMin;
         }

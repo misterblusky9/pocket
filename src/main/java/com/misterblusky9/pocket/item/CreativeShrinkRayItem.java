@@ -44,7 +44,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 
-public final class CreativeShrinkRayItem extends ZapperItem {
+public final class CreativeShrinkRayItem extends ZapperItem implements PriorityInteractionItem {
     private static final String STAGE_KEY = "PocketStage";
     private static final String TARGETING_MODE_KEY = "PocketTargetingMode";
     private static final double RANGE = 192.0D;

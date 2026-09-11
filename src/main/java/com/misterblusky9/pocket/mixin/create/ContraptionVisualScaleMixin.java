@@ -56,8 +56,8 @@ public abstract class ContraptionVisualScaleMixin extends AbstractEntityVisual<A
         final AbstractContraptionEntity host = this.entity;
         if (host == null) return;
 
-        final SubLevel raw = Sable.HELPER.getContaining(host);
-        if (!(raw instanceof final ClientSubLevel subLevel) || subLevel.isRemoved()) return;
+        final ClientSubLevel subLevel = pocket$getRenderSubLevel(host);
+        if (subLevel == null) return;
 
         final float partialTick = context.partialTick();
         final Pose3dc renderPose = subLevel.renderPose(partialTick);
@@ -89,6 +89,21 @@ public abstract class ContraptionVisualScaleMixin extends AbstractEntityVisual<A
                 "contraption:" + host.getId(),
                 "contraptionEmbedding entity={} id={} scale={} anchor={}",
                 host.getClass().getSimpleName(), host.getId(), scale, anchor);
+    }
+
+    @Unique
+    private static ClientSubLevel pocket$getRenderSubLevel(final AbstractContraptionEntity host) {
+        final SubLevel containing = Sable.HELPER.getContaining(host);
+        if (containing instanceof final ClientSubLevel subLevel && !subLevel.isRemoved()) {
+            return subLevel;
+        }
+
+        final SubLevel tracking = Sable.HELPER.getTrackingSubLevel(host);
+        if (tracking instanceof final ClientSubLevel subLevel && !subLevel.isRemoved()) {
+            return subLevel;
+        }
+
+        return null;
     }
 
     @Unique
