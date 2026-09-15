@@ -40,7 +40,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
     private static PocketedSubLevelSavedData created(final String dimension) {
         final PocketedSubLevelSavedData data = new PocketedSubLevelSavedData();
         data.dimension = dimension;
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketStore] NEW dimension={} entries=0 - no storage file existed", dimension);
         return data;
     }
@@ -60,7 +60,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
             }
         }
 
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketStore] LOAD dimension={} entries={} malformedKeys={} tokens={}",
                 dimension, data.entries.size(), malformed, data.tokenSummary());
         if (malformed > 0) {
@@ -75,7 +75,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
     public void put(final UUID token, final CompoundTag subLevelTag) {
         this.entries.put(token, subLevelTag.copy());
         this.setDirty();
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketStore] PUT dimension={} token={} entries={} dirty=true",
                 this.dimension, token, this.entries.size());
     }
@@ -91,7 +91,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
         }
         this.savedEntryCount = this.entries.size();
 
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketStore] COMMIT dimension={} token={} entries={} holder={} - payload, craft "
                         + "removal and carrier are all on disk",
                 this.dimension, token, this.entries.size(),
@@ -119,7 +119,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
         }
         this.savedEntryCount = this.entries.size();
 
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketStore] COMMIT-DEPLOY source={} target={} token={} entries={} holder={} - payload "
                         + "removal, craft and carrier are all on disk",
                 sourceLevel.dimension().location(), targetLevel.dimension().location(), token,
@@ -134,7 +134,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
     public void remove(final UUID token) {
         if (this.entries.remove(token) != null) {
             this.setDirty();
-            PocketTrace.logger().info(
+            PocketTrace.debug(
                     "[PocketStore] REMOVE dimension={} token={} entries={} dirty=true",
                     this.dimension, token, this.entries.size());
         }
@@ -159,7 +159,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
         tag.put("entries", entriesTag);
 
         this.savedEntryCount = this.entries.size();
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketStore] SAVE dimension={} entries={} tokens={}",
                 this.dimension, this.entries.size(), this.tokenSummary());
         return tag;
@@ -167,7 +167,7 @@ public final class PocketedSubLevelSavedData extends SavedData {
 
     public void auditAfterSave() {
         if (this.savedEntryCount < 0 || this.savedEntryCount == this.entries.size()) return;
-        PocketTrace.logger().warn(
+        PocketTrace.debugWarn(
                 "[PocketStore] RELOAD-RISK dimension={} entries={} lastSaved={} - {} entr{} exist only "
                         + "in memory and would be lost if the server stopped without saving",
                 this.dimension, this.entries.size(), this.savedEntryCount,

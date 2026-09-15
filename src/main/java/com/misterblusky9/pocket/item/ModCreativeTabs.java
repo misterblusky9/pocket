@@ -16,9 +16,12 @@ public final class ModCreativeTabs {
             "main",
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.pocket"))
-                    .icon(() -> new ItemStack(ModItems.COMPRESSION_GUN.get()))
+                    .icon(() -> CompressionGunTank.filled(new ItemStack(ModItems.COMPRESSION_GUN.get())))
                     .displayItems((parameters, output) -> {
                         output.accept(ModItems.COMPRESSION_GUN.get());
+                        output.accept(CompressionGunTank.filled(new ItemStack(ModItems.COMPRESSION_GUN.get())));
+                        output.accept(ModItems.PEARLESCENT_COMPRESSION_GUN.get());
+                        output.accept(CompressionGunTank.filled(new ItemStack(ModItems.PEARLESCENT_COMPRESSION_GUN.get())));
                         output.accept(ModItems.CREATIVE_SHRINK_RAY.get());
                         output.accept(ModItems.POCKET_KNIFE.get());
                         output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());

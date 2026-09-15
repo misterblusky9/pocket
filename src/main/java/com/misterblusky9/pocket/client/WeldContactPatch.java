@@ -149,6 +149,22 @@ public final class WeldContactPatch {
                 color);
     }
 
+    public static void showGlueFace(
+            final String key,
+            final BlockPos targetPos,
+            final Direction targetFacing,
+            final Vector3d targetAnchor,
+            final double span
+    ) {
+        final double half = Math.max(0.0D, span) * 0.5D;
+        WeldFaceRenderer.showGlue(
+                key,
+                targetPos,
+                targetFacing,
+                targetAnchor,
+                new Edge(-half, -half, half, half));
+    }
+
     public static void showFaces(
             final String key,
             final BlockPos targetPos,

@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.mixin.sable;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.config.PocketServerConfig;
+import com.simibubi.create.content.contraptions.actors.seat.SeatEntity;
 import dev.ryanhcode.sable.mixinhelpers.entity.entity_riding_sub_level_vehicle.EntityRidingSubLevelVehicleHelper;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.world.entity.Entity;
@@ -22,7 +23,7 @@ public abstract class SableRiderEyeScaleMixin {
             cancellable = true,
             remap = false
     )
-    private static void pocket$keepFullSizePlayerEyeOffset(
+    private static void pocket$keepFullSizePlayerSeatAnchor(
             final Entity entity,
             final Vec3 position,
             final SubLevel subLevel,
@@ -30,6 +31,7 @@ public abstract class SableRiderEyeScaleMixin {
     ) {
         if (!(entity instanceof Player)) return;
         if (PocketServerConfig.scalePlayerInShrunkenSeat()) return;
+        if (!(entity.getVehicle() instanceof final SeatEntity seat)) return;
         if (subLevel == null || subLevel.isRemoved()) return;
 
         final Vector3dc scale = subLevel.logicalPose().scale();
@@ -50,19 +52,21 @@ public abstract class SableRiderEyeScaleMixin {
         }
 
         final Vec3 eyeOffset = entity.getEyePosition().subtract(entity.position());
-        final Vec3 transformedFeet = subLevel.logicalPose().transformPosition(position);
+        final Vec3 attachment = entity.getVehicleAttachmentPoint(seat);
+        final Vec3 transformedAttachment = subLevel.logicalPose()
+                .transformPosition(position.add(attachment));
 
-        final Vector3d rotatedEye = new Vector3d(
-                eyeOffset.x,
-                eyeOffset.y,
-                eyeOffset.z
+        final Vector3d rotatedEyeFromAttachment = new Vector3d(
+                eyeOffset.x - attachment.x,
+                eyeOffset.y - attachment.y,
+                eyeOffset.z - attachment.z
         );
-        subLevel.logicalPose().orientation().transform(rotatedEye);
+        subLevel.logicalPose().orientation().transform(rotatedEyeFromAttachment);
 
-        cir.setReturnValue(transformedFeet.add(
-                rotatedEye.x - eyeOffset.x,
-                rotatedEye.y - eyeOffset.y,
-                rotatedEye.z - eyeOffset.z
+        cir.setReturnValue(transformedAttachment.add(
+                rotatedEyeFromAttachment.x - eyeOffset.x,
+                rotatedEyeFromAttachment.y - eyeOffset.y,
+                rotatedEyeFromAttachment.z - eyeOffset.z
         ));
     }
 }

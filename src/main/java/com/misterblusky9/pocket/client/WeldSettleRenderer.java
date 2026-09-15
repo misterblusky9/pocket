@@ -10,8 +10,7 @@ import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
-import dev.simulated_team.simulated.Simulated;
-import dev.simulated_team.simulated.util.SimColors;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -24,6 +23,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
+import org.joml.Quaterniond;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 
@@ -33,7 +33,7 @@ import java.util.List;
 @EventBusSubscriber(modid = PocketSized.MOD_ID, value = Dist.CLIENT)
 public final class WeldSettleRenderer {
     private static final RenderType STRAND = RenderType.entityCutout(
-            Simulated.path("textures/block/merging_glue/strand.png"));
+            ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "textures/block/hot_glue/hot_glue_strand.png"));
     private static final Pose3d WORLD_POSE = new Pose3d();
 
     private static final double[][] STRANDS = {
@@ -64,20 +64,18 @@ public final class WeldSettleRenderer {
         current = endpoints(minecraft);
         for (final Endpoints pair : current) {
             final WeldRecord record = pair.record();
-            WeldContactPatch.showFace(
+            WeldContactPatch.showGlueFace(
                     "pocket_weld_settle_a_" + record.weldId(),
                     record.smallPos(),
                     record.smallFacing(),
                     record.anchorFor(true),
-                    record.smallSpan(),
-                    SimColors.SUCCESS_LIME);
-            WeldContactPatch.showFace(
+                    record.smallSpan());
+            WeldContactPatch.showGlueFace(
                     "pocket_weld_settle_b_" + record.weldId(),
                     record.bigPos(),
                     record.bigFacing(),
                     record.anchorFor(false),
-                    record.bigSpan(),
-                    SimColors.SUCCESS_LIME);
+                    record.bigSpan());
         }
     }
 
@@ -128,10 +126,11 @@ public final class WeldSettleRenderer {
             final double scale = PocketSized.clampScale(rawScale);
             if (a.distance(b) <= Math.max(1.0E-4D, scale * 0.02D)) continue;
 
-            final Vector3d rightA = tangent(record.smallFacing(), true, false);
-            final Vector3d upA = tangent(record.smallFacing(), false, false);
-            final Vector3d rightB = tangent(record.bigFacing(), true, true);
-            final Vector3d upB = tangent(record.bigFacing(), false, true);
+            final Quaterniond toBig = new Quaterniond(record.orientation()).invert();
+            final Vector3d rightA = tangent(record.smallFacing(), true);
+            final Vector3d upA = tangent(record.smallFacing(), false);
+            final Vector3d rightB = toBig.transform(new Vector3d(rightA));
+            final Vector3d upB = toBig.transform(new Vector3d(upA));
             poseA.transformNormal(rightA);
             poseA.transformNormal(upA);
             poseB.transformNormal(rightB);
@@ -221,10 +220,10 @@ public final class WeldSettleRenderer {
                 .setNormal(poses.last(), 0.0F, 1.0F, 0.0F);
     }
 
-    private static Vector3d tangent(final Direction facing, final boolean right, final boolean peer) {
+    private static Vector3d tangent(final Direction facing, final boolean right) {
         if (facing.getAxis().isHorizontal()) {
             if (right) {
-                final Direction direction = peer ? facing.getCounterClockWise() : facing.getClockWise();
+                final Direction direction = facing.getClockWise();
                 return new Vector3d(direction.getStepX(), direction.getStepY(), direction.getStepZ());
             }
             return new Vector3d(0.0D, 1.0D, 0.0D);

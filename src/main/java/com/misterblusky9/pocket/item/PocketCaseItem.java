@@ -206,7 +206,7 @@ public class PocketCaseItem extends PackageItem {
         final ServerSubLevelContainer container =
                 ServerSubLevelContainer.getContainer(subLevel.getLevel());
         if (SubLevelParentage.isJoinedToAnother(container, subLevel)) {
-            PocketTrace.logger().info(
+            PocketTrace.debug(
                     "[PocketTransfer] capture rejected uuid={} reason=joined_to_another_sublevel",
                     subLevel.getUniqueId());
             if (feedbackPlayer != null) {
@@ -253,7 +253,7 @@ public class PocketCaseItem extends PackageItem {
 
         pruneOrphans(audit.orphans(), token, "capture", "live_source");
         writeIntegrityManifest(fullTag, structure);
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] capture payload canonical token={} uuid={} blocks={} chunks={} "
                         + "blockEntities={} repairedOrphans={} structureHash=0x{} backendValid=true",
                 token, subLevel.getUniqueId(), structure.blocks(), structure.chunks(),
@@ -423,7 +423,7 @@ public class PocketCaseItem extends PackageItem {
         thrown.setPickUpDelay(20);
         level.addFreshEntity(thrown);
 
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] route=item_throw token={} dimension={} player={} velocity={} "
                         + "entity={} packageEntity=false",
                 payloadToken, level.dimension().location(), player.getScoreboardName(), velocity,
@@ -476,7 +476,7 @@ public class PocketCaseItem extends PackageItem {
             return false;
         }
 
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] route=hand begin token={} target={} player={} hand={}",
                 payloadToken, level.dimension().location(), player.getScoreboardName(), hand);
         final ServerSubLevel restored = restoreAt(
@@ -498,7 +498,7 @@ public class PocketCaseItem extends PackageItem {
                     commitSource, level, payloadToken, serverPlayer);
         }
 
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] route=hand end token={} target={} restored=true backendValid=true",
                 payloadToken, level.dimension().location());
         return true;
@@ -511,12 +511,12 @@ public class PocketCaseItem extends PackageItem {
     ) {
         if (!isFilled(stack)) return false;
         final UUID payloadToken = token(stack);
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] route=broken_package begin token={} target={} position={}",
                 payloadToken, level.dimension().location(), position);
         final boolean restored = restoreAt(
                 level, stack, position, Direction.UP, null, false, false, true) != null;
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] route=broken_package end token={} target={} restored={} backendValid={}",
                 payloadToken, level.dimension().location(), restored, restored);
         return restored;
@@ -667,7 +667,7 @@ public class PocketCaseItem extends PackageItem {
                     fullTag,
                     transfer.destinationPlotX(), transfer.destinationPlotZ(),
                     transfer.deltaBlocksX(), transfer.deltaBlocksY(), transfer.deltaBlocksZ());
-            PocketTrace.logger().info(
+            PocketTrace.debug(
                     "[PocketTransfer] rebase token={} source={} target={} plot=({},{})->({},{}) "
                             + "delta=({}, {}, {}) blockEntities={} ticks={} entities={}",
                     token,
@@ -752,7 +752,7 @@ public class PocketCaseItem extends PackageItem {
         if (positioned == null) return fail(feedbackPlayer, "Could not prepare the stored sublevel.");
 
         final ServerSubLevel restored;
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] load begin token={} source={} target={} destinationPlot=({}, {}) uuid={}",
                 token, backend.sourceLevel().dimension().location(), serverLevel.dimension().location(),
                 transfer.destinationPlotX(), transfer.destinationPlotZ(), positioned.uuid());
@@ -778,7 +778,7 @@ public class PocketCaseItem extends PackageItem {
         final boolean chunksLoaded = !restored.getPlot().getLoadedChunks().isEmpty();
         final boolean destinationValid = identityRegistered && plotRegistered
                 && destinationReserved && chunksLoaded;
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] load validation token={} target={} destinationPlot=({}, {}) uuid={} "
                         + "identityRegistered={} plotRegistered={} reserved={} chunksLoaded={} backendValid={}",
                 token, serverLevel.dimension().location(),
@@ -796,7 +796,7 @@ public class PocketCaseItem extends PackageItem {
                 token,
                 storedCount(stack, BLOCKS_KEY),
                 storedCount(stack, BLOCK_ENTITIES_KEY));
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] payload validation token={} target={} expectedChunks={} loadedChunks={} "
                         + "serializedBlockEntities={} canonicalBlockEntities={} validBlockEntities={} "
                         + "expectedBlocks={} restoredBlocks={} repairedOrphans={} proof={} backendValid={}",
@@ -828,7 +828,7 @@ public class PocketCaseItem extends PackageItem {
         com.misterblusky9.pocket.pocket.PocketedEntities.restore(serverLevel, fullTag);
 
         backend.storage().remove(token);
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] commit token={} source={} target={} payloadRemoved=true "
                         + "legacyReservation={} backendValid=true",
                 token, backend.sourceLevel().dimension().location(), serverLevel.dimension().location(),
@@ -907,7 +907,7 @@ public class PocketCaseItem extends PackageItem {
                 && sourceContainer.getOccupancy().get(sourceContainer.getIndex(sourcePlotX, sourcePlotZ));
         final boolean live = inBounds && sourceContainer.getSubLevel(sourcePlotX, sourcePlotZ) != null;
         final boolean legacyReservation = !fullTag.getBoolean(DETACHED_CAPTURE_KEY) && occupied && !live;
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] source validation token={} source={} target={} payload=true plot=({}, {}) "
                         + "inBounds={} occupied={} live={} legacyReservation={} backendValid={}",
                 token, sourceId, targetLevel.dimension().location(), sourcePlotX, sourcePlotZ,
@@ -1001,7 +1001,7 @@ public class PocketCaseItem extends PackageItem {
         final int deltaY = targetLevel.getMinBuildHeight() - backend.sourceLevel().getMinBuildHeight();
         final int deltaZ = (targetGlobalZ - sourceGlobalZ) * plotBlockSize;
 
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] target validation token={} target={} preferredPlot=({}, {}) "
                         + "preferredAvailable={} destinationPlot=({}, {}) deltaY={} "
                         + "rebaseRequired={} backendValid=true",
@@ -1203,7 +1203,7 @@ public class PocketCaseItem extends PackageItem {
                     if (state.isAir() && actual == null) {
                         orphans.add(new OrphanBlockEntityTag(
                                 entries, i, chunkKey, position, expectedId));
-                        PocketTrace.logger().warn(
+                        PocketTrace.debugWarn(
                                 "[PocketTransfer] payload block entity repair candidate token={} route={} "
                                         + "chunk={} pos={} expectedId={} hostBlock=minecraft:air "
                                         + "reason=impossible orphan",
@@ -1244,7 +1244,7 @@ public class PocketCaseItem extends PackageItem {
         for (int i = orphans.size() - 1; i >= 0; i--) {
             final OrphanBlockEntityTag orphan = orphans.get(i);
             orphan.owner().remove(orphan.index());
-            PocketTrace.logger().warn(
+            PocketTrace.debugWarn(
                     "[PocketTransfer] payload block entity canonicalized token={} route={} chunk={} "
                             + "pos={} expectedId={} proof={} action=removed_impossible_tag",
                     token, route, orphan.chunkKey(), orphan.position(), orphan.expectedId(), proof);
@@ -1565,7 +1565,7 @@ public class PocketCaseItem extends PackageItem {
             serverPlayer.inventoryMenu.broadcastChanges();
             if (serverPlayer.containerMenu != serverPlayer.inventoryMenu) serverPlayer.containerMenu.broadcastChanges();
         }
-        PocketTrace.logger().info(
+        PocketTrace.debug(
                 "[PocketTransfer] carrier replaced token={} player={} hand={} "
                         + "payloadStackEmpty={} returnedContainer={} backendValid=true",
                 deployedToken, player.getScoreboardName(), hand, deployedStack.isEmpty(),

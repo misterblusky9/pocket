@@ -11,10 +11,10 @@ import com.misterblusky9.pocket.moon.MoonTargeting;
 import com.misterblusky9.pocket.network.CompressionBeamPayload;
 import com.misterblusky9.pocket.network.CompressionGunOpenMenuPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
-import com.simibubi.create.content.equipment.armor.BacktankUtil;
 import com.simibubi.create.foundation.item.CustomArmPoseItem;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -22,10 +22,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
@@ -34,6 +38,10 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class CompressionGunItem extends Item implements CustomArmPoseItem, PriorityInteractionItem {
@@ -46,16 +54,26 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
 
     private static final CompressionStage SURVIVAL_FLOOR = CompressionStage.SIXTEENTH;
 
-    private static final int NOMINAL_AIR_COST = 60;
+    private static final int LEVITITE_BAR_COLOUR = 0x46C8BE;
 
-    public CompressionGunItem(final Properties properties) {
+    private static final Map<UUID, Boolean> BEAMS = new ConcurrentHashMap<>();
+
+    private final boolean pearlescent;
+
+    public CompressionGunItem(final Properties properties, final boolean pearlescent) {
         super(properties);
+        this.pearlescent = pearlescent;
     }
 
     @Override
     @OnlyIn(Dist.CLIENT)
     public void initializeClient(final Consumer<IClientItemExtensions> consumer) {
-        consumer.accept(SimpleCustomRenderer.create(this, new CompressionGunRenderer()));
+        consumer.accept(SimpleCustomRenderer.create(this, new CompressionGunRenderer(this.pearlescent)));
+    }
+
+    @Override
+    public boolean claimsEntity(final Player player, final ItemStack stack, final Entity target) {
+        return !(target instanceof ItemFrame) && !(target instanceof ArmorStand);
     }
 
     @Override
@@ -83,9 +101,13 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         }
 
         player.startUsingItem(hand);
-        if (player instanceof final ServerPlayer serverPlayer
-                && targetingMode(stack) != CompressionGunTargetingMode.SELF) {
-            CompressionBeamPayload.send(serverPlayer, true, isGrowing(stack));
+        if (player instanceof final ServerPlayer serverPlayer) {
+            BEAMS.remove(serverPlayer.getUUID());
+            CompressionGunTank.stopEngine(serverPlayer);
+            if (targetingMode(stack) != CompressionGunTargetingMode.SELF
+                    && CompressionGunTank.canFire(serverPlayer, stack)) {
+                beam(serverPlayer, true, isGrowing(stack));
+            }
         }
         return InteractionResultHolder.consume(stack);
     }
@@ -100,11 +122,22 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         if (level.isClientSide || !(entity instanceof final ServerPlayer player)) return;
 
         final int elapsed = getUseDuration(stack, entity) - remainingUseTicks;
-        if (elapsed < CHARGE_TICKS) return;
-
         final boolean growing = isGrowing(stack);
-        final CompressionStage goal = growing ? CompressionStage.NORMAL : SURVIVAL_FLOOR;
         final CompressionGunTargetingMode targeting = targetingMode(stack);
+
+        if (!CompressionGunTank.runEngine(player, stack, player.getUsedItemHand(), elapsed)) {
+            player.displayClientMessage(Component.literal("No air pressure"), true);
+            shutDown(player);
+            return;
+        }
+
+        final boolean fueled = CompressionGunTank.amount(stack) > 0;
+        if (elapsed < CHARGE_TICKS) {
+            if (targeting != CompressionGunTargetingMode.SELF) beam(player, fueled, growing);
+            return;
+        }
+
+        final CompressionStage goal = growing ? CompressionStage.NORMAL : SURVIVAL_FLOOR;
 
         if (targeting == CompressionGunTargetingMode.SELF) {
             if (!PehkuiScaleBridge.isOperational()) {
@@ -113,12 +146,23 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
             }
 
             if (SelfCompressionSessions.renew(player, goal)) return;
+            if (!fueled) {
+                player.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
+                return;
+            }
             SelfCompressionSessions.begin(player, goal, player.getUsedItemHand(), growing);
             return;
         }
 
         if (MoonCompressionSessions.renew(player, goal)) return;
         if (CompressionSessions.renew(player, goal)) return;
+
+        if (!fueled) {
+            player.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
+            beam(player, false, growing);
+            return;
+        }
+        beam(player, true, growing);
 
         final MoonTargeting.Hit moonHit = MoonTargeting.hit(
                 player,
@@ -154,9 +198,9 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
             final int remainingUseTicks
     ) {
         if (!level.isClientSide && entity instanceof final ServerPlayer player) {
-            CompressionSessions.releaseAll(player);
-            MoonCompressionSessions.release(player);
-            SelfCompressionSessions.release(player);
+            shutDown(player);
+            CompressionGunTank.stopEngine(player);
+            BEAMS.remove(player.getUUID());
             CompressionBeamPayload.send(player, false, false);
         }
     }
@@ -164,11 +208,31 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
     @Override
     public void onStopUsing(final ItemStack stack, final LivingEntity entity, final int count) {
         if (!entity.level().isClientSide && entity instanceof final ServerPlayer player) {
-            CompressionSessions.releaseAll(player);
-            MoonCompressionSessions.release(player);
-            SelfCompressionSessions.release(player);
+            shutDown(player);
+            CompressionGunTank.stopEngine(player);
+            BEAMS.remove(player.getUUID());
             CompressionBeamPayload.send(player, false, false);
         }
+    }
+
+    private static void shutDown(final ServerPlayer player) {
+        CompressionSessions.releaseAll(player);
+        MoonCompressionSessions.release(player);
+        SelfCompressionSessions.release(player);
+        beam(player, false, false);
+    }
+
+    private static void beam(final ServerPlayer player, final boolean firing, final boolean growing) {
+        final UUID id = player.getUUID();
+        final Boolean current = BEAMS.get(id);
+        if (firing) {
+            if (current != null && current == growing) return;
+            BEAMS.put(id, growing);
+        } else {
+            if (current == null) return;
+            BEAMS.remove(id);
+        }
+        CompressionBeamPayload.send(player, firing, growing);
     }
 
     public static boolean isGrowing(final ItemStack stack) {
@@ -234,16 +298,27 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
 
     @Override
     public boolean isBarVisible(final ItemStack stack) {
-        return BacktankUtil.isBarVisible(stack, NOMINAL_AIR_COST);
+        return CompressionGunTank.amount(stack) < CompressionGunTank.CAPACITY;
     }
 
     @Override
     public int getBarWidth(final ItemStack stack) {
-        return BacktankUtil.getBarWidth(stack, NOMINAL_AIR_COST);
+        return Math.round(13.0F * CompressionGunTank.amount(stack) / CompressionGunTank.CAPACITY);
     }
 
     @Override
     public int getBarColor(final ItemStack stack) {
-        return BacktankUtil.getBarColor(stack, NOMINAL_AIR_COST);
+        return LEVITITE_BAR_COLOUR;
+    }
+
+    @Override
+    public void appendHoverText(
+            final ItemStack stack,
+            final TooltipContext context,
+            final List<Component> tooltip,
+            final TooltipFlag flag
+    ) {
+        tooltip.add(Component.literal("Levitite Blend: " + CompressionGunTank.amount(stack)
+                + " / " + CompressionGunTank.CAPACITY + " mB").withStyle(ChatFormatting.GRAY));
     }
 }

@@ -62,6 +62,22 @@ public record WeldRecord(
         return small ? this.smallSpan : this.bigSpan;
     }
 
+    public WeldRecord withSpans(final double smallSpan, final double bigSpan) {
+        return new WeldRecord(
+                this.weldId,
+                this.smallSubLevel,
+                this.bigSubLevel,
+                this.smallPos,
+                this.bigPos,
+                this.smallFacing,
+                this.bigFacing,
+                new Vector3d(this.smallAnchor),
+                new Vector3d(this.bigAnchor),
+                smallSpan,
+                bigSpan,
+                new Quaterniond(this.orientation));
+    }
+
     public CompoundTag save() {
         final CompoundTag tag = new CompoundTag();
         tag.putUUID("weld", this.weldId);

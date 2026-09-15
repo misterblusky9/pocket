@@ -1,8 +1,10 @@
 package com.misterblusky9.pocket.mixin.client;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.render.vanilla.VanillaSingleSubLevelRenderData;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaterniondc;
 import org.joml.Quaternionfc;
@@ -54,6 +56,26 @@ public abstract class SingleBlockSubLevelScaleMixin {
         final Vector3dc scale = pocket$renderScale();
         matrix.scale((float) scale.x(), (float) scale.y(), (float) scale.z());
         return matrix;
+    }
+
+    @ModifyExpressionValue(
+            method = "renderSingleBlock",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lorg/joml/Matrix4f;normal(Lorg/joml/Matrix3f;)Lorg/joml/Matrix3f;",
+                    ordinal = 0,
+                    remap = false
+            )
+    )
+    private Matrix3f pocket$correctSingleBlockNormalScale(final Matrix3f normal) {
+        final Vector3dc scale = pocket$renderScale();
+        final double sx = scale.x();
+        if (sx > 0.0D
+                && Math.abs(sx - scale.y()) <= 1.0E-6D
+                && Math.abs(sx - scale.z()) <= 1.0E-6D) {
+            normal.scale((float) sx);
+        }
+        return normal;
     }
 
     @Unique

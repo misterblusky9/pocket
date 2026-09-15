@@ -1,10 +1,14 @@
 package com.misterblusky9.pocket.compression;
 
 import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
+import com.misterblusky9.pocket.item.CompressionGunItem;
+import com.misterblusky9.pocket.item.CompressionGunTank;
 import com.misterblusky9.pocket.network.SelfCompressionEffectPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.Iterator;
@@ -20,6 +24,7 @@ public final class SelfCompressionSessions {
     private static final int STEP_GROWTH = 4;
     private static final int FINAL_STEP_EXTRA_TICKS = 8;
     private static final int PULSE_LEAD_TICKS = 3;
+    private static final int LEVITITE_PER_TICK = 5;
 
     private static final Map<UUID, Session> SESSIONS = new ConcurrentHashMap<>();
 
@@ -50,6 +55,7 @@ public final class SelfCompressionSessions {
 
         final Session session = new Session(id, goal, growing, now);
         session.hand = hand == null ? InteractionHand.MAIN_HAND : hand;
+        session.levititePerTick = player.isCreative() ? 0 : LEVITITE_PER_TICK;
         SESSIONS.put(id, session);
         SelfCompressionEffectPayload.sendBegin(player, growing);
         SelfCompressionEffectPayload.sendPulse(player, growing);
@@ -113,6 +119,15 @@ public final class SelfCompressionSessions {
         final CompressionStage current = currentStage(player);
         if (current == session.goal) return false;
 
+        if (session.levititePerTick > 0) {
+            final ItemStack gun = player.getItemInHand(session.hand);
+            if (!(gun.getItem() instanceof CompressionGunItem)
+                    || CompressionGunTank.drain(gun, session.levititePerTick) != session.levititePerTick) {
+                player.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
+                return false;
+            }
+        }
+
         session.sinceStep++;
         final int delay = stepDelay(session, current);
         if (!session.pulsed && session.sinceStep >= Math.max(0, delay - PULSE_LEAD_TICKS)) {
@@ -163,6 +178,7 @@ public final class SelfCompressionSessions {
         private int steps;
         private boolean pulsed;
         private InteractionHand hand = InteractionHand.MAIN_HAND;
+        private int levititePerTick;
 
         private Session(
                 final UUID playerId,

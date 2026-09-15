@@ -1,7 +1,6 @@
 package com.misterblusky9.pocket.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.simibubi.create.content.equipment.zapper.ShootableGadgetItemMethods;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
@@ -38,7 +37,7 @@ public final class CompressionBeamRenderer {
     private static final int GROW_COLOUR = 0xFFD24A;
     private static final float LINE_WIDTH = 0.0375F;
 
-    private static final Vec3 BARREL_OFFSET = new Vec3(0.45D, -0.15D, 1.2D);
+    private static final Vec3 BARREL_OFFSET = new Vec3(0.75D, -0.15D, 1.5D);
 
     private static final double RANGE = 160.0D;
     private static final double MISS_REACH_FRACTION = 0.35D;
@@ -86,9 +85,16 @@ public final class CompressionBeamRenderer {
         if (playerId == null) return;
         if (!firing) {
             ACTIVE.remove(playerId);
+            CompressionGunMuzzleTracker.clear(playerId);
             return;
         }
         ACTIVE.computeIfAbsent(playerId, Beam::new).setGrowing(growing);
+    }
+
+    private static void recoil(final UUID playerId) {
+        final Player player = Minecraft.getInstance().player;
+        if (player == null || !playerId.equals(player.getUUID())) return;
+        CompressionGunRenderHandler.INSTANCE.shoot(player.getUsedItemHand(), player.position());
     }
 
     public static void setTarget(final UUID playerId, final UUID subLevelId) {
@@ -137,6 +143,7 @@ public final class CompressionBeamRenderer {
 
     public static void clear() {
         ACTIVE.clear();
+        CompressionGunMuzzleTracker.clear();
     }
 
     public static void tick() {
@@ -185,6 +192,9 @@ public final class CompressionBeamRenderer {
     }
 
     private static Vec3 muzzleOf(final Player player, final float partialTick) {
+        final Vec3 tracked = CompressionGunMuzzleTracker.muzzle(player.getUUID(), partialTick);
+        if (tracked != null) return tracked;
+
         final boolean mainHand = player.getUsedItemHand() == InteractionHand.MAIN_HAND;
 
         final double x = Mth.lerp(partialTick, player.xo, player.getX());
@@ -397,7 +407,9 @@ public final class CompressionBeamRenderer {
 
         private void tick(final Player owner, final Level level) {
             this.energy *= SURGE_DECAY;
+            final boolean charging = this.chargeTicks < CHARGE_TICKS;
             this.chargeTicks = Math.min(CHARGE_TICKS, this.chargeTicks + 1.0F);
+            if (charging && this.chargeTicks >= CHARGE_TICKS) recoil(owner.getUUID());
             tickSurge();
 
             this.muzzle = muzzleOf(owner);

@@ -2,10 +2,13 @@ package com.misterblusky9.pocket.compat.simulated;
 
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
+import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaterniond;
 import org.joml.Quaterniondc;
@@ -16,7 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class WeldContact {
-    public static final int RADIUS = 48;
+    public static final int RADIUS = 256;
 
     public record Projection(Vector3d axisU, Vector3d axisV, double cell) {}
 
@@ -68,19 +71,13 @@ public final class WeldContact {
         final Set<Long> found = new HashSet<>();
         if (level == null || (source != null && source.isRemoved())) return found;
 
-        final Direction.Axis uAxis = uAxis(sourceFacing);
-        final Direction.Axis vAxis = vAxis(sourceFacing);
+        final Window window = window(source, sourcePos, sourceFacing, radius);
+        if (window.empty()) return found;
 
-        for (int du = -radius; du <= radius; du++) {
-            for (int dv = -radius; dv <= radius; dv++) {
-                final BlockPos cell = offset(sourcePos, uAxis, du, vAxis, dv);
-                if (source != null && !source.getPlot().contains(
-                        new Vector3d(cell.getX() + 0.5D, cell.getY() + 0.5D, cell.getZ() + 0.5D))) {
-                    continue;
-                }
-                if (level.getBlockState(cell).isAir()) continue;
-                if (!level.getBlockState(cell.relative(sourceFacing)).isAir()) continue;
-                found.add(packed(du, dv));
+        final Reader reader = new Reader(level);
+        for (int du = window.uMin(); du <= window.uMax(); du++) {
+            for (int dv = window.vMin(); dv <= window.vMax(); dv++) {
+                if (isFace(reader, source, sourcePos, sourceFacing, du, dv)) found.add(packed(du, dv));
             }
         }
         return found;
@@ -110,18 +107,36 @@ public final class WeldContact {
             final Vector3d targetAnchor,
             final Projection projection
     ) {
+        return contactCells(level, source, sourcePos, sourceFacing, target,
+                targetPos, targetFacing, targetAnchor, projection, false);
+    }
+
+    private static Set<Long> contactCells(
+            final Level level,
+            final SubLevel source,
+            final BlockPos sourcePos,
+            final Direction sourceFacing,
+            final SubLevel target,
+            final BlockPos targetPos,
+            final Direction targetFacing,
+            final Vector3d targetAnchor,
+            final Projection projection,
+            final boolean firstOnly
+    ) {
         final Set<Long> found = new HashSet<>();
         if (level == null || source == null || source.isRemoved()
                 || (target != null && target.isRemoved())) return found;
 
-        final Direction.Axis uAxis = uAxis(sourceFacing);
-        final Direction.Axis vAxis = vAxis(sourceFacing);
+        final Window window = window(source, sourcePos, sourceFacing, RADIUS);
+        if (window.empty()) return found;
 
-        for (int du = -RADIUS; du <= RADIUS; du++) {
-            for (int dv = -RADIUS; dv <= RADIUS; dv++) {
-                if (contact(level, source, sourcePos, sourceFacing, uAxis, vAxis, target,
+        final Reader reader = new Reader(level);
+        for (int du = window.uMin(); du <= window.uMax(); du++) {
+            for (int dv = window.vMin(); dv <= window.vMax(); dv++) {
+                if (contact(reader, source, sourcePos, sourceFacing, target,
                         targetPos, targetFacing, targetAnchor, projection, du, dv)) {
                     found.add(packed(du, dv));
+                    if (firstOnly) return found;
                 }
             }
         }
@@ -136,7 +151,7 @@ public final class WeldContact {
     ) {
         if (level == null || small == null || record == null) return false;
         if (!record.worldAnchored() && big == null) return false;
-        return !cells(
+        return !contactCells(
                 level,
                 small,
                 record.smallPos(),
@@ -145,16 +160,15 @@ public final class WeldContact {
                 record.bigPos(),
                 record.bigFacing(),
                 record.anchorFor(false),
-                projectionFor(record, true)).isEmpty();
+                projectionFor(record, true),
+                true).isEmpty();
     }
 
     private static boolean contact(
-            final Level level,
+            final Reader reader,
             final SubLevel source,
             final BlockPos sourcePos,
             final Direction sourceFacing,
-            final Direction.Axis uAxis,
-            final Direction.Axis vAxis,
             final SubLevel target,
             final BlockPos targetPos,
             final Direction targetFacing,
@@ -163,14 +177,7 @@ public final class WeldContact {
             final int du,
             final int dv
     ) {
-        final BlockPos cell = offset(sourcePos, uAxis, du, vAxis, dv);
-
-        if (!source.getPlot().contains(
-                new Vector3d(cell.getX() + 0.5D, cell.getY() + 0.5D, cell.getZ() + 0.5D))) {
-            return false;
-        }
-        if (level.getBlockState(cell).isAir()) return false;
-        if (!level.getBlockState(cell.relative(sourceFacing)).isAir()) return false;
+        if (!isFace(reader, source, sourcePos, sourceFacing, du, dv)) return false;
 
         final Direction.Axis targetU = uAxis(targetFacing);
         final Direction.Axis targetV = vAxis(targetFacing);
@@ -181,13 +188,115 @@ public final class WeldContact {
                 axisOf(targetAnchor, targetU) + centre[0],
                 axisOf(targetAnchor, targetV) + centre[1]);
 
-        if (target != null && !target.getPlot().contains(
-                new Vector3d(against.getX() + 0.5D, against.getY() + 0.5D, against.getZ() + 0.5D))) {
+        if (target != null && !target.getPlot().contains(against.getX() + 0.5D, against.getZ() + 0.5D)) {
             return false;
         }
 
-        return !level.getBlockState(against).isAir()
-                && level.getBlockState(against.relative(targetFacing)).isAir();
+        return !reader.air(against.getX(), against.getY(), against.getZ())
+                && reader.air(
+                        against.getX() + targetFacing.getStepX(),
+                        against.getY() + targetFacing.getStepY(),
+                        against.getZ() + targetFacing.getStepZ());
+    }
+
+    private static final int BOUNDS_PADDING = 1;
+    private static final Window NO_WINDOW = new Window(0, -1, 0, -1);
+
+    private record Window(int uMin, int uMax, int vMin, int vMax) {
+        private boolean empty() {
+            return this.uMin > this.uMax || this.vMin > this.vMax;
+        }
+    }
+
+    private static Window window(
+            final SubLevel source,
+            final BlockPos origin,
+            final Direction facing,
+            final int radius
+    ) {
+        if (source == null) return new Window(-radius, radius, -radius, radius);
+
+        final BoundingBox3ic bounds = source.getPlot().getBoundingBox();
+        if (bounds == null
+                || bounds.minX() > bounds.maxX()
+                || bounds.minY() > bounds.maxY()
+                || bounds.minZ() > bounds.maxZ()) {
+            return NO_WINDOW;
+        }
+
+        final Direction.Axis normal = facing.getAxis();
+        final int plane = origin.get(normal);
+        if (plane < boundsMin(bounds, normal) - BOUNDS_PADDING
+                || plane > boundsMax(bounds, normal) + BOUNDS_PADDING) {
+            return NO_WINDOW;
+        }
+
+        final Direction.Axis uAxis = uAxis(facing);
+        final Direction.Axis vAxis = vAxis(facing);
+        return new Window(
+                Math.max(-radius, boundsMin(bounds, uAxis) - BOUNDS_PADDING - origin.get(uAxis)),
+                Math.min(radius, boundsMax(bounds, uAxis) + BOUNDS_PADDING - origin.get(uAxis)),
+                Math.max(-radius, boundsMin(bounds, vAxis) - BOUNDS_PADDING - origin.get(vAxis)),
+                Math.min(radius, boundsMax(bounds, vAxis) + BOUNDS_PADDING - origin.get(vAxis)));
+    }
+
+    private static int boundsMin(final BoundingBox3ic bounds, final Direction.Axis axis) {
+        return switch (axis) {
+            case X -> bounds.minX();
+            case Y -> bounds.minY();
+            case Z -> bounds.minZ();
+        };
+    }
+
+    private static int boundsMax(final BoundingBox3ic bounds, final Direction.Axis axis) {
+        return switch (axis) {
+            case X -> bounds.maxX();
+            case Y -> bounds.maxY();
+            case Z -> bounds.maxZ();
+        };
+    }
+
+    private static boolean isFace(
+            final Reader reader,
+            final SubLevel source,
+            final BlockPos origin,
+            final Direction facing,
+            final int du,
+            final int dv
+    ) {
+        final Direction.Axis uAxis = uAxis(facing);
+        final Direction.Axis vAxis = vAxis(facing);
+        final int x = origin.getX() + (uAxis == Direction.Axis.X ? du : 0) + (vAxis == Direction.Axis.X ? dv : 0);
+        final int y = origin.getY() + (uAxis == Direction.Axis.Y ? du : 0) + (vAxis == Direction.Axis.Y ? dv : 0);
+        final int z = origin.getZ() + (uAxis == Direction.Axis.Z ? du : 0) + (vAxis == Direction.Axis.Z ? dv : 0);
+
+        if (source != null && !source.getPlot().contains(x + 0.5D, z + 0.5D)) return false;
+        if (reader.air(x, y, z)) return false;
+        return reader.air(x + facing.getStepX(), y + facing.getStepY(), z + facing.getStepZ());
+    }
+
+    private static final class Reader {
+        private final Level level;
+        private final BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        private int chunkX = Integer.MIN_VALUE;
+        private int chunkZ = Integer.MIN_VALUE;
+        private LevelChunk chunk;
+
+        private Reader(final Level level) {
+            this.level = level;
+        }
+
+        private boolean air(final int x, final int y, final int z) {
+            if (this.level.isOutsideBuildHeight(y)) return true;
+            final int cx = SectionPos.blockToSectionCoord(x);
+            final int cz = SectionPos.blockToSectionCoord(z);
+            if (this.chunk == null || cx != this.chunkX || cz != this.chunkZ) {
+                this.chunk = this.level.getChunk(cx, cz);
+                this.chunkX = cx;
+                this.chunkZ = cz;
+            }
+            return this.chunk.getBlockState(this.cursor.set(x, y, z)).isAir();
+        }
     }
 
     public static double seamDistance(final Level level, final WeldRecord record, final Vec3 point) {
@@ -364,25 +473,6 @@ public final class WeldContact {
             case Z -> z = (int) Math.floor(v);
         }
         return new BlockPos(x, y, z);
-    }
-
-    private static BlockPos offset(
-            final BlockPos origin,
-            final Direction.Axis uAxis,
-            final int du,
-            final Direction.Axis vAxis,
-            final int dv
-    ) {
-        return new BlockPos(
-                origin.getX()
-                        + (uAxis == Direction.Axis.X ? du : 0)
-                        + (vAxis == Direction.Axis.X ? dv : 0),
-                origin.getY()
-                        + (uAxis == Direction.Axis.Y ? du : 0)
-                        + (vAxis == Direction.Axis.Y ? dv : 0),
-                origin.getZ()
-                        + (uAxis == Direction.Axis.Z ? du : 0)
-                        + (vAxis == Direction.Axis.Z ? dv : 0));
     }
 
     private WeldContact() {}

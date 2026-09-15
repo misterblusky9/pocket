@@ -45,7 +45,12 @@ public final class ModItems {
 
     public static final DeferredItem<CompressionGunItem> COMPRESSION_GUN = ITEMS.register(
             "compression_gun",
-            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512))
+            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512), false)
+    );
+
+    public static final DeferredItem<CompressionGunItem> PEARLESCENT_COMPRESSION_GUN = ITEMS.register(
+            "pearlescent_compression_gun",
+            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512), true)
     );
 
     public static final DeferredItem<BlockItem> PORTABLE_SUBSPACE_COMPRESSOR = ITEMS.register(

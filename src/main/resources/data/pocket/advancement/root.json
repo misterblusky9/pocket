@@ -1,7 +1,13 @@
 {
   "display": {
     "icon": {
-      "id": "pocket:compression_gun"
+      "id": "pocket:compression_gun",
+      "components": {
+        "pocket:levitite_tank": {
+          "id": "aeronautics:levitite_blend",
+          "amount": 3000
+        }
+      }
     },
     "title": {
       "text": "Create Pocket Sized"
