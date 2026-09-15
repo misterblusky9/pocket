@@ -11,6 +11,8 @@ import java.util.UUID;
 public final class PocketTrace {
     private static final Logger LOGGER = LogUtils.getLogger();
 
+    public static final boolean DEBUG = false;
+
     public static final boolean PHYSICS = false;
 
     public static final boolean SCALE = false;
@@ -56,7 +58,15 @@ public final class PocketTrace {
     }
 
     public static void warn(final String message, final Object... args) {
-        LOGGER.warn("[PocketScale] " + message, args);
+        if (DEBUG) LOGGER.warn("[PocketScale] " + message, args);
+    }
+
+    public static void debug(final String message, final Object... args) {
+        if (DEBUG) LOGGER.info(message, args);
+    }
+
+    public static void debugWarn(final String message, final Object... args) {
+        if (DEBUG) LOGGER.warn(message, args);
     }
 
     public static final boolean RENDER = false;

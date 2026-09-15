@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compat.simulated.WeldContact;
 import com.misterblusky9.pocket.compat.simulated.WeldGeometry;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -13,11 +14,13 @@ import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.createmod.catnip.render.PonderRenderTypes;
 import net.createmod.catnip.theme.Color;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix3f;
@@ -33,9 +36,20 @@ public final class WeldFaceRenderer {
     private static final double SURFACE_OFFSET = 1.0D / 128.0D;
     private static final RenderType GLUE = PonderRenderTypes.outlineTranslucent(
             AllSpecialTextures.GLUE.getLocation(), false);
+    private static final RenderType GLUE_PANEL = RenderType.entityCutoutNoCull(
+            ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "textures/block/hot_glue/hot_glue.png"));
     private static final Map<String, Face> FACES = new LinkedHashMap<>();
+    private static final Map<String, Panel> PANELS = new LinkedHashMap<>();
     private static final Map<String, Pivot> PIVOTS = new LinkedHashMap<>();
     private static final Pose3d WORLD_POSE = new Pose3d();
+
+    private record Panel(
+            BlockPos targetPos,
+            Direction targetFacing,
+            Vector3d targetAnchor,
+            WeldContactPatch.Edge rect,
+            long expires
+    ) {}
 
     private record Face(
             BlockPos targetPos,
@@ -74,6 +88,21 @@ public final class WeldFaceRenderer {
                 PocketClientFrame.frame() + 1L));
     }
 
+    public static void showGlue(
+            final String key,
+            final BlockPos targetPos,
+            final Direction targetFacing,
+            final Vector3d targetAnchor,
+            final WeldContactPatch.Edge rect
+    ) {
+        PANELS.put(key, new Panel(
+                targetPos,
+                targetFacing,
+                new Vector3d(targetAnchor),
+                rect,
+                PocketClientFrame.frame() + 1L));
+    }
+
     public static void showPivot(
             final String key,
             final BlockPos targetPos,
@@ -93,18 +122,34 @@ public final class WeldFaceRenderer {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
 
         final Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || (FACES.isEmpty() && PIVOTS.isEmpty())) return;
+        if (minecraft.level == null || (FACES.isEmpty() && PANELS.isEmpty() && PIVOTS.isEmpty())) return;
 
         final long frame = PocketClientFrame.frame();
         FACES.entrySet().removeIf(entry -> entry.getValue().expires() < frame);
+        PANELS.entrySet().removeIf(entry -> entry.getValue().expires() < frame);
         PIVOTS.entrySet().removeIf(entry -> entry.getValue().expires() < frame);
-        if (FACES.isEmpty() && PIVOTS.isEmpty()) return;
+        if (FACES.isEmpty() && PANELS.isEmpty() && PIVOTS.isEmpty()) return;
 
         final Vec3 camera = event.getCamera().getPosition();
         final PoseStack poses = event.getPoseStack();
         final MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
-        final VertexConsumer consumer = buffers.getBuffer(GLUE);
         final float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+
+        if (!PANELS.isEmpty()) {
+            final VertexConsumer panelConsumer = buffers.getBuffer(GLUE_PANEL);
+            for (final Panel panel : PANELS.values()) {
+                final SubLevel raw = Sable.HELPER.getContaining(minecraft.level, panel.targetPos());
+                if (raw instanceof final ClientSubLevel subLevel) {
+                    if (subLevel.isRemoved()) continue;
+                    renderPanel(minecraft, panel, subLevel.renderPose(partialTick), camera, poses, panelConsumer);
+                } else {
+                    renderPanel(minecraft, panel, WORLD_POSE, camera, poses, panelConsumer);
+                }
+            }
+            buffers.endBatch(GLUE_PANEL);
+        }
+
+        final VertexConsumer consumer = buffers.getBuffer(GLUE);
 
         for (final Face face : FACES.values()) {
             final SubLevel raw = Sable.HELPER.getContaining(minecraft.level, face.targetPos());
@@ -172,6 +217,61 @@ public final class WeldFaceRenderer {
             vertex(poses, consumer, pc, red, green, blue, (float) c[0], (float) c[1], normal);
             vertex(poses, consumer, pd, red, green, blue, (float) d[0], (float) d[1], normal);
         }
+    }
+
+    private static void renderPanel(
+            final Minecraft minecraft,
+            final Panel panel,
+            final Pose3dc pose,
+            final Vec3 camera,
+            final PoseStack poses,
+            final VertexConsumer consumer
+    ) {
+        final Direction facing = panel.targetFacing();
+        final Direction.Axis targetU = WeldContact.uAxis(facing);
+        final Direction.Axis targetV = WeldContact.vAxis(facing);
+        final double anchorU = WeldContact.axisOf(panel.targetAnchor(), targetU);
+        final double anchorV = WeldContact.axisOf(panel.targetAnchor(), targetV);
+        final double scale = Math.max(1.0E-6D, Math.abs(pose.scale().x()));
+        final double plane = WeldGeometry.facePlane(panel.targetPos(), facing)
+                + (facing.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1.0D : -1.0D)
+                * SURFACE_OFFSET / scale;
+
+        final Vector3d normal = new Vector3d(facing.getStepX(), facing.getStepY(), facing.getStepZ());
+        pose.transformNormal(normal).normalize();
+        final int light = LevelRenderer.getLightColor(minecraft.level, panel.targetPos().relative(facing));
+
+        final WeldContactPatch.Edge rect = panel.rect();
+        final Vector3d pa = world(facing, pose, plane, anchorU + rect.u0(), anchorV + rect.v0(), camera);
+        final Vector3d pb = world(facing, pose, plane, anchorU + rect.u0(), anchorV + rect.v1(), camera);
+        final Vector3d pc = world(facing, pose, plane, anchorU + rect.u1(), anchorV + rect.v1(), camera);
+        final Vector3d pd = world(facing, pose, plane, anchorU + rect.u1(), anchorV + rect.v0(), camera);
+
+        panelVertex(poses, consumer, pa, 0.0F, 0.0F, light, normal);
+        panelVertex(poses, consumer, pb, 0.0F, 1.0F, light, normal);
+        panelVertex(poses, consumer, pc, 1.0F, 1.0F, light, normal);
+        panelVertex(poses, consumer, pd, 1.0F, 0.0F, light, normal);
+    }
+
+    private static void panelVertex(
+            final PoseStack poses,
+            final VertexConsumer consumer,
+            final Vector3d point,
+            final float u,
+            final float v,
+            final int light,
+            final Vector3d normal
+    ) {
+        final PoseStack.Pose last = poses.last();
+        final Vector3f transformedNormal = new Vector3f((float) normal.x, (float) normal.y, (float) normal.z)
+                .mul(last.normal())
+                .normalize();
+        consumer.addVertex(last.pose(), (float) point.x, (float) point.y, (float) point.z)
+                .setColor(0xFFFFFFFF)
+                .setUv(u, v)
+                .setOverlay(OverlayTexture.NO_OVERLAY)
+                .setLight(light)
+                .setNormal(transformedNormal.x, transformedNormal.y, transformedNormal.z);
     }
 
     private static void renderPivot(
@@ -248,7 +348,18 @@ public final class WeldFaceRenderer {
             final double v,
             final Vec3 camera
     ) {
-        final Vector3d point = WeldGeometry.inPlane(face.targetFacing(), plane, u, v);
+        return world(face.targetFacing(), pose, plane, u, v, camera);
+    }
+
+    private static Vector3d world(
+            final Direction facing,
+            final Pose3dc pose,
+            final double plane,
+            final double u,
+            final double v,
+            final Vec3 camera
+    ) {
+        final Vector3d point = WeldGeometry.inPlane(facing, plane, u, v);
         pose.transformPosition(point);
         return point.sub(camera.x, camera.y, camera.z);
     }
@@ -280,6 +391,7 @@ public final class WeldFaceRenderer {
 
     public static void clear() {
         FACES.clear();
+        PANELS.clear();
         PIVOTS.clear();
     }
 

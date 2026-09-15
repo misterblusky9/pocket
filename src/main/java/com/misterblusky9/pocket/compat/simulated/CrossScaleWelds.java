@@ -192,7 +192,7 @@ public final class CrossScaleWelds {
                         : Refusal.NONE;
             }
 
-            return componentConnected(level, this.small.getUniqueId(), this.big.getUniqueId())
+            return directlyWelded(level, this.small.getUniqueId(), this.big.getUniqueId())
                     ? Refusal.ALREADY_CONNECTED
                     : Refusal.NONE;
         }
@@ -278,6 +278,16 @@ public final class CrossScaleWelds {
         return container != null && snapshot(container).component(first).contains(second);
     }
 
+    public static boolean directlyWelded(
+            final Level level,
+            final UUID first,
+            final UUID second
+    ) {
+        if (level == null || first == null || second == null || first.equals(second)) return false;
+        final SubLevelContainer container = SubLevelContainer.getContainer(level);
+        return container != null && snapshot(container).adjacent(first, second);
+    }
+
     public static boolean isWelded(
             final ServerSubLevelContainer container,
             final ServerSubLevel subLevel
@@ -349,7 +359,6 @@ public final class CrossScaleWelds {
 
         final WeldGraph graph = snapshot(container);
         if (!graph.isEndpoint(origin.getUniqueId())) return ScalePlan.single(origin, requested);
-        if (graph.worldAnchored(origin.getUniqueId())) return ScalePlan.blocked(true);
         if (!graph.complete(origin.getUniqueId())) return ScalePlan.blocked(true);
 
         final Set<UUID> component = graph.component(origin.getUniqueId());
@@ -379,6 +388,37 @@ public final class CrossScaleWelds {
         }
 
         return new ScalePlan(true, true, Collections.unmodifiableMap(goals));
+    }
+
+    public static Vector3d worldAnchorPoint(final SubLevelContainer container, final UUID origin) {
+        if (container == null || origin == null) return null;
+        final Set<UUID> component = snapshot(container).component(origin);
+        for (final WeldRecord record : records(container.getLevel())) {
+            if (record.worldAnchored() && component.contains(record.smallSubLevel())) return record.anchorFor(false);
+        }
+        return null;
+    }
+
+    public static void restageWorldWelds(final ServerSubLevel subLevel, final CompressionStage stage) {
+        if (subLevel == null || stage == null || subLevel.getUniqueId() == null
+                || !(subLevel.getLevel() instanceof final ServerLevel level)) {
+            return;
+        }
+
+        final WeldStore store = WeldStore.get(level);
+        final double smallSpan = WeldGeometry.span(stage, CompressionStage.NORMAL);
+        final double bigSpan = WeldGeometry.span(CompressionStage.NORMAL, stage);
+        boolean changed = false;
+        for (final WeldRecord record : store.touching(subLevel.getUniqueId())) {
+            if (!record.worldAnchored()) continue;
+            if (Math.abs(record.smallSpan() - smallSpan) <= PocketSized.EPSILON
+                    && Math.abs(record.bigSpan() - bigSpan) <= PocketSized.EPSILON) {
+                continue;
+            }
+            store.add(record.withSpans(smallSpan, bigSpan));
+            changed = true;
+        }
+        if (changed) CrossScaleWeldSync.broadcast(level);
     }
 
     public static int commandedDepth(final ServerSubLevel subLevel) {
@@ -509,6 +549,10 @@ public final class CrossScaleWelds {
 
         public boolean isEndpoint(final UUID id) {
             return id != null && this.endpointIds.contains(id);
+        }
+
+        public boolean adjacent(final UUID a, final UUID b) {
+            return a != null && b != null && this.links.getOrDefault(a, Set.of()).contains(b);
         }
 
         public Set<UUID> component(final UUID origin) {

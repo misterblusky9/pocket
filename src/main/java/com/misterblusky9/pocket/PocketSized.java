@@ -42,9 +42,12 @@ public final class PocketSized {
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
         modBus.addListener(SubspaceRecyclerBlockEntity::registerCapabilities);
         ModItems.ITEMS.register(modBus);
+        com.misterblusky9.pocket.item.CompressionGunTank.COMPONENTS.register(modBus);
+        modBus.addListener(com.misterblusky9.pocket.item.CompressionGunTank::registerCapabilities);
         ModEntities.ENTITIES.register(modBus);
         modBus.addListener(ModEntities::registerAttributes);
         ModCreativeTabs.TABS.register(modBus);
+        com.misterblusky9.pocket.advancement.HauntedCompressionGunTrigger.TRIGGERS.register(modBus);
         PocketCreateIntegration.register(modBus);
         modBus.addListener(ScaleNetwork::register);
         modBus.addListener(HelmBearingNetwork::register);

@@ -56,9 +56,11 @@ public final class PocketSizedClient {
         NeoForge.EVENT_BUS.addListener(SwitchBearingOutlineRenderer::render);
         NeoForge.EVENT_BUS.addListener(TweezerBeamRenderer::render);
         NeoForge.EVENT_BUS.addListener(WeldFaceRenderer::render);
+        CompressionGunRenderHandler.INSTANCE.registerListeners(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(
                 (net.neoforged.neoforge.client.event.ClientTickEvent.Post event) -> {
                     CompressionBeamRenderer.tick();
+                    CompressionGunRenderHandler.INSTANCE.tick();
                     ScaleHandshake.tick();
                     TweezerDrag.tick();
                 }

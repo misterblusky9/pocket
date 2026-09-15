@@ -314,6 +314,7 @@ public final class ScaleController {
                 state.stableStage(activeTarget);
                 state.transitionStage(null);
                 forcePoseScale(subLevel, activeTarget.scale());
+                if (welded) CrossScaleWelds.restageWorldWelds(subLevel, activeTarget);
                 if (choice != null) {
                     choice.source().clearJamMessage();
                     choice.source().onTransitionCompleted(subLevel, activeTarget);
@@ -819,8 +820,12 @@ public final class ScaleController {
             this.driver = driver;
             this.source = source;
             this.goal = goal;
+            final Vector3d grid = CrossScaleWelds.worldAnchorPoint(
+                    ServerSubLevelContainer.getContainer(driver.getLevel()), driver.getUniqueId());
             final Vector3d localAnchor = source.anchorLocalPoint();
-            this.worldAnchor = localAnchor == null
+            this.worldAnchor = grid != null
+                    ? grid
+                    : localAnchor == null
                     ? new Vector3d(driver.logicalPose().position())
                     : worldPoint(driver, localAnchor, ScaleState.serverState(driver).currentScale());
         }

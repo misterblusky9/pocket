@@ -1,7 +1,67 @@
 {
-  "parent": "create:item/potato_cannon/cog",
-  "textures": {
-    "1": "pocket:item/compression_gun",
-    "particle": "pocket:item/compression_gun"
-  }
+	"format_version": "1.9.0",
+	"credit": "Made with Blockbench",
+	"texture_size": [32, 32],
+	"textures": {
+		"gun": "pocket:item/compression_gun",
+		"particle": "pocket:item/compression_gun"
+	},
+	"elements": [
+		{
+			"name": "Cog",
+			"from": [7.5, 6, 6.5],
+			"to": [8.5, 11, 9.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8.00331, 8.24822, 10.25]},
+			"faces": {
+				"north": {"uv": [0.25, 4.75, 1.5, 5], "rotation": 90, "texture": "#gun"},
+				"east": {"uv": [1.75, 4.75, 0.25, 5.25], "texture": "#gun"},
+				"south": {"uv": [0.25, 6, 2.25, 6], "rotation": 90, "texture": "#gun"},
+				"west": {"uv": [1.75, 4.75, 0.25, 5.25], "texture": "#gun"},
+				"up": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Cog",
+			"from": [7.679, 5.9286, 6.5],
+			"to": [8.679, 10.9286, 9.5],
+			"rotation": {"angle": 45, "axis": "z", "origin": [8.00331, 8.24822, 10.25]},
+			"faces": {
+				"north": {"uv": [0.25, 5.75, 2.75, 6.25], "rotation": 270, "texture": "#gun"},
+				"east": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 270, "texture": "#gun"},
+				"south": {"uv": [0.25, 5.75, 2.75, 6.25], "rotation": 90, "texture": "#gun"},
+				"west": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 270, "texture": "#gun"},
+				"up": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 90, "texture": "#gun"},
+				"down": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 90, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Cog",
+			"from": [5.5, 8, 6.5],
+			"to": [10.5, 9, 9.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [8.00331, 8.24822, 10.25]},
+			"faces": {
+				"north": {"uv": [0.25, 5.75, 2.75, 6.25], "texture": "#gun"},
+				"east": {"uv": [1.75, 4.75, 0.25, 5.25], "texture": "#gun"},
+				"south": {"uv": [0.25, 5.75, 2.75, 6.25], "texture": "#gun"},
+				"west": {"uv": [1.75, 4.75, 0.25, 5.25], "texture": "#gun"},
+				"up": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 180, "texture": "#gun"},
+				"down": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 180, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Cog",
+			"from": [5.679, 7.92861, 6.5],
+			"to": [10.679, 8.92861, 9.5],
+			"rotation": {"angle": 45, "axis": "z", "origin": [8.00331, 8.24822, 10.25]},
+			"faces": {
+				"north": {"uv": [0.25, 5.75, 2.75, 6.25], "texture": "#gun"},
+				"east": {"uv": [1.75, 4.75, 0.25, 5.25], "texture": "#gun"},
+				"south": {"uv": [0.25, 5.75, 2.75, 6.25], "texture": "#gun"},
+				"west": {"uv": [1.75, 4.75, 0.25, 5.25], "texture": "#gun"},
+				"up": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 180, "texture": "#gun"},
+				"down": {"uv": [1.75, 4.75, 0.25, 5.25], "rotation": 180, "texture": "#gun"}
+			}
+		}
+	]
 }

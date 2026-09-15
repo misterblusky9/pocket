@@ -1,0 +1,279 @@
+{
+	"format_version": "1.9.0",
+	"credit": "Made with Blockbench",
+	"parent": "create:item/potato_cannon/item",
+	"texture_size": [32, 32],
+	"textures": {
+		"particle": "pocket:item/compression_gun",
+		"gun": "pocket:item/compression_gun"
+	},
+	"elements": [
+		{
+			"name": "Back Base",
+			"from": [6.12654, 6.16085, 15.5],
+			"to": [9.12654, 9.16085, 16.5],
+			"rotation": {"angle": 45, "axis": "z", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [9.25, 0.25, 10.75, 1.75], "texture": "#gun"},
+				"east": {"uv": [5.75, 0.5, 6.25, 2], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [5, 4, 6.5, 5.5], "texture": "#gun"},
+				"west": {"uv": [5.75, 0.5, 6.25, 2], "texture": "#gun"},
+				"up": {"uv": [4.5, 0.25, 6, 0.75], "rotation": 180, "texture": "#gun"},
+				"down": {"uv": [4.5, 0.25, 6, 0.75], "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Back Cap",
+			"from": [6.62654, 6.66085, 15.5],
+			"to": [8.62654, 8.66085, 17.5],
+			"rotation": {"angle": 45, "axis": "z", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"east": {"uv": [3, 0.25, 4, 1.25], "texture": "#gun"},
+				"south": {"uv": [5, 4, 6.5, 5.5], "texture": "#gun"},
+				"west": {"uv": [3, 0.25, 4, 1.25], "rotation": 180, "texture": "#gun"},
+				"up": {"uv": [3, 0.25, 4, 1.25], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [3, 0.25, 4, 1.25], "rotation": 90, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Trigger",
+			"from": [7.75, 5.85629, 3.73864],
+			"to": [8.25, 8.35629, 4.23864],
+			"rotation": {"angle": -22.5, "axis": "x", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [1.5, 5.5, 0.25, 5.25], "rotation": 270, "texture": "#gun"},
+				"east": {"uv": [1.5, 5.5, 0.25, 5.25], "rotation": 270, "texture": "#gun"},
+				"west": {"uv": [1.5, 5.25, 0.25, 5.5], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [1, 5.5, 0.75, 5.25], "rotation": 90, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Trigger Base",
+			"from": [7.65, 5.18502, 4.10647],
+			"to": [8.35, 8.18502, 5.60647],
+			"rotation": {"angle": -22.5, "axis": "x", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [6.5, 3.75, 5, 3.5], "rotation": 270, "texture": "#gun"},
+				"east": {"uv": [6.5, 2.75, 5, 3.5], "rotation": 270, "texture": "#gun"},
+				"south": {"uv": [6.5, 3.75, 5, 3.5], "rotation": 270, "texture": "#gun"},
+				"west": {"uv": [6.5, 3.5, 5, 2.75], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [7.75, 2.5, 6.75, 2.25], "rotation": 90, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Tubing",
+			"from": [7, 5.35, 14.5],
+			"to": [9, 8.85, 16],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [3.75, 3.75, 4.75, 5.5], "texture": "#gun"},
+				"east": {"uv": [3.75, 3.75, 4.5, 5.5], "texture": "#gun"},
+				"south": {"uv": [3.75, 3.75, 4.75, 5.5], "texture": "#gun"},
+				"west": {"uv": [4.5, 3.75, 3.75, 5.5], "texture": "#gun"},
+				"up": {"uv": [4.75, 3.5, 3.75, 4.25], "rotation": 180, "texture": "#gun"},
+				"down": {"uv": [4.75, 3.5, 3.75, 4.25], "rotation": 180, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Canister",
+			"from": [4.71232, 4.74663, 9.725],
+			"to": [7.71232, 7.74663, 15.225],
+			"rotation": {"angle": 45, "axis": "z", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [5, 4, 6.5, 5.5], "rotation": 180, "texture": "#gun"},
+				"east": {"uv": [1, 0, 4, 1.5], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [5, 4, 6.5, 5.5], "texture": "#gun"},
+				"west": {"uv": [1, 0, 4, 1.5], "texture": "#gun"},
+				"up": {"uv": [1, 0, 4, 1.5], "rotation": 90, "texture": "#gun"},
+				"down": {"uv": [1, 0, 4, 1.5], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Body Plate",
+			"from": [6, 6.35, 9.5],
+			"to": [10, 6.85, 15.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [0.5, 3.75, 2.5, 4], "texture": "#gun"},
+				"east": {"uv": [0, 4.25, 3, 4], "texture": "#gun"},
+				"south": {"uv": [4.25, 2.25, 6.25, 2], "texture": "#gun"},
+				"west": {"uv": [0, 4.25, 3, 4], "texture": "#gun"},
+				"up": {"uv": [0, 1.5, 3, 0], "rotation": 90, "texture": "#gun"},
+				"down": {"uv": [0, 1.5, 3, 0], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Coil Large",
+			"from": [6.25, 6.85, 3.5],
+			"to": [9.75, 10.35, 4],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [6.75, 2.25, 8.5, 4], "texture": "#gun"},
+				"east": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [6.75, 2.25, 8.5, 4], "rotation": 180, "texture": "#gun"},
+				"west": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 180, "texture": "#gun"},
+				"up": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Coil Large",
+			"from": [6.25, 6.85, 2],
+			"to": [9.75, 10.35, 2.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 7]},
+			"faces": {
+				"north": {"uv": [6.75, 2.25, 8.5, 4], "texture": "#gun"},
+				"east": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [6.75, 2.25, 8.5, 4], "rotation": 180, "texture": "#gun"},
+				"west": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 180, "texture": "#gun"},
+				"up": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [8.5, 0, 8.75, 1.75], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Coil Chamber",
+			"from": [6.5, 6.85663, 4.5],
+			"to": [9.5, 10.35663, 6.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [6.75, 2.25, 8.5, 4], "texture": "#gun"},
+				"east": {"uv": [2.75, 1.5, 3.75, 3.25], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [6.75, 2.25, 8.5, 4], "rotation": 90, "texture": "#gun"},
+				"west": {"uv": [2.75, 1.5, 3.75, 3.25], "texture": "#gun"},
+				"up": {"uv": [2.75, 1.5, 3.75, 3.25], "rotation": 90, "texture": "#gun"},
+				"down": {"uv": [2.75, 1.5, 3.75, 3.25], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Coil Chamber",
+			"from": [7.25, 10.10663, 4.475],
+			"to": [8.75, 10.60663, 6.475],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [7, 0, 7.75, 0.25], "texture": "#gun"},
+				"east": {"uv": [2.75, 3, 3.75, 3.25], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [6.75, 3, 7.5, 3.25], "rotation": 180, "texture": "#gun"},
+				"west": {"uv": [2.75, 3, 3.75, 3.25], "texture": "#gun"},
+				"up": {"uv": [2.75, 2.5, 3.75, 3.25], "rotation": 90, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Barrel",
+			"from": [6.50664, 7.1, 1],
+			"to": [9.50664, 10.1, 4.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"east": {"uv": [0, 2.25, 1.75, 3.75], "rotation": 180, "texture": "#gun"},
+				"west": {"uv": [0, 2.25, 1.75, 3.75], "texture": "#gun"},
+				"up": {"uv": [0, 2.25, 1.75, 3.75], "rotation": 90, "texture": "#gun"},
+				"down": {"uv": [0, 2.25, 1.75, 3.75], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Barrel",
+			"from": [7.25664, 6.1, 4.025],
+			"to": [8.75664, 7.6, 6.525],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [7, 2.5, 7.75, 3.25], "texture": "#gun"},
+				"east": {"uv": [7.25, 3.25, 8.5, 2.5], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [6.75, 2.75, 7.5, 3.5], "texture": "#gun"},
+				"west": {"uv": [7.25, 3.25, 8.5, 2.5], "texture": "#gun"},
+				"down": {"uv": [7.25, 3.25, 8.5, 2.5], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Nose",
+			"from": [6.00664, 6.6, 0],
+			"to": [10.00664, 10.6, 1],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [9, 0, 11, 2], "texture": "#gun"},
+				"east": {"uv": [6, 0.25, 6.5, 2.25], "texture": "#gun"},
+				"south": {"uv": [6.75, 2.25, 8.5, 4], "rotation": 90, "texture": "#gun"},
+				"west": {"uv": [6, 0.25, 6.5, 2.25], "texture": "#gun"},
+				"up": {"uv": [6.25, 0, 4.25, 0.5], "rotation": 180, "texture": "#gun"},
+				"down": {"uv": [4.25, 2, 6.25, 2.5], "rotation": 180, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Glass",
+			"from": [6.25, 6.85, 10],
+			"to": [9.75, 10.35, 15],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [3.25, 7.75, 5.25, 9.75], "texture": "#gun"},
+				"east": {"uv": [3.25, 5.75, 6.25, 7.75], "texture": "#gun"},
+				"south": {"uv": [3.25, 7.75, 5.25, 9.75], "rotation": 90, "texture": "#gun"},
+				"west": {"uv": [3.25, 5.75, 6.25, 7.75], "texture": "#gun"},
+				"up": {"uv": [3.25, 5.75, 6.25, 7.75], "rotation": 90, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Tank Front",
+			"from": [6.5, 6.85, 9.5],
+			"to": [9.5, 10.1, 10],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [4.25, 0.375, 6.25, 2.25], "rotation": 180, "texture": "#gun"},
+				"east": {"uv": [0.25, 4, 1.875, 3.75], "rotation": 90, "texture": "#gun"},
+				"south": {"uv": [4.25, 0.375, 6.25, 2.25], "rotation": 180, "texture": "#gun"},
+				"west": {"uv": [0.25, 4, 1.875, 3.75], "rotation": 90, "texture": "#gun"},
+				"up": {"uv": [2.25, 1.75, 2.5, 3.25], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [2.25, 1.5, 2.5, 3.25], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Tank Butt",
+			"from": [6.5, 6.85, 15],
+			"to": [9.5, 10.1, 15.5],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [6.75, 0, 8.75, 1.875], "texture": "#gun"},
+				"east": {"uv": [0.375, 4, 2.25, 4.25], "rotation": 270, "texture": "#gun"},
+				"south": {"uv": [6.75, 2.25, 8.5, 4.125], "texture": "#gun"},
+				"west": {"uv": [0.375, 4, 2.25, 4.25], "rotation": 270, "texture": "#gun"},
+				"up": {"uv": [2.25, 1.75, 2.5, 3.25], "rotation": 270, "texture": "#gun"},
+				"down": {"uv": [1.75, 1.5, 2, 3.5], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Display",
+			"from": [9.6429, 7.6, 4.11709],
+			"to": [10.6429, 9.6, 5.11709],
+			"rotation": {"angle": 45, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [11.75, 1, 11.25, 0], "rotation": 180, "texture": "#gun"},
+				"west": {"uv": [11.5, 1, 12, 0], "texture": "#gun"},
+				"up": {"uv": [1.25, 2.25, 0.75, 2.75], "rotation": 180, "texture": "#gun"},
+				"down": {"uv": [1.25, 2.25, 0.75, 2.75], "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Scope",
+			"from": [9.59672, 9.64039, 2.75],
+			"to": [10.09672, 10.14039, 6.25],
+			"rotation": {"angle": 45, "axis": "z", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [1.25, 5, 1.5, 5.25], "rotation": 270, "texture": "#gun"},
+				"east": {"uv": [2, 1.25, 3.75, 1.5], "rotation": 180, "texture": "#gun"},
+				"south": {"uv": [1.5, 5.25, 1.75, 5.5], "rotation": 90, "texture": "#gun"},
+				"west": {"uv": [2, 1.25, 3.75, 1.5], "texture": "#gun"},
+				"up": {"uv": [2, 1.25, 3.75, 1.5], "rotation": 90, "texture": "#gun"},
+				"down": {"uv": [2, 1.25, 3.75, 1.5], "rotation": 270, "texture": "#gun"}
+			}
+		},
+		{
+			"name": "Scope Mount",
+			"from": [7.74337, 9.6, 4.25],
+			"to": [8.24337, 11.15, 4.75],
+			"rotation": {"angle": 0, "axis": "y", "origin": [7.28316, 8.33123, 8.5]},
+			"faces": {
+				"north": {"uv": [2.75, 1.25, 3, 1.5], "rotation": 90, "texture": "#gun"},
+				"east": {"uv": [2.75, 1.25, 3, 1.5], "rotation": 90, "texture": "#gun"},
+				"south": {"uv": [2.75, 1.25, 3, 1.5], "rotation": 90, "texture": "#gun"},
+				"west": {"uv": [2.75, 1.25, 3, 1.5], "rotation": 90, "texture": "#gun"}
+			}
+		}
+	]
+}

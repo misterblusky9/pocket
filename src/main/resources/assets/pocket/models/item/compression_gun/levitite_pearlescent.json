@@ -1,0 +1,6 @@
+{
+	"parent": "pocket:item/compression_gun/levitite",
+	"textures": {
+		"levitite": "pocket:fluid/pearlescent_levitite_blend_flow"
+	}
+}

@@ -1,0 +1,12 @@
+{
+  "sources": [
+    {
+      "type": "single",
+      "resource": "pocket:fluid/pearlescent_levitite_blend_still"
+    },
+    {
+      "type": "single",
+      "resource": "pocket:fluid/pearlescent_levitite_blend_flow"
+    }
+  ]
+}

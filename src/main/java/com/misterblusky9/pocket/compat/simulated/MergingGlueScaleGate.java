@@ -38,7 +38,7 @@ public final class MergingGlueScaleGate {
         if (Math.abs(ScaleState.getScale(first) - ScaleState.getScale(second)) > PocketSized.EPSILON) {
             return Refusal.SCALE;
         }
-        return CrossScaleWelds.componentConnected(level, first.getUniqueId(), second.getUniqueId())
+        return CrossScaleWelds.directlyWelded(level, first.getUniqueId(), second.getUniqueId())
                 ? Refusal.WELDED
                 : Refusal.NONE;
     }

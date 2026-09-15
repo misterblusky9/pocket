@@ -27,7 +27,7 @@ public final class CompressionGunControls {
         event.setCanceled(true);
 
         final ItemStack stack = player.getItemInHand(hand);
-        final boolean growing = delta > 0.0D;
+        final boolean growing = !CompressionGunItem.isGrowing(stack);
         CompressionGunItem.setGrowing(stack, growing);
 
         PacketDistributor.sendToServer(new CompressionGunSettingsPayload(

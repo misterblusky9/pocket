@@ -149,7 +149,7 @@ public final class PocketedSubLevelEvents {
             final boolean payloadStored = storage.contains(token);
             final boolean sourceFree = !container.getOccupancy().get(container.getIndex(plotX, plotZ));
             final boolean sourceGone = container.getSubLevel(plotX, plotZ) == null;
-            PocketTrace.logger().info(
+            PocketTrace.debug(
                     "[PocketTransfer] capture commit token={} source={} plot=({}, {}) uuid={} "
                             + "payloadStored={} sourceFree={} liveRemoved={} blocks={} blockEntities={} "
                             + "entities={} backendValid={}",

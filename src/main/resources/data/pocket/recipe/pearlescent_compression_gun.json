@@ -1,0 +1,13 @@
+{
+  "type": "create:haunting",
+  "ingredients": [
+    {
+      "item": "pocket:compression_gun"
+    }
+  ],
+  "results": [
+    {
+      "id": "pocket:pearlescent_compression_gun"
+    }
+  ]
+}

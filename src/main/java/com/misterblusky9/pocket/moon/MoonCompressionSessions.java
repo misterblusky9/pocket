@@ -1,33 +1,31 @@
 package com.misterblusky9.pocket.moon;
 
+import com.misterblusky9.pocket.item.CompressionGunItem;
+import com.misterblusky9.pocket.item.CompressionGunTank;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import net.minecraft.advancements.AdvancementHolder;
-import com.simibubi.create.content.equipment.armor.BacktankUtil;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-import java.util.List;
 import java.util.UUID;
 
 @EventBusSubscriber(modid = "pocket")
 public final class MoonCompressionSessions {
     private static final int ACQUIRE_TICKS = 70;
     private static final int INSTANT_ACQUIRE_TICKS = 3;
+    private static final int ACQUIRE_LEVITITE = 2000;
     private static final int STEP_BASE_TICKS = 14;
     private static final float STEP_GROWTH = 0.85F;
     private static final int FINAL_STEP_EXTRA_TICKS = 22;
     private static final int PULSE_LEAD_TICKS = 10;
     private static final int HOLD_GRACE_TICKS = 3;
-    private static final int AIR_COST = 16;
-    private static final int AIR_PER_DURABILITY = 12;
     private static final int REBOUND_SETTLE_TICKS = 9;
     private static final int REBOUND_HALF_TICKS = 120;
     private static final int REBOUND_QUARTER_TICKS = 100;
@@ -74,12 +72,12 @@ public final class MoonCompressionSessions {
                 player.getUUID(),
                 floor,
                 hand,
-                player.isCreative() ? 0 : AIR_COST,
                 now,
                 ACQUIRE_TICKS,
                 hit.surfaceX(),
                 hit.surfaceZ()
         );
+        session.levititeCost = player.isCreative() ? 0 : ACQUIRE_LEVITITE;
         MoonScaleNetwork.broadcastEffectBegin(
                 growing,
                 false,
@@ -123,7 +121,6 @@ public final class MoonCompressionSessions {
                 player.getUUID(),
                 stage,
                 player.getUsedItemHand(),
-                0,
                 player.level().getGameTime(),
                 INSTANT_ACQUIRE_TICKS,
                 hit.surfaceX(),
@@ -189,8 +186,8 @@ public final class MoonCompressionSessions {
         session.age++;
 
         if (!session.sealed) {
-            if (session.airCost > 0 && !drawAir(session, holder)) {
-                holder.displayClientMessage(Component.literal("Backtank empty"), true);
+            if (session.levititeCost > 0 && !drawLevitite(session, holder)) {
+                holder.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
                 return false;
             }
 
@@ -365,46 +362,16 @@ public final class MoonCompressionSessions {
         if (notify) MoonScaleNetwork.broadcastEffectRelease();
     }
 
-    private static boolean drawAir(final Session session, final ServerPlayer player) {
-        session.airDebt += session.airCost / (float) session.acquireTicks;
+    private static boolean drawLevitite(final Session session, final ServerPlayer player) {
+        final int owed = (int) ((long) session.levititeCost * Math.min(session.age, session.acquireTicks)
+                / session.acquireTicks) - session.levititePaid;
+        if (owed <= 0) return true;
 
-        int whole = (int) session.airDebt;
-        if (whole <= 0) return true;
-        session.airDebt -= whole;
-
-        while (whole > 0) {
-            final List<ItemStack> tanks = BacktankUtil.getAllWithAir(player);
-            if (tanks.isEmpty()) break;
-
-            final ItemStack tank = tanks.get(0);
-            final int available = BacktankUtil.getAir(tank);
-            if (available <= 0) break;
-
-            final int spend = Math.min(available, whole);
-            BacktankUtil.consumeAir(player, tank, spend);
-            whole -= spend;
-        }
-
-        if (whole <= 0) return true;
-        return payWithDurability(session, player, whole);
-    }
-
-    private static boolean payWithDurability(
-            final Session session,
-            final ServerPlayer player,
-            final int shortfall
-    ) {
         final ItemStack gun = player.getItemInHand(session.hand);
-        if (!gun.isDamageableItem()) return false;
-
-        final int damage = Math.max(1, shortfall / AIR_PER_DURABILITY);
-        if (gun.getMaxDamage() - gun.getDamageValue() <= damage) {
-            player.displayClientMessage(Component.literal("No pressure left"), true);
-            return false;
-        }
-
-        gun.hurtAndBreak(damage, player, EquipmentSlot.MAINHAND);
-        return true;
+        if (!(gun.getItem() instanceof CompressionGunItem)) return false;
+        final int drained = CompressionGunTank.drain(gun, owed);
+        session.levititePaid += drained;
+        return drained == owed;
     }
 
     private static final class Session {
@@ -412,14 +379,14 @@ public final class MoonCompressionSessions {
         private final UUID holder;
         private final CompressionStage floor;
         private final InteractionHand hand;
-        private final int airCost;
         private final int acquireTicks;
+        private int levititeCost;
+        private int levititePaid;
         private long lastHeldTick;
         private int age;
         private boolean sealed;
         private int sinceStep;
         private int steps;
-        private float airDebt;
         private boolean autoRelease;
         private boolean directDrive;
         private boolean pulsed;
@@ -431,7 +398,6 @@ public final class MoonCompressionSessions {
                 final UUID holder,
                 final CompressionStage floor,
                 final InteractionHand hand,
-                final int airCost,
                 final long lastHeldTick,
                 final int acquireTicks,
                 final float surfaceX,
@@ -441,7 +407,6 @@ public final class MoonCompressionSessions {
             this.holder = holder;
             this.floor = floor;
             this.hand = hand;
-            this.airCost = airCost;
             this.lastHeldTick = lastHeldTick;
             this.acquireTicks = acquireTicks;
             this.surfaceX = surfaceX;

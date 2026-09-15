@@ -8,7 +8,8 @@ import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ManualScaleOverride;
 import com.misterblusky9.pocket.scale.ScaleController;
 import com.misterblusky9.pocket.scale.ScaleState;
-import com.simibubi.create.content.equipment.armor.BacktankUtil;
+import com.misterblusky9.pocket.item.CompressionGunItem;
+import com.misterblusky9.pocket.item.CompressionGunTank;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -18,7 +19,6 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,18 +38,14 @@ public final class CompressionSessions {
 
     private static final int CREATIVE_STEP_TICKS = 6;
 
-    public static final int SURVIVAL_BLOCK_LIMIT = 8192;
+    public static final int SURVIVAL_BLOCK_LIMIT = PocketSized.MAX_COMPRESSED_BLOCKS;
 
-    private static final double MASS_PER_AIR_UNIT = 250.0D;
-    private static final int MIN_ACQUIRE_AIR = 16;
-    private static final int MAX_ACQUIRE_AIR = 600;
+    private static final float LEVITITE_PER_TICK = 5.0F;
 
     private static final int PULSE_LEAD_TICKS = 10;
 
     private static final int HOLD_GRACE_TICKS = 3;
     private static final double AIM_RANGE = 160.0D;
-
-    private static final int AIR_PER_DURABILITY = 12;
 
     private static final Map<UUID, Session> SESSIONS = new ConcurrentHashMap<>();
 
@@ -95,7 +91,7 @@ public final class CompressionSessions {
         final int acquireTicks = instant
                 ? INSTANT_ACQUIRE_TICKS
                 : estimateAcquireTicks(subLevel);
-        final int airCost = player.isCreative() ? 0 : estimateAirCost(subLevel);
+        final float levititePerTick = player.isCreative() ? 0.0F : LEVITITE_PER_TICK;
 
         final boolean growing = growingIntent;
         final int ceiling = player.isCreative()
@@ -120,7 +116,7 @@ public final class CompressionSessions {
 
         ManualScaleOverride.engage(subLevel, now);
 
-        session = new Session(id, player.getUUID(), hitLocalPos.immutable(), acquireTicks, airCost, floor, now);
+        session = new Session(id, player.getUUID(), hitLocalPos.immutable(), acquireTicks, levititePerTick, floor, now);
         session.blocked = cellLimit > 0;
         session.hand = hand;
         session.propagateJoints = propagateJoints;
@@ -164,7 +160,7 @@ public final class CompressionSessions {
 
         final Session session = new Session(
                 id, player.getUUID(), hitLocalPos.immutable(),
-                INSTANT_ACQUIRE_TICKS, 0, requested, now
+                INSTANT_ACQUIRE_TICKS, 0.0F, requested, now
         );
         session.autoRelease = true;
         session.uniformSteps = true;
@@ -311,8 +307,8 @@ public final class CompressionSessions {
             if (!session.autoRelease && !session.illuminated) return true;
 
             session.age++;
-            if (session.airCost > 0 && !drawAir(session, holder)) {
-                holder.displayClientMessage(Component.literal("Backtank empty"), true);
+            if (session.levititePerTick > 0.0F && !drawLevitite(session, holder)) {
+                holder.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
                 return false;
             }
 
@@ -393,55 +389,16 @@ public final class CompressionSessions {
         return Math.max(MIN_ACQUIRE_TICKS, Math.min(MAX_ACQUIRE_TICKS, ticks));
     }
 
-    private static int estimateAirCost(final ServerSubLevel subLevel) {
-        final var tracker = subLevel.getMassTracker();
-        final double mass = tracker == null ? 0.0D : tracker.getMass();
-        if (!Double.isFinite(mass) || mass <= 0.0D) return MIN_ACQUIRE_AIR;
+    private static boolean drawLevitite(final Session session, final ServerPlayer player) {
+        session.levititeDebt += session.levititePerTick;
 
-        final int cost = (int) Math.round(mass / MASS_PER_AIR_UNIT);
-        return Math.max(MIN_ACQUIRE_AIR, Math.min(MAX_ACQUIRE_AIR, cost));
-    }
-
-    private static boolean drawAir(final Session session, final ServerPlayer player) {
-        session.airDebt += session.airCost / (float) Math.max(1, session.acquireTicks);
-
-        int whole = (int) session.airDebt;
+        final int whole = (int) session.levititeDebt;
         if (whole <= 0) return true;
-        session.airDebt -= whole;
+        session.levititeDebt -= whole;
 
-        while (whole > 0) {
-            final List<ItemStack> tanks = BacktankUtil.getAllWithAir(player);
-            if (tanks.isEmpty()) break;
-
-            final ItemStack tank = tanks.get(0);
-            final int available = BacktankUtil.getAir(tank);
-            if (available <= 0) break;
-
-            final int spend = Math.min(available, whole);
-            BacktankUtil.consumeAir(player, tank, spend);
-            whole -= spend;
-        }
-
-        if (whole <= 0) return true;
-        return payWithDurability(session, player, whole);
-    }
-
-    private static boolean payWithDurability(
-            final Session session,
-            final ServerPlayer player,
-            final int shortfall
-    ) {
         final ItemStack gun = player.getItemInHand(session.hand);
-        if (!gun.isDamageableItem()) return false;
-
-        final int damage = Math.max(1, shortfall / AIR_PER_DURABILITY);
-        if (gun.getMaxDamage() - gun.getDamageValue() <= damage) {
-            player.displayClientMessage(Component.literal("No pressure left"), true);
-            return false;
-        }
-
-        gun.hurtAndBreak(damage, player, net.minecraft.world.entity.EquipmentSlot.MAINHAND);
-        return true;
+        if (!(gun.getItem() instanceof CompressionGunItem)) return false;
+        return CompressionGunTank.drain(gun, whole) == whole;
     }
 
     private static ServerSubLevel findSubLevel(
@@ -474,7 +431,7 @@ public final class CompressionSessions {
         private final UUID holder;
         private final BlockPos hitLocalPos;
         private final int acquireTicks;
-        private final int airCost;
+        private final float levititePerTick;
 
         private ServerLevel level;
         private CompressionStage floor;
@@ -483,7 +440,7 @@ public final class CompressionSessions {
         private boolean sealed;
         private int sinceStep;
         private int steps;
-        private float airDebt;
+        private float levititeDebt;
         private boolean autoRelease;
 
         private boolean uniformSteps;
@@ -501,7 +458,7 @@ public final class CompressionSessions {
                 final UUID holder,
                 final BlockPos hitLocalPos,
                 final int acquireTicks,
-                final int airCost,
+                final float levititePerTick,
                 final CompressionStage floor,
                 final long now
         ) {
@@ -509,7 +466,7 @@ public final class CompressionSessions {
             this.holder = holder;
             this.hitLocalPos = hitLocalPos;
             this.acquireTicks = acquireTicks;
-            this.airCost = airCost;
+            this.levititePerTick = levititePerTick;
             this.floor = floor;
             this.lastHeldTick = now;
         }

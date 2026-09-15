@@ -1,0 +1,7 @@
+{
+	"parent": "pocket:item/compression_gun/item",
+	"textures": {
+		"gun": "pocket:item/compression_gun_pearlescent",
+		"particle": "pocket:item/compression_gun_pearlescent"
+	}
+}

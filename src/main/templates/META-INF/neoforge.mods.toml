@@ -63,6 +63,13 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
+modId="aeronautics"
+type="required"
+versionRange="[1.3.0,1.4)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
 modId="pehkui"
 type="optional"
 versionRange="[3.8.3,)"
