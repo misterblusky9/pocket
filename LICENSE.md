@@ -13,6 +13,8 @@ This license applies to any files under the following directories:
 Exceptions to the asset license above:
 - Personal Subspace Compressor base texture: [GPS by Futureazoo](https://github.com/Futureazoo/TextureRepository/blob/master/futureazoo/items/tech/gps.png), used under their [original license](https://github.com/Futureazoo/TextureRepository/blob/master/README.md) and modified for my needs.
 
+---
+
 ## Code License (MIT)
 
 All other files are licensed under the MIT License:
