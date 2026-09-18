@@ -20,6 +20,7 @@ public final class WeldSnapTest {
     public static void main(final String[] args) {
         everyStagePairHasAWholeDivisor();
         spanIsTheJointFootprint();
+        arbitraryAbsoluteScalesUseExactRatios();
         freeSnapStaysOnTheFacePlane();
         smartSnapLandsOnTheGrid();
         everyCellOfTheGridIsReachable();
@@ -30,6 +31,26 @@ public final class WeldSnapTest {
         alignmentAgreesWithUpstreamOnItsOwnDomain();
         tumbledCraftIsPulledStraight();
         System.out.println("WeldSnapTest: PASS");
+    }
+
+    private static void arbitraryAbsoluteScalesUseExactRatios() {
+        check(WeldGeometry.divisor(0.15D, 0.3D) == 2, "custom sizes with a 2:1 ratio support the weld grid");
+        check(WeldGeometry.divisor(0.075D, 0.6D) == 8, "custom sizes with an 8:1 ratio support the weld grid");
+        check(WeldGeometry.divisor(1.0D / 3.0D, 1.0D) == 3, "whole-number ratios keep a grid");
+        check(WeldGeometry.divisor(0.25D, 8.0D) == 32, "large whole-number ratios keep a grid");
+        check(WeldGeometry.divisor(0.3D, 1.0D) == WeldGeometry.UNSTEPPED, "uneven ratios weld unstepped, not refused");
+        check(WeldGeometry.divisor(1.0D, 0.5D) == 0, "a weld still needs a strictly smaller first side");
+        check(near(WeldGeometry.placeAxis(0.0D, WeldGeometry.UNSTEPPED, 0.3D, SnapMode.SMART), 0.15D),
+                "an unstepped footprint stays on the face");
+        check(near(WeldGeometry.placeAxis(1.0D, WeldGeometry.UNSTEPPED, 0.3D, SnapMode.MAGNET), 0.85D),
+                "an unstepped footprint stays on the face under CTRL too");
+        check(near(WeldGeometry.placeAxis(0.0D, WeldGeometry.UNSTEPPED, 0.3D, SnapMode.FREE), 0.0D),
+                "ALT placement stays free");
+        check(near(WeldGeometry.placeAxis(0.42D, WeldGeometry.UNSTEPPED, 0.3D, SnapMode.SMART), 0.42D),
+                "unstepped placement does not snap");
+        check(WeldGeometry.divisor(Double.NaN, 1.0D) == 0, "NaN must not create a weld");
+        check(near(WeldGeometry.span(1.0D, 0.3D), 0.3D), "world weld footprint must retain the exact size");
+        check(near(WeldGeometry.span(0.3D, 0.15D), 0.5D), "weld footprint follows the ratio");
     }
 
     private static void everyStagePairHasAWholeDivisor() {

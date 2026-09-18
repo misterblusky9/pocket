@@ -39,9 +39,10 @@ public final class PocketedSubLevelEvents {
         final SubLevel found = findSubLevel(event);
         if (found == null) return;
 
-        final double scale = ScaleState.getScale(found);
-        if (Math.abs(scale - PocketSized.MIN_SCALE) > PICKUP_SCALE_TOLERANCE
-                || ScaleState.getStage(found) != CompressionStage.SIXTEENTH) return;
+        final double settled = ScaleState.getSettledScale(found);
+        if (settled > PocketCaseItem.POCKETABLE_SCALE + PICKUP_SCALE_TOLERANCE
+                || Math.abs(ScaleState.getScale(found) - settled) > PICKUP_SCALE_TOLERANCE
+                || !ScaleState.isAt(found, settled)) return;
 
         final ItemStack held = event.getItemStack();
         if (!PocketCaseItem.isContainer(held)) return;
@@ -62,8 +63,8 @@ public final class PocketedSubLevelEvents {
 
         final PocketMetrics metrics = PocketMetrics.measureForCompression(subLevel, serverLevel.getGameTime());
         if (metrics.blocks() > PocketSized.MAX_COMPRESSED_BLOCKS) {
-            player.displayClientMessage(Component.literal("Pocket Sized hard limit: "
-                    + metrics.blocks() + "/" + PocketSized.MAX_COMPRESSED_BLOCKS + " blocks"), true);
+            player.displayClientMessage(Component.translatable("pocket.message.hard_limit_ratio",
+                    metrics.blocks(), PocketSized.MAX_COMPRESSED_BLOCKS), true);
             return;
         }
         pocket(serverLevel, player, subLevel, metrics, held);
@@ -125,6 +126,7 @@ public final class PocketedSubLevelEvents {
                 new ItemStack(ModItems.POCKETED_SUBLEVEL.get()), token, level,
                 displayName, snapshot, canonicalMetrics.blocks(), canonicalMetrics.blockEntities(), mass);
         PocketCaseItem.setPackedBy(result, player.getGameProfile().getName());
+        PocketCaseItem.setPocketedScale(result, ScaleState.getSettledScale(subLevel));
 
         PocketCaseItem.setContainer(result, packedInto.isEmpty()
                 ? new ItemStack(ModItems.EMPTY_BOX.get())

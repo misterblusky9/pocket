@@ -9,6 +9,9 @@ Copyright (c) 2026 misterblusky9
 This license applies to any files under the following directories:
 
 - ./src/main/resources/assets/
+  
+Exceptions to the asset license above:
+- Personal Subspace Compressor base texture: [GPS by Futureazoo](https://github.com/Futureazoo/TextureRepository/blob/master/futureazoo/items/tech/gps.png), used under their [original license](https://github.com/Futureazoo/TextureRepository/blob/master/README.md) and modified for my needs.
 
 ---
 

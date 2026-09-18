@@ -1,7 +1,9 @@
 package com.misterblusky9.pocket.network;
 
+import com.misterblusky9.pocket.Overclocking;
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
+import com.misterblusky9.pocket.item.SelfResizeDeviceItem;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -16,7 +18,7 @@ import java.util.UUID;
 
 public final class ScaleNetwork {
     public static void register(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("10");
+        final PayloadRegistrar registrar = event.registrar("13");
         registrar.playToClient(
                 ScaleSyncPayload.TYPE,
                 ScaleSyncPayload.STREAM_CODEC,
@@ -57,6 +59,13 @@ public final class ScaleNetwork {
                 )
         );
         registrar.playToClient(
+                OverclockingSyncPayload.TYPE,
+                OverclockingSyncPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> Overclocking.acceptClient(payload.enabled())
+                )
+        );
+        registrar.playToClient(
                 CompressionGunOpenMenuPayload.TYPE,
                 CompressionGunOpenMenuPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(
@@ -71,7 +80,9 @@ public final class ScaleNetwork {
                     if (!(stack.getItem() instanceof CompressionGunItem)) return;
 
                     CompressionGunItem.setTargetingMode(stack, payload.targetingMode());
-                    CompressionGunItem.setGrowing(stack, payload.growing());
+                    if (!CompressionGunItem.modeLocked(context.player(), payload.hand())) {
+                        CompressionGunItem.setGrowing(stack, payload.growing());
+                    }
                 })
         );
         registrar.playToClient(
@@ -169,12 +180,14 @@ public final class ScaleNetwork {
                 })
         );
         registrar.playToServer(
-                ShrinkRayStagePayload.TYPE,
-                ShrinkRayStagePayload.STREAM_CODEC,
+                ShrinkRayScalePayload.TYPE,
+                ShrinkRayScalePayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
                     final ItemStack stack = context.player().getItemInHand(payload.hand());
-                    if (stack.getItem() instanceof CreativeShrinkRayItem) {
-                        CreativeShrinkRayItem.setSelectedStage(stack, payload.stage());
+                    if ((stack.getItem() instanceof CreativeShrinkRayItem
+                            || stack.getItem() instanceof SelfResizeDeviceItem)
+                            && CreativeShrinkRayItem.permits(context.player(), payload.scale())) {
+                        CreativeShrinkRayItem.setSelectedScale(stack, payload.scale());
                     }
                 })
         );
@@ -200,10 +213,7 @@ public final class ScaleNetwork {
         final double current = ScaleState.getServerScale(subLevel);
         final double target;
         if (ScaleState.hasServerState(id)) {
-            final ScaleState.ServerState state = ScaleState.serverState(subLevel);
-            target = state.transitionStage() == null
-                    ? state.stableStage().scale()
-                    : state.transitionStage().scale();
+            target = ScaleState.serverState(subLevel).goalScale();
         } else {
             target = current;
         }
@@ -229,10 +239,7 @@ public final class ScaleNetwork {
 
         double target = current;
         if (ScaleState.hasServerState(subLevel.getUniqueId())) {
-            final ScaleState.ServerState state = ScaleState.serverState(subLevel);
-            target = state.transitionStage() == null
-                    ? state.stableStage().scale()
-                    : state.transitionStage().scale();
+            target = ScaleState.serverState(subLevel).goalScale();
         }
 
         player.connection.send(new ClientboundCustomPayloadPacket(new ScaleSyncPayload(

@@ -4,6 +4,8 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compression.CompressionBlacklist;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleState;
+import com.misterblusky9.pocket.scale.ScaleController;
+import com.misterblusky9.pocket.scale.ScaleLimits;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
@@ -74,8 +76,8 @@ public final class CrossScaleWelds {
             BlockPos bigPos,
             Direction smallFacing,
             Direction bigFacing,
-            CompressionStage smallStage,
-            CompressionStage bigStage,
+            double smallScale,
+            double bigScale,
             int divisor,
             Vector3d smallAnchor,
             Vector3d bigAnchor
@@ -101,31 +103,33 @@ public final class CrossScaleWelds {
             if (first == null && second == null) return null;
 
             final boolean worldWeld = first == null || second == null;
-            final CompressionStage firstStage = first == null ? CompressionStage.NORMAL : ScaleState.getStage(first);
-            final CompressionStage secondStage = second == null ? CompressionStage.NORMAL : ScaleState.getStage(second);
-            final boolean sameScale = firstStage == secondStage;
+            final double firstScale = first == null ? 1.0D : ScaleState.getSettledScale(first);
+            final double secondScale = second == null ? 1.0D : ScaleState.getSettledScale(second);
+            final boolean sameScale = ScaleController.sameScale(firstScale, secondScale);
             final boolean firstIsSmall = worldWeld
                     ? first != null
-                    : sameScale || firstStage.isDeeperThan(secondStage);
+                    : sameScale || firstScale < secondScale;
             final BlockPos smallPos = (firstIsSmall ? firstPos : secondPos).immutable();
             final BlockPos bigPos = (firstIsSmall ? secondPos : firstPos).immutable();
             final Direction smallFacing = firstIsSmall ? firstFacing : secondFacing;
             final Direction bigFacing = firstIsSmall ? secondFacing : firstFacing;
-            final CompressionStage smallStage = firstIsSmall ? firstStage : secondStage;
-            final CompressionStage bigStage = firstIsSmall ? secondStage : firstStage;
+            final double smallScale = firstIsSmall ? firstScale : secondScale;
+            final double bigScale = firstIsSmall ? secondScale : firstScale;
             final SubLevel small = firstIsSmall ? first : second;
             final SubLevel big = worldWeld ? null : firstIsSmall ? second : first;
             if (small == null) return null;
 
-            final int divisor = sameScale ? 1 : WeldGeometry.divisor(smallStage, bigStage);
+            final boolean unsized = sameScale || smallScale > bigScale;
+            final int divisor = unsized ? WeldGeometry.UNSTEPPED : WeldGeometry.divisor(smallScale, bigScale);
+            final double footprint = unsized ? 1.0D : smallScale / bigScale;
             final Vec3 rawHit = firstIsSmall ? secondHit : firstHit;
             final Vec3 hit = rawHit == null ? new Vec3(0.5D, 0.5D, 0.5D) : rawHit;
-            final WeldGeometry.SnapMode resolvedMode = !sameScale && !firstIsSmall
+            final WeldGeometry.SnapMode resolvedMode = !unsized && !firstIsSmall
                     ? WeldGeometry.SnapMode.GRID
                     : mode;
-            final Vector3d bigAnchor = sameScale && mode != WeldGeometry.SnapMode.FREE
+            final Vector3d bigAnchor = unsized && mode != WeldGeometry.SnapMode.FREE
                     ? WeldGeometry.faceCentre(bigPos, bigFacing)
-                    : WeldGeometry.anchor(bigPos, bigFacing, hit.x, hit.y, hit.z, divisor, resolvedMode);
+                    : WeldGeometry.anchor(bigPos, bigFacing, hit.x, hit.y, hit.z, divisor, footprint, resolvedMode);
 
             return new Weld(
                     small,
@@ -134,8 +138,8 @@ public final class CrossScaleWelds {
                     bigPos,
                     smallFacing,
                     bigFacing,
-                    smallStage,
-                    bigStage,
+                    smallScale,
+                    bigScale,
                     divisor,
                     WeldGeometry.faceCentre(smallPos, smallFacing),
                     bigAnchor);
@@ -146,11 +150,11 @@ public final class CrossScaleWelds {
         }
 
         public double smallSpan() {
-            return WeldGeometry.span(this.smallStage, this.bigStage);
+            return WeldGeometry.span(this.smallScale, this.bigScale);
         }
 
         public double bigSpan() {
-            return WeldGeometry.span(this.bigStage, this.smallStage);
+            return WeldGeometry.span(this.bigScale, this.smallScale);
         }
 
         public boolean worldAnchored() {
@@ -350,7 +354,24 @@ public final class CrossScaleWelds {
             final CompressionStage requested,
             final long gameTime
     ) {
-        if (origin == null || requested == null || origin.isRemoved() || origin.getUniqueId() == null) {
+        return requested == null ? ScalePlan.blocked(false) : planScale(origin, requested.scale(), gameTime);
+    }
+
+    public static ScalePlan planScale(
+            final ServerSubLevel origin,
+            final double requested,
+            final long gameTime
+    ) {
+        return planScale(origin, requested, gameTime, ScaleLimits.API);
+    }
+
+    public static ScalePlan planScale(
+            final ServerSubLevel origin,
+            final double requested,
+            final long gameTime,
+            final ScaleLimits limits
+    ) {
+        if (origin == null || !PocketSized.isValidScale(requested) || origin.isRemoved() || origin.getUniqueId() == null) {
             return ScalePlan.blocked(false);
         }
 
@@ -363,24 +384,19 @@ public final class CrossScaleWelds {
 
         final Set<UUID> component = graph.component(origin.getUniqueId());
 
-        final int originDepth = commandedDepth(origin);
-        final int delta = requested.depth() - originDepth;
-        final Map<UUID, CompressionStage> goals = new LinkedHashMap<>();
+        final double ratio = requested / commandedScale(origin);
+        final Map<UUID, Double> goals = new LinkedHashMap<>();
 
         for (final UUID id : component) {
             if (!(container.getSubLevel(id) instanceof final ServerSubLevel member) || member.isRemoved()) {
                 return ScalePlan.blocked(true);
             }
 
-            final int currentDepth = commandedDepth(member);
-            final int targetDepth = currentDepth + delta;
-            if (targetDepth < CompressionStage.NORMAL.depth()
-                    || targetDepth > CompressionStage.SIXTEENTH.depth()) {
-                return ScalePlan.blocked(true);
-            }
-
-            final CompressionStage goal = CompressionStage.values()[targetDepth];
-            if (goal.depth() > currentDepth
+            final double current = commandedScale(member);
+            final double target = current * ratio;
+            if (!limits.permits(current, target)) return ScalePlan.blocked(true);
+            final double goal = CompressionStage.snap(target);
+            if (goal < current - PocketSized.EPSILON
                     && CompressionBlacklist.find(member, gameTime).blocked()) {
                 return ScalePlan.blocked(true);
             }
@@ -399,15 +415,15 @@ public final class CrossScaleWelds {
         return null;
     }
 
-    public static void restageWorldWelds(final ServerSubLevel subLevel, final CompressionStage stage) {
-        if (subLevel == null || stage == null || subLevel.getUniqueId() == null
+    public static void restageWorldWelds(final ServerSubLevel subLevel, final double scale) {
+        if (subLevel == null || !PocketSized.isValidScale(scale) || subLevel.getUniqueId() == null
                 || !(subLevel.getLevel() instanceof final ServerLevel level)) {
             return;
         }
 
         final WeldStore store = WeldStore.get(level);
-        final double smallSpan = WeldGeometry.span(stage, CompressionStage.NORMAL);
-        final double bigSpan = WeldGeometry.span(CompressionStage.NORMAL, stage);
+        final double smallSpan = WeldGeometry.span(scale, 1.0D);
+        final double bigSpan = WeldGeometry.span(1.0D, scale);
         boolean changed = false;
         for (final WeldRecord record : store.touching(subLevel.getUniqueId())) {
             if (!record.worldAnchored()) continue;
@@ -421,17 +437,11 @@ public final class CrossScaleWelds {
         if (changed) CrossScaleWeldSync.broadcast(level);
     }
 
-    public static int commandedDepth(final ServerSubLevel subLevel) {
-        if (subLevel == null) return CompressionStage.NORMAL.depth();
+    public static double commandedScale(final ServerSubLevel subLevel) {
+        if (subLevel == null) return 1.0D;
         final UUID id = subLevel.getUniqueId();
-        if (id == null || !ScaleState.hasServerState(id)) {
-            return CompressionStage.nearest(ScaleState.getServerScale(subLevel)).depth();
-        }
-        final ScaleState.ServerState state = ScaleState.serverState(subLevel);
-        final CompressionStage stage = state.requestedStage() != null
-                ? state.requestedStage()
-                : state.transitionStage() != null ? state.transitionStage() : state.stableStage();
-        return stage == null ? CompressionStage.NORMAL.depth() : stage.depth();
+        if (id == null || !ScaleState.hasServerState(id)) return ScaleState.getServerScale(subLevel);
+        return ScaleState.serverState(subLevel).requestedScale();
     }
 
     public static WeldGraph snapshot(final SubLevelContainer container) {
@@ -596,9 +606,9 @@ public final class CrossScaleWelds {
         }
     }
 
-    public record ScalePlan(boolean welded, boolean allowed, Map<UUID, CompressionStage> goals) {
-        private static ScalePlan single(final ServerSubLevel subLevel, final CompressionStage stage) {
-            return new ScalePlan(false, true, Map.of(subLevel.getUniqueId(), stage));
+    public record ScalePlan(boolean welded, boolean allowed, Map<UUID, Double> goals) {
+        private static ScalePlan single(final ServerSubLevel subLevel, final double scale) {
+            return new ScalePlan(false, true, Map.of(subLevel.getUniqueId(), scale));
         }
 
         private static ScalePlan blocked(final boolean welded) {

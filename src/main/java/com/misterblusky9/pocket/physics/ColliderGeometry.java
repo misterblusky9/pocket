@@ -386,7 +386,7 @@ public final class ColliderGeometry {
     }
 
     private static boolean validScale(final double scale) {
-        return Double.isFinite(scale) && scale > 0.0D && scale <= 1.0D;
+        return Double.isFinite(scale) && scale > 0.0D && scale <= com.misterblusky9.pocket.PocketSized.MAX_SCALE;
     }
 
     private static int floor(final double value) {

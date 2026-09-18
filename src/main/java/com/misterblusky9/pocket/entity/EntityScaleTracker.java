@@ -1,15 +1,19 @@
 package com.misterblusky9.pocket.entity;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.compression.SelfCompressionSessions;
 import com.misterblusky9.pocket.config.PocketServerConfig;
+import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.decoration.HangingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.Vec3;
@@ -69,6 +73,14 @@ public final class EntityScaleTracker {
         }
 
         if (entity instanceof Projectile) {
+            STATES.remove(entity);
+            if (PehkuiScaleBridge.ownsScaling()) {
+                PehkuiScaleBridge.clear(entity);
+            }
+            return;
+        }
+
+        if (isPocketCaseItem(entity)) {
             STATES.remove(entity);
             if (PehkuiScaleBridge.ownsScaling()) {
                 PehkuiScaleBridge.clear(entity);
@@ -248,7 +260,9 @@ public final class EntityScaleTracker {
         if (state == null || !state.personalScaleOwned) return;
         if (player.level().isClientSide) return;
 
-        PehkuiScaleBridge.snapPersonalScale(player, 1.0D);
+        PehkuiScaleBridge.snapPersonalScale(player, player instanceof final ServerPlayer serverPlayer
+                ? SelfCompressionSessions.currentScale(serverPlayer)
+                : 1.0D);
         state.personalScaleOwned = false;
         state.personalScale = 1.0D;
     }
@@ -321,6 +335,12 @@ public final class EntityScaleTracker {
     public static boolean isContained(final Entity entity) {
         final SubLevel containing = Sable.HELPER.getContaining(entity);
         return containing != null && !containing.isRemoved();
+    }
+
+    private static boolean isPocketCaseItem(final Entity entity) {
+        return entity instanceof final ItemEntity item
+                && item.getItem().getItem() instanceof PocketCaseItem
+                && PocketCaseItem.isFilled(item.getItem());
     }
 
     private static void syncPehkui(final Entity entity, final State state) {
@@ -431,7 +451,7 @@ public final class EntityScaleTracker {
 
     private static double sanitize(final double scale) {
         if (!Double.isFinite(scale) || scale <= 0.0D) return 1.0D;
-        return Math.max(PocketSized.MIN_SCALE, Math.min(1.0D, scale));
+        return PocketSized.clampScale(scale);
     }
 
     private enum Mode {

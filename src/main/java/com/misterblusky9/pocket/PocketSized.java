@@ -26,8 +26,16 @@ public final class PocketSized {
     public static final String MOD_ID = "pocket";
     public static final String MOD_NAME = "Create: Pocket Sized";
 
-    public static final double MIN_SCALE = 1.0D / 16.0D;
-    public static final double MAX_SCALE = 1.0D;
+    public static final double MIN_SCALE = 1.0D / 64.0D;
+    public static final double MAX_SCALE = 32.0D;
+    public static final double EXPERIMENTAL_MIN_SCALE = 1.0D / 32.0D;
+    public static final double EXPERIMENTAL_MAX_SCALE = 4.0D;
+    public static final double CREATIVE_MIN_SCALE = 1.0D / 16.0D;
+    public static final double CREATIVE_MAX_SCALE = 2.0D;
+    public static final double SURVIVAL_MIN_SCALE = 1.0D / 16.0D;
+    public static final double SURVIVAL_MAX_SCALE = 2.0D;
+    public static final double STANDARD_MAX_SCALE = 2.0D;
+    public static final double FULL_SCALE = 1.0D;
     public static final double EPSILON = 1.0E-6D;
 
     public static final int MAX_COMPRESSED_BLOCKS = 1_048_576;
@@ -59,7 +67,15 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(CannonDeploymentQueue::onServerTick);
         NeoForge.EVENT_BUS.addListener(PocketPerformanceLimits::onBlockPlaced);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.CompressionSessions::onServerTick);
-        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.SelfCompressionSessions::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.EntityCompressionSessions::onServerTick);
+    }
+
+    public static double clampCreativeScale(final double scale) {
+        return Math.max(CREATIVE_MIN_SCALE, Math.min(CREATIVE_MAX_SCALE, scale));
+    }
+
+    public static double clampExperimentalScale(final double scale) {
+        return Math.max(EXPERIMENTAL_MIN_SCALE, Math.min(EXPERIMENTAL_MAX_SCALE, scale));
     }
 
     public static double clampScale(final double scale) {

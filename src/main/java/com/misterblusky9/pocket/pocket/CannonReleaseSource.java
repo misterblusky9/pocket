@@ -3,6 +3,8 @@ package com.misterblusky9.pocket.pocket;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleCommandSource;
 import com.misterblusky9.pocket.scale.ScaleController;
+import com.misterblusky9.pocket.scale.ScaleLimits;
+import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.server.level.ServerLevel;
 import dev.ryanhcode.sable.companion.math.BoundingBox3dc;
@@ -22,6 +24,7 @@ public final class CannonReleaseSource implements ScaleCommandSource {
     private final long expiresAt;
     private final Vector3d anchorLocal;
     private final CannonExpansionMode mode;
+    private final double pocketedScale;
     private boolean released;
     private String jam = "";
 
@@ -33,7 +36,8 @@ public final class CannonReleaseSource implements ScaleCommandSource {
             final long timeoutTick,
             final long expiresAt,
             final Vector3d anchorLocal,
-            final CannonExpansionMode mode
+            final CannonExpansionMode mode,
+            final double pocketedScale
     ) {
         this.level = level;
         this.subLevel = subLevel;
@@ -43,6 +47,7 @@ public final class CannonReleaseSource implements ScaleCommandSource {
         this.expiresAt = expiresAt;
         this.anchorLocal = anchorLocal;
         this.mode = mode;
+        this.pocketedScale = pocketedScale;
     }
 
     public static void arm(
@@ -76,7 +81,8 @@ public final class CannonReleaseSource implements ScaleCommandSource {
                 timeoutTick,
                 expiresAt,
                 new Vector3d(subLevel.logicalPose().rotationPoint()),
-                mode
+                mode,
+                ScaleState.getSettledScale(subLevel)
         );
         ScaleController.registerExternalCommandUntil(subLevel, source, expiresAt);
     }
@@ -85,15 +91,18 @@ public final class CannonReleaseSource implements ScaleCommandSource {
     public Vector3d anchorLocalPoint() { return new Vector3d(this.anchorLocal); }
 
     @Override
-    public CompressionStage commandedStage() {
-        if (this.released) return CompressionStage.NORMAL;
+    public ScaleLimits scaleLimits() { return ScaleLimits.CANNON_RELEASE; }
+
+    @Override
+    public double commandedScale() {
+        if (this.released) return CompressionStage.NORMAL.scale();
 
         if (this.level.getGameTime() >= this.timeoutTick || readyToUnfold()) {
             this.released = true;
-            return CompressionStage.NORMAL;
+            return CompressionStage.NORMAL.scale();
         }
 
-        return CompressionStage.SIXTEENTH;
+        return this.pocketedScale;
     }
 
     private boolean readyToUnfold() {

@@ -51,6 +51,18 @@ public final class MoonCompressionSessions {
             final boolean growingIntent
     ) {
         if (player == null || floor == null || hit == null) return false;
+        MoonLightLag.hold(player, floor, hand, hit, growingIntent);
+        return true;
+    }
+
+    static boolean deliverHold(
+            final ServerPlayer player,
+            final CompressionStage floor,
+            final InteractionHand hand,
+            final MoonTargeting.Hit hit,
+            final boolean growingIntent
+    ) {
+        if (player == null || floor == null || hit == null) return false;
         if (reboundActive && reboundServer == player.serverLevel().getServer()) return true;
         final long now = player.level().getGameTime();
         refreshNefarioTimer(player.serverLevel().getServer(), floor, now);
@@ -89,19 +101,19 @@ public final class MoonCompressionSessions {
     }
 
     public static boolean renew(final ServerPlayer player, final CompressionStage floor) {
-        if (player == null || session == null) return false;
-        if (!session.holder.equals(player.getUUID()) || session.autoRelease) return false;
-        if (floor != null && session.floor != floor) {
-            end(session, true);
-            return false;
-        }
-        final long now = player.level().getGameTime();
-        refreshNefarioTimer(player.serverLevel().getServer(), floor, now);
-        session.lastHeldTick = now;
-        return true;
+        return MoonLightLag.renew(player, floor);
     }
 
     public static void instant(
+            final ServerPlayer player,
+            final CompressionStage stage,
+            final MoonTargeting.Hit hit
+    ) {
+        if (player == null || stage == null || hit == null) return;
+        MoonLightLag.instant(player, stage, hit);
+    }
+
+    static void deliverInstant(
             final ServerPlayer player,
             final CompressionStage stage,
             final MoonTargeting.Hit hit
@@ -149,6 +161,20 @@ public final class MoonCompressionSessions {
     }
 
     public static void release(final ServerPlayer player) {
+        MoonLightLag.release(player);
+    }
+
+    public static void reset() {
+        MoonLightLag.clear(null);
+        deliverRelease(null);
+    }
+
+    public static void abandon(final ServerPlayer player) {
+        MoonLightLag.clear(player);
+        deliverRelease(player);
+    }
+
+    static void deliverRelease(final ServerPlayer player) {
         if (session == null) return;
         if (player != null && !session.holder.equals(player.getUUID())) return;
         end(session, true);
@@ -157,6 +183,7 @@ public final class MoonCompressionSessions {
     @SubscribeEvent
     public static void onServerTick(final ServerTickEvent.Post event) {
         if (reboundServer != null && reboundServer != event.getServer()) clearRebound();
+        MoonLightLag.tick(event.getServer());
         MoonScale.tick(event.getServer());
         tickRebound(event.getServer());
 
@@ -187,7 +214,7 @@ public final class MoonCompressionSessions {
 
         if (!session.sealed) {
             if (session.levititeCost > 0 && !drawLevitite(session, holder)) {
-                holder.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
+                holder.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
                 return false;
             }
 

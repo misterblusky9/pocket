@@ -200,7 +200,7 @@ public final class HotGlueGunClient {
 
     private static void renderPreview(final Minecraft minecraft, final CrossScaleWelds.Weld weld) {
         final int color = weld.check().allowed() ? SimColors.SUCCESS_LIME : SimColors.NUH_UH_RED;
-        final float lineWidth = (float) (PocketSized.clampScale(weld.smallStage().scale()) / 16.0D);
+        final float lineWidth = (float) (PocketSized.clampScale(weld.smallScale()) / 16.0D);
         final boolean sourceIsSmall = weld.startedSmall(firstPos);
         final Quaterniond orientation = CrossScaleWelds.weldOrientation(weld, rotationTurns);
         final double cell = sourceIsSmall ? weld.bigSpan() : 1.0D / weld.bigSpan();

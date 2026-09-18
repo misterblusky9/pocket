@@ -18,14 +18,16 @@ public final class ModCreativeTabs {
                     .title(Component.translatable("itemGroup.pocket"))
                     .icon(() -> CompressionGunTank.filled(new ItemStack(ModItems.COMPRESSION_GUN.get())))
                     .displayItems((parameters, output) -> {
-                        output.accept(ModItems.COMPRESSION_GUN.get());
                         output.accept(CompressionGunTank.filled(new ItemStack(ModItems.COMPRESSION_GUN.get())));
-                        output.accept(ModItems.PEARLESCENT_COMPRESSION_GUN.get());
                         output.accept(CompressionGunTank.filled(new ItemStack(ModItems.PEARLESCENT_COMPRESSION_GUN.get())));
                         output.accept(ModItems.CREATIVE_SHRINK_RAY.get());
                         output.accept(ModItems.POCKET_KNIFE.get());
                         output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.STATIC_SUBSPACE_COMPRESSOR.get());
+                        if (com.misterblusky9.pocket.entity.PehkuiScaleBridge.ownsScaling()) {
+                            output.accept(CompressionGunTank.filled(
+                                    new ItemStack(ModItems.SELF_RESIZE_DEVICE.get()), SelfResizeDeviceItem.CAPACITY));
+                        }
                         output.accept(ModItems.EMPTY_BOX.get());
                         output.accept(ModItems.DISPLAY_BOTTLE.get());
                         output.accept(ModItems.BRASS_DISPLAY_CASE.get());

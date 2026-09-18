@@ -28,40 +28,36 @@ public final class ScaleState {
     public static ServerState serverState(final ServerSubLevel subLevel) {
         return SERVER.computeIfAbsent(subLevel.getUniqueId(), ignored -> {
             final double initial = PocketSized.clampScale(subLevel.logicalPose().scale().x());
-            final CompressionStage stage = CompressionStage.nearest(initial);
-            return new ServerState(initial, stage, stage, null);
+            return new ServerState(initial, initial, initial, NO_TRANSITION);
         });
     }
 
     public static ServerState restoreServerState(
             final ServerSubLevel subLevel,
             final double current,
-            final CompressionStage stableStage,
-            final CompressionStage requestedStage,
-            final CompressionStage transitionStage
+            final double stableScale,
+            final double requestedScale,
+            final double transitionScale
     ) {
+        final double clamped = PocketSized.clampScale(current);
         final ServerState state = new ServerState(
-                PocketSized.clampScale(current),
-                stableStage == null ? CompressionStage.nearest(current) : stableStage,
-                requestedStage == null ? CompressionStage.nearest(current) : requestedStage,
-                transitionStage
+                clamped,
+                validOr(stableScale, clamped),
+                validOr(requestedScale, clamped),
+                PocketSized.isValidScale(transitionScale)
+                        ? PocketSized.clampScale(transitionScale)
+                        : NO_TRANSITION
         );
         SERVER.put(subLevel.getUniqueId(), state);
         return state;
     }
 
-    public static ServerState restoreServerState(
-            final ServerSubLevel subLevel,
-            final double current,
-            final double oldTarget
-    ) {
-        return restoreServerState(
-                subLevel,
-                current,
-                CompressionStage.nearest(current),
-                CompressionStage.nearest(oldTarget),
-                null
-        );
+    public static ServerState restoreSettledState(final ServerSubLevel subLevel, final double scale) {
+        return restoreServerState(subLevel, scale, scale, scale, NO_TRANSITION);
+    }
+
+    private static double validOr(final double scale, final double fallback) {
+        return PocketSized.isValidScale(scale) ? PocketSized.clampScale(scale) : fallback;
     }
 
     public static boolean hasServerState(final UUID id) {
@@ -71,14 +67,22 @@ public final class ScaleState {
     public static boolean isSettled(final UUID id) {
         if (id == null) return true;
         final ServerState state = SERVER.get(id);
-        return state == null || state.transitionStage() == null;
+        return state == null || !state.transitioning();
     }
 
     public static boolean isSettled(final SubLevel subLevel) {
         if (subLevel == null) return true;
         if (subLevel instanceof final ServerSubLevel server) return isSettled(server.getUniqueId());
-        final double scale = getScale(subLevel);
-        return Math.abs(scale - CompressionStage.nearest(scale).scale()) <= PocketSized.EPSILON;
+        if (subLevel instanceof final ClientSubLevel client) {
+            final UUID id = client.getUniqueId();
+            return !hasClientSnapshot(id)
+                    || Math.abs(getClientScale(client) - getClientTarget(id)) <= PocketSized.EPSILON;
+        }
+        return true;
+    }
+
+    public static boolean isAt(final SubLevel subLevel, final double scale) {
+        return isSettled(subLevel) && Math.abs(getSettledScale(subLevel) - scale) <= PocketSized.EPSILON;
     }
 
     public static java.util.Set<UUID> trackedIds() {
@@ -96,10 +100,21 @@ public final class ScaleState {
         return subLevel.logicalPose().scale().x();
     }
 
+    public static double getSettledScale(final SubLevel subLevel) {
+        if (subLevel instanceof final ServerSubLevel server) {
+            final ServerState state = server.getUniqueId() == null ? null : SERVER.get(server.getUniqueId());
+            return state == null ? getServerScale(server) : state.stableScale();
+        }
+        if (subLevel instanceof final ClientSubLevel client && hasClientSnapshot(client.getUniqueId())) {
+            return getClientTarget(client.getUniqueId());
+        }
+        return getScale(subLevel);
+    }
+
     public static CompressionStage getStage(final SubLevel subLevel) {
         if (subLevel instanceof final ServerSubLevel server) {
             final ServerState state = SERVER.get(server.getUniqueId());
-            if (state != null && state.transitionStage == null) return state.stableStage;
+            if (state != null && !state.transitioning()) return CompressionStage.nearest(state.stableScale());
         }
         return CompressionStage.nearest(getScale(subLevel));
     }
@@ -285,11 +300,13 @@ public final class ScaleState {
         }
     }
 
+    public static final double NO_TRANSITION = Double.NaN;
+
     public static final class ServerState {
         private double currentScale;
-        private CompressionStage stableStage;
-        private CompressionStage requestedStage;
-        private CompressionStage transitionStage;
+        private double stableScale;
+        private double requestedScale;
+        private double transitionScale;
 
         private double transitionFrom;
         private int transitionTicks;
@@ -299,58 +316,63 @@ public final class ScaleState {
 
         private ServerState(
                 final double currentScale,
-                final CompressionStage stableStage,
-                final CompressionStage requestedStage,
-                final CompressionStage transitionStage
+                final double stableScale,
+                final double requestedScale,
+                final double transitionScale
         ) {
             this.currentScale = PocketSized.clampScale(currentScale);
-            this.stableStage = stableStage;
-            this.requestedStage = requestedStage;
-            this.transitionStage = transitionStage;
+            this.stableScale = stableScale;
+            this.requestedScale = requestedScale;
+            this.transitionScale = transitionScale;
             this.transitionFrom = this.currentScale;
         }
 
         public double currentScale() { return this.currentScale; }
-        public CompressionStage stableStage() { return this.stableStage; }
-        public CompressionStage requestedStage() { return this.requestedStage; }
-        public CompressionStage transitionStage() { return this.transitionStage; }
+        public double stableScale() { return this.stableScale; }
+        public double requestedScale() { return this.requestedScale; }
+        public double transitionScale() { return this.transitionScale; }
+        public boolean transitioning() { return !Double.isNaN(this.transitionScale); }
+        public double goalScale() { return transitioning() ? this.transitionScale : this.stableScale; }
         public double transitionFrom() { return this.transitionFrom; }
         public int transitionTicks() { return this.transitionTicks; }
         public double transitionSpeedFactor() { return this.transitionSpeedFactor; }
         public boolean needsPersistence() { return this.persistenceDirty; }
         public void tickTransition() { this.transitionTicks++; }
 
-        public void beginTransition(final CompressionStage stage, final double fromScale) {
-            beginTransition(stage, fromScale, 1.0D);
+        public void beginTransition(final double scale, final double fromScale) {
+            beginTransition(scale, fromScale, 1.0D);
         }
 
         public void beginTransition(
-                final CompressionStage stage,
+                final double scale,
                 final double fromScale,
                 final double speedFactor
         ) {
-            this.transitionStage = stage;
+            this.transitionScale = PocketSized.clampScale(scale);
             this.transitionFrom = PocketSized.clampScale(fromScale);
             this.transitionTicks = 0;
             this.transitionSpeedFactor = speedFactor;
             this.persistenceDirty = true;
         }
 
+        public void endTransition() {
+            if (!transitioning()) return;
+            this.transitionScale = NO_TRANSITION;
+            this.transitionSpeedFactor = 1.0D;
+            this.persistenceDirty = true;
+        }
+
         public void currentScale(final double value) { this.currentScale = PocketSized.clampScale(value); }
-        public void stableStage(final CompressionStage value) {
-            if (this.stableStage == value) return;
-            this.stableStage = value;
+        public void stableScale(final double value) {
+            final double clamped = PocketSized.clampScale(value);
+            if (Double.compare(this.stableScale, clamped) == 0) return;
+            this.stableScale = clamped;
             this.persistenceDirty = true;
         }
-        public void requestedStage(final CompressionStage value) {
-            if (this.requestedStage == value) return;
-            this.requestedStage = value;
-            this.persistenceDirty = true;
-        }
-        public void transitionStage(final CompressionStage value) {
-            if (this.transitionStage == value) return;
-            if (value == null) this.transitionSpeedFactor = 1.0D;
-            this.transitionStage = value;
+        public void requestedScale(final double value) {
+            final double clamped = PocketSized.clampScale(value);
+            if (Double.compare(this.requestedScale, clamped) == 0) return;
+            this.requestedScale = clamped;
             this.persistenceDirty = true;
         }
         public void markPersisted() { this.persistenceDirty = false; }

@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.physics;
 
+import com.misterblusky9.pocket.PocketSized;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -99,7 +100,7 @@ public final class ColliderDetail {
 
     public static long estimateFragments(final List<PlotShape.Box> boxes, final double scale) {
         if (boxes == null) return 0L;
-        final double bounded = scale > 0.0D && scale <= 1.0D ? scale : 1.0D;
+        final double bounded = scale > 0.0D && scale <= PocketSized.MAX_SCALE ? scale : 1.0D;
         long total = 0L;
         for (final PlotShape.Box box : boxes) {
             final long x = spanCells(box.maxX() - box.minX(), bounded);

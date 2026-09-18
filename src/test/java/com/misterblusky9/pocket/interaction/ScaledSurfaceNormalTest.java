@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.interaction;
 
+import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.scale.CompressionStage;
 
 public final class ScaledSurfaceNormalTest {
@@ -8,17 +9,19 @@ public final class ScaledSurfaceNormalTest {
     public static void main(final String[] args) {
         theSubLevelScaleIsReadBackFromTheNormal();
         everyStageAmplifiesByTheInverseScale();
+        theWholeBandAmplifiesByTheInverseScale();
+        grownSubLevelsReportNormalsLongerThanUnit();
         unscaledNormalsAreLeftAlone();
         degenerateAndNonFiniteNormalsPassThrough();
         directionSurvivesRescaling();
-        System.out.println("ScaledSurfaceNormalTest: PASS (" + CompressionStage.values().length + " stages)");
+        System.out.println("ScaledSurfaceNormalTest: PASS ("
+                + CompressionStage.values().length + " stages, " + band().length + " band scales)");
     }
 
     private static void theSubLevelScaleIsReadBackFromTheNormal() {
-        for (final CompressionStage stage : CompressionStage.values()) {
-            final double scale = stage.scale();
+        for (final double scale : band()) {
             check(Math.abs(ScaledSurfaceNormal.subLevelScaleOf(0.0D, scale, 0.0D) - scale) <= TOLERANCE,
-                    "stage " + stage.label() + " did not report its own scale");
+                    "scale " + scale + " did not report its own scale");
         }
 
         check(ScaledSurfaceNormal.subLevelScaleOf(0.0D, 0.0D, 0.0D) == 1.0D,
@@ -49,6 +52,44 @@ public final class ScaledSurfaceNormalTest {
         }
     }
 
+    private static void theWholeBandAmplifiesByTheInverseScale() {
+        for (final double scale : band()) {
+            final double expected = 1.0D / scale;
+
+            for (final double[] axis : axes()) {
+                final double[] scaled = { axis[0] * scale, axis[1] * scale, axis[2] * scale };
+                check(ScaledSurfaceNormal.needsRescale(scaled[0], scaled[1], scaled[2])
+                                == (Math.abs(scale - 1.0D) > PocketSized.EPSILON),
+                        "scale " + scale + " misjudged whether the normal needed rescaling");
+
+                final double[] result = ScaledSurfaceNormal.perWorldBlock(scaled[0], scaled[1], scaled[2]);
+                check(Math.abs(length(result) - expected) <= TOLERANCE,
+                        "scale " + scale + " produced length " + length(result) + ", wanted " + expected);
+
+                for (int i = 0; i < 3; i++) {
+                    check(Math.abs(result[i] - axis[i] * expected) <= TOLERANCE,
+                            "scale " + scale + " moved the normal off its axis");
+                }
+            }
+        }
+    }
+
+    private static void grownSubLevelsReportNormalsLongerThanUnit() {
+        for (final double scale : new double[] { 1.5D, 2.0D, 4.0D, PocketSized.MAX_SCALE }) {
+            final double[] raw = { scale, 0.0D, 0.0D };
+            check(length(raw) > 1.0D, "a grown sublevel must hand back a normal longer than unit");
+            check(ScaledSurfaceNormal.needsRescale(raw[0], raw[1], raw[2]),
+                    "a grown sublevel normal at " + scale + " was left unrescaled");
+
+            final double[] result = ScaledSurfaceNormal.perWorldBlock(raw[0], raw[1], raw[2]);
+            check(length(result) < 1.0D,
+                    "growth must shorten the per-world-block normal, got " + length(result));
+            check(Math.abs(length(result) - 1.0D / scale) <= TOLERANCE,
+                    "growth at " + scale + " did not land on the inverse scale");
+            check(result[0] > 0.0D, "growth flipped the normal");
+        }
+    }
+
     private static void unscaledNormalsAreLeftAlone() {
         for (final double[] axis : axes()) {
             check(!ScaledSurfaceNormal.needsRescale(axis[0], axis[1], axis[2]),
@@ -71,15 +112,35 @@ public final class ScaledSurfaceNormalTest {
     }
 
     private static void directionSurvivesRescaling() {
-        final double scale = CompressionStage.SIXTEENTH.scale();
-        final double expected = 1.0D / scale;
-        final double[] result = ScaledSurfaceNormal.perWorldBlock(-0.6D * scale, 0.0D, 0.8D * scale);
+        for (final double scale : band()) {
+            final double expected = 1.0D / scale;
+            final double[] result = ScaledSurfaceNormal.perWorldBlock(-0.6D * scale, 0.0D, 0.8D * scale);
 
-        check(Math.abs(result[0] + 0.6D * expected) <= TOLERANCE
-                        && Math.abs(result[2] - 0.8D * expected) <= TOLERANCE,
-                "rescaling flipped or skewed a diagonal normal");
-        check(Math.abs(length(result) - expected) <= TOLERANCE,
-                "a diagonal normal did not come back at the inverse scale");
+            check(Math.abs(result[0] + 0.6D * expected) <= TOLERANCE
+                            && Math.abs(result[2] - 0.8D * expected) <= TOLERANCE,
+                    "rescaling flipped or skewed a diagonal normal at " + scale);
+            check(Math.abs(length(result) - expected) <= TOLERANCE,
+                    "a diagonal normal at " + scale + " did not come back at the inverse scale");
+        }
+    }
+
+    private static double[] band() {
+        return new double[] {
+                PocketSized.MAX_SCALE,
+                PocketSized.EXPERIMENTAL_MAX_SCALE,
+                PocketSized.CREATIVE_MAX_SCALE,
+                1.5D,
+                PocketSized.FULL_SCALE,
+                0.75D,
+                0.5D,
+                1.0D / 3.0D,
+                0.3D,
+                0.25D,
+                0.125D,
+                PocketSized.CREATIVE_MIN_SCALE,
+                PocketSized.EXPERIMENTAL_MIN_SCALE,
+                PocketSized.MIN_SCALE
+        };
     }
 
     private static double[][] axes() {

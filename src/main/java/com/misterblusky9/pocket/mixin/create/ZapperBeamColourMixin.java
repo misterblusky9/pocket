@@ -24,6 +24,15 @@ public abstract class ZapperBeamColourMixin {
     }
 
     @ModifyConstant(
+            method = "addBeam",
+            constant = @Constant(intValue = 10),
+            require = 1
+    )
+    private int pocket$impactParticleCount(final int original) {
+        return 3;
+    }
+
+    @ModifyConstant(
             method = "lambda$tick$1(Lcom/simibubi/create/content/equipment/zapper/ZapperRenderHandler$LaserBeam;)V",
             constant = @Constant(intValue = 0xFFFFFF),
             require = 1

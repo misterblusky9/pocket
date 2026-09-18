@@ -64,10 +64,11 @@ neoForge {
     runs {
         client1 {
             client()
+            devLogin = true
             gameDirectory = project.file("runs/client1")
 
             programArguments = [
-                    "--username", "Player1"
+                    "--username", "MisterBluSky"
             ]
 
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
@@ -272,7 +273,16 @@ tasks.register('weldSnapTest', JavaExec) {
     mainClass = 'com.misterblusky9.pocket.compat.WeldSnapTest'
 }
 
+tasks.register('genericConstraintStateTest', JavaExec) {
+    group = 'verification'
+    description = 'Checks moving constraint frames and limit replay across scale changes.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.misterblusky9.pocket.physics.GenericConstraintStateTest'
+}
+
 tasks.named('check') {
+    dependsOn tasks.named('genericConstraintStateTest')
     dependsOn tasks.named('scaleTransitionTest')
     dependsOn tasks.named('colliderBudgetTest')
     dependsOn tasks.named('scaleContractTest')

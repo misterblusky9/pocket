@@ -7,6 +7,8 @@ import com.misterblusky9.pocket.scale.ScaleState;
 import com.misterblusky9.pocket.scale.SubLevelParentage;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
+import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintConfiguration;
+import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintHandle;
 import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintConfiguration;
 import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
@@ -28,6 +30,8 @@ public final class ConstraintRefresh {
             PhysicsConstraintHandle handle,
             UUID bodyA,
             UUID bodyB,
+            PhysicsPipelineBody rawBodyA,
+            PhysicsPipelineBody rawBodyB,
             Vector3dc pivotA,
             Vector3dc pivotB,
             double scaleA,
@@ -57,8 +61,15 @@ public final class ConstraintRefresh {
 
         if (REPOINTING.get()) return;
 
+        if (handle instanceof final GenericConstraintState.Access access
+                && originalConfiguration instanceof final GenericConstraintConfiguration generic) {
+            access.pocket$trackGeneric(bodyA, bodyB, new GenericConstraintState(
+                    generic, pivotOf(bodyA), scaleOf(bodyA), pivotOf(bodyB), scaleOf(bodyB)));
+        }
+
         TRACKED.add(new Tracked(
                 handle, idA, idB,
+                idA == null ? bodyA : null, idB == null ? bodyB : null,
                 pivotOf(bodyA), pivotOf(bodyB),
                 scaleOf(bodyA), scaleOf(bodyB),
                 originalConfiguration == null ? null : ConstraintConfigurations.copy(originalConfiguration)));
@@ -106,10 +117,16 @@ public final class ConstraintRefresh {
                     continue;
                 }
 
-                if (!ConstraintConfigurations.anchorsWouldMove(
+                final PhysicsPipelineBody bodyA = bodyOf(container, tracked.bodyA(), tracked.rawBodyA());
+                final PhysicsPipelineBody bodyB = bodyOf(container, tracked.bodyB(), tracked.rawBodyB());
+                final GenericConstraintState generic = genericState(tracked);
+                final boolean moved = generic != null
+                        ? generic.anchorsWouldMove(pivotOf(bodyA), scaleOf(bodyA), pivotOf(bodyB), scaleOf(bodyB))
+                        : ConstraintConfigurations.anchorsWouldMove(
                         tracked.configuration(),
-                        bodyOf(container, tracked.bodyA()), tracked.pivotA(), tracked.scaleA(),
-                        bodyOf(container, tracked.bodyB()), tracked.pivotB(), tracked.scaleB())) {
+                        bodyA, tracked.pivotA(), tracked.scaleA(),
+                        bodyB, tracked.pivotB(), tracked.scaleB());
+                if (!moved) {
                     continue;
                 }
 
@@ -123,20 +140,23 @@ public final class ConstraintRefresh {
     }
 
     private static void correct(final ServerSubLevelContainer container, final Tracked tracked) {
-        final PhysicsPipelineBody bodyA = bodyOf(container, tracked.bodyA());
-        final PhysicsPipelineBody bodyB = bodyOf(container, tracked.bodyB());
+        final PhysicsPipelineBody bodyA = bodyOf(container, tracked.bodyA(), tracked.rawBodyA());
+        final PhysicsPipelineBody bodyB = bodyOf(container, tracked.bodyB(), tracked.rawBodyB());
 
-        if (tracked.bodyA() != null && bodyA == null) return;
-        if (tracked.bodyB() != null && bodyB == null) return;
+        if ((tracked.bodyA() != null || tracked.rawBodyA() != null) && bodyA == null) return;
+        if ((tracked.bodyB() != null || tracked.rawBodyB() != null) && bodyB == null) return;
         if (bodyA == null && bodyB == null) return;
 
         final RepointableConstraint owned = (RepointableConstraint) tracked.handle();
         final PhysicsPipeline pipeline = container.physicsSystem().getPipeline();
+        final GenericConstraintState generic = genericState(tracked);
+        final PhysicsConstraintConfiguration<?> configuration = generic == null
+                ? tracked.configuration() : generic.configuration();
 
         PhysicsConstraintHandle replacement = null;
         REPOINTING.set(Boolean.TRUE);
         try {
-            replacement = pipeline.addConstraint(bodyA, bodyB, cast(tracked.configuration()));
+            replacement = pipeline.addConstraint(bodyA, bodyB, cast(configuration));
         } catch (final RuntimeException exception) {
             PocketTrace.warn(
                     "joint correction refused for bodyA={} bodyB={}: {}",
@@ -162,6 +182,11 @@ public final class ConstraintRefresh {
 
         RapierBridge.removeConstraint(scene, retired);
 
+        if (generic != null) {
+            ((GenericConstraintState.Access) tracked.handle()).pocket$trackGeneric(bodyA, bodyB, generic);
+            generic.bake(pivotOf(bodyA), scaleOf(bodyA), pivotOf(bodyB), scaleOf(bodyB));
+            generic.replayLimits((GenericConstraintHandle) tracked.handle());
+        }
         owned.pocket$replayMotors();
         owned.pocket$replayContacts();
 
@@ -169,6 +194,7 @@ public final class ConstraintRefresh {
             TRACKED.remove(tracked);
             TRACKED.add(new Tracked(
                     tracked.handle(), tracked.bodyA(), tracked.bodyB(),
+                    tracked.rawBodyA(), tracked.rawBodyB(),
                     pivotOf(bodyA), pivotOf(bodyB),
                     scaleOf(bodyA), scaleOf(bodyB), tracked.configuration()));
         }
@@ -181,8 +207,15 @@ public final class ConstraintRefresh {
         return (PhysicsConstraintConfiguration<T>) configuration;
     }
 
-    private static PhysicsPipelineBody bodyOf(final ServerSubLevelContainer container, final UUID id) {
-        if (id == null) return null;
+    private static GenericConstraintState genericState(final Tracked tracked) {
+        return tracked.handle() instanceof final GenericConstraintState.Access access
+                ? access.pocket$genericState() : null;
+    }
+
+    private static PhysicsPipelineBody bodyOf(
+            final ServerSubLevelContainer container, final UUID id, final PhysicsPipelineBody rawBody
+    ) {
+        if (id == null) return rawBody != null && !rawBody.isRemoved() ? rawBody : null;
         return container.getSubLevel(id) instanceof final ServerSubLevel subLevel && !subLevel.isRemoved()
                 ? subLevel
                 : null;
@@ -198,6 +231,8 @@ public final class ConstraintRefresh {
             return false;
         }
         if (owned.pocket$isKnownRemoved() || !owned.pocket$isSceneLive()) return false;
+        if (tracked.rawBodyA() != null && tracked.rawBodyA().isRemoved()) return false;
+        if (tracked.rawBodyB() != null && tracked.rawBodyB().isRemoved()) return false;
 
         final boolean valid = tracked.handle().isValid();
         if (!valid) owned.pocket$markRemoved();

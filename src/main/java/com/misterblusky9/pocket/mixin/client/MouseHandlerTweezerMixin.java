@@ -80,9 +80,10 @@ public abstract class MouseHandlerTweezerMixin {
         }
         if (subLevel == null || subLevel.getPlot() == null) return false;
 
-        final double scale = ScaleState.getScale(subLevel);
-        if (Math.abs(scale - PocketSized.MIN_SCALE) > QUILL_SCALE_TOLERANCE
-                || ScaleState.getStage(subLevel) != CompressionStage.SIXTEENTH) {
+        final double settled = ScaleState.getSettledScale(subLevel);
+        if (settled > CompressionStage.SIXTEENTH.scale() + QUILL_SCALE_TOLERANCE
+                || Math.abs(ScaleState.getScale(subLevel) - settled) > QUILL_SCALE_TOLERANCE
+                || !ScaleState.isAt(subLevel, settled)) {
             return false;
         }
 

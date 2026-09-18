@@ -8,6 +8,7 @@ import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ManualScaleOverride;
 import com.misterblusky9.pocket.scale.ScaleCommandSource;
+import com.misterblusky9.pocket.scale.ScaleLimits;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor;
@@ -69,7 +70,7 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
 
         final UUID id = subLevel.getUniqueId();
         final boolean settled = ScaleState.isSettled(id);
-        final CompressionStage current = ScaleState.getStage(subLevel);
+        final double current = ScaleState.getSettledScale(subLevel);
 
         if (!this.operational) {
             this.commandedTarget = null;
@@ -89,8 +90,8 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
         if (this.sealed) {
             this.commandedTarget = this.desiredStage;
 
-            final boolean growing = this.desiredStage.depth() < current.depth();
-            if (this.fieldActive && current != this.desiredStage && growing != this.lastFieldGrowing) {
+            final boolean growing = this.desiredStage.scale() > current;
+            if (this.fieldActive && !ScaleState.isAt(subLevel, this.desiredStage.scale()) && growing != this.lastFieldGrowing) {
                 CompressionSyncPayload.sendMachineBegin(
                         subLevel,
                         this.worldPosition,
@@ -100,20 +101,20 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
                 this.lastFieldGrowing = growing;
             }
 
-            if (settled && current == this.desiredStage) finishJob();
+            if (settled && ScaleState.isAt(subLevel, this.desiredStage.scale())) finishJob();
             return;
         }
 
         if (!settled) return;
 
-        if (current == this.desiredStage) {
+        if (ScaleState.isAt(subLevel, this.desiredStage.scale())) {
             this.commandedTarget = null;
             releaseField();
             clearAcquisition();
             return;
         }
 
-        if (this.desiredStage.depth() > current.depth()) {
+        if (this.desiredStage.scale() < current) {
             final long now = subLevel.getLevel().getGameTime();
             final CompressionBlacklist.Result blocked = CompressionBlacklist.find(subLevel, now);
             if (blocked.blocked()) {
@@ -148,7 +149,7 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
 
     private void beginAcquisition(
             final ServerSubLevel subLevel,
-            final CompressionStage current,
+            final double current,
             final CompressionStage target
     ) {
         releaseField();
@@ -159,7 +160,7 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
         this.acquisitionTicks = CompressionSessions.estimateAcquireTicks(subLevel);
         this.fieldActive = true;
 
-        this.lastFieldGrowing = target.depth() < current.depth();
+        this.lastFieldGrowing = target.scale() > current;
         CompressionSyncPayload.sendMachineBegin(
                 subLevel,
                 this.worldPosition,
@@ -191,6 +192,11 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
     @Override
     public boolean stepwiseTransitions() {
         return true;
+    }
+
+    @Override
+    public ScaleLimits scaleLimits() {
+        return ScaleLimits.STANDARD;
     }
 
     @Override

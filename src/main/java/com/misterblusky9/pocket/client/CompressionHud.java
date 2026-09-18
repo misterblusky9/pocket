@@ -1,10 +1,9 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.moon.MoonTargeting;
-import com.misterblusky9.pocket.scale.CompressionStage;
-import com.misterblusky9.pocket.scale.ScaleState;
 import net.createmod.catnip.animation.AnimationTickHolder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -43,6 +42,14 @@ public final class CompressionHud {
         final int centreX = graphics.guiWidth() / 2;
         final int y = graphics.guiHeight() - HOTBAR_CLEARANCE;
 
+        final EntityCompressionTargeting.Target entityAim = EntityCompressionTargeting.find(player, range);
+        if (entityAim != null) {
+            drawCentred(
+                    graphics, font, ScaleReadout.of(entityAim.entity()),
+                    centreX, y, SCALE_COLOUR);
+            return;
+        }
+
         if (MoonTargeting.isLookingAtMoon(player, MoonScaleClient.get(), partialTick, range)) {
             final String moonStatus = moonStatus();
             if (moonStatus != null) {
@@ -53,7 +60,7 @@ public final class CompressionHud {
             drawCentred(
                     graphics,
                     font,
-                    CompressionStage.nearest(MoonScaleClient.get()).label(),
+                    ScaleReadout.moon(),
                     centreX,
                     y,
                     SCALE_COLOUR
@@ -72,7 +79,7 @@ public final class CompressionHud {
         }
 
         drawCentred(graphics, font,
-                CompressionStage.nearest(ScaleState.getClientScale(id)).label(),
+                ScaleReadout.of(aim.subLevel()),
                 centreX, y, SCALE_COLOUR);
     }
 

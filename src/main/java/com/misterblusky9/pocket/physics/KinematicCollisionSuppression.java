@@ -29,7 +29,7 @@ public final class KinematicCollisionSuppression {
             return false;
         }
 
-        return ScaleState.getServerScale(serverParent) < 1.0D - PocketSized.EPSILON;
+        return Math.abs(ScaleState.getServerScale(serverParent) - PocketSized.FULL_SCALE) > PocketSized.EPSILON;
     }
 
     public static synchronized void markSuppressed(final KinematicContraption contraption) {

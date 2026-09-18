@@ -34,11 +34,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ScaleController {
     private static final long EXTERNAL_COMMAND_TTL = 8L;
 
-    private static final double STEP_TICKS = 9.0D;
-
     private static final double REFERENCE_MASS = 5_000.0D;
     private static final double MIN_STEP_FACTOR = 0.20D;
     private static final double MAX_STEP_FACTOR = 1.50D;
+    private static final double RATIO_TOLERANCE = 1.0E-6D;
     private static final Map<UUID, ExternalCommand> EXTERNAL_COMMANDS = new ConcurrentHashMap<>();
 
     public static void registerExternalCommand(
@@ -98,24 +97,62 @@ public final class ScaleController {
             final boolean propagateJoints,
             final ScalePhysicsMode physicsMode
     ) {
-        if (subLevel == null || stage == null) return;
+        if (stage == null) return;
+        forceScale(subLevel, stage.scale(), gameTime, anchorLocalPoint, propagateJoints, physicsMode);
+    }
 
+    public static void forceScale(
+            final ServerSubLevel subLevel,
+            final double scale,
+            final long gameTime,
+            final Vector3d anchorLocalPoint,
+            final boolean propagateJoints
+    ) {
+        forceScale(subLevel, scale, gameTime, anchorLocalPoint, propagateJoints, ScalePhysicsMode.TRACKING);
+    }
+
+    public static void forceScale(
+            final ServerSubLevel subLevel,
+            final double scale,
+            final long gameTime,
+            final Vector3d anchorLocalPoint,
+            final boolean propagateJoints,
+            final ScalePhysicsMode physicsMode
+    ) {
+        forceScale(subLevel, scale, gameTime, anchorLocalPoint, propagateJoints, physicsMode, ScaleLimits.API);
+    }
+
+    public static void forceScale(
+            final ServerSubLevel subLevel,
+            final double scale,
+            final long gameTime,
+            final Vector3d anchorLocalPoint,
+            final boolean propagateJoints,
+            final ScalePhysicsMode physicsMode,
+            final ScaleLimits limits
+    ) {
+        if (subLevel == null || !PocketSized.isValidScale(scale)) return;
+
+        final double requested = CompressionStage.snap(scale);
         final ScalePhysicsMode effectiveMode =
                 physicsMode == null ? ScalePhysicsMode.TRACKING : physicsMode;
+        final ScaleLimits effectiveLimits = limits == null ? ScaleLimits.API : limits;
 
         if (!CrossScaleWelds.scaleCommandActive()) {
-            final CrossScaleWelds.ScalePlan plan = CrossScaleWelds.planScale(subLevel, stage, gameTime);
+            final CrossScaleWelds.ScalePlan plan =
+                    CrossScaleWelds.planScale(subLevel, requested, gameTime, effectiveLimits);
             if (plan.welded()) {
                 if (!plan.allowed()) return;
                 final ServerSubLevelContainer container = ServerSubLevelContainer.getContainer(subLevel.getLevel());
                 if (container == null) return;
 
-                if (propagateJoints) {
-                    JointScalePropagation.onCommanded(subLevel, stage, effectiveMode);
+                if (propagateJoints
+                        && !JointScalePropagation.onCommanded(subLevel, requested, effectiveMode, effectiveLimits)) {
+                    return;
                 }
 
-                final Map<ServerSubLevel, CompressionStage> members = new LinkedHashMap<>();
-                for (final Map.Entry<UUID, CompressionStage> entry : plan.goals().entrySet()) {
+                final Map<ServerSubLevel, Double> members = new LinkedHashMap<>();
+                for (final Map.Entry<UUID, Double> entry : plan.goals().entrySet()) {
                     if (!(container.getSubLevel(entry.getKey()) instanceof final ServerSubLevel member)
                             || member.isRemoved()) {
                         return;
@@ -125,15 +162,16 @@ public final class ScaleController {
 
                 CrossScaleWelds.beginScaleCommand();
                 try {
-                    for (final Map.Entry<ServerSubLevel, CompressionStage> entry : members.entrySet()) {
+                    for (final Map.Entry<ServerSubLevel, Double> entry : members.entrySet()) {
                         final ServerSubLevel member = entry.getKey();
-                        forceStage(
+                        forceScale(
                                 member,
                                 entry.getValue(),
                                 gameTime,
                                 member == subLevel ? anchorLocalPoint : null,
                                 false,
-                                effectiveMode);
+                                effectiveMode,
+                                effectiveLimits);
                     }
                 } finally {
                     CrossScaleWelds.endScaleCommand();
@@ -142,35 +180,35 @@ public final class ScaleController {
             }
         }
 
-        final CompressionStage effectiveStage = stage.isCompressed()
+        final double effectiveScale = compressed(requested)
                 && CompressionBlacklist.find(subLevel, gameTime).blocked()
-                ? CompressionStage.NORMAL
-                : stage;
+                ? PocketSized.FULL_SCALE
+                : requested;
 
         PocketTrace.scale(
-                "forceStage {} -> {} by {}", subLevel.getUniqueId(), effectiveStage, PocketTrace.caller());
+                "forceScale {} -> {} by {}", subLevel.getUniqueId(), effectiveScale, PocketTrace.caller());
 
-        ScalePhysicsTransitions.setMode(subLevel, effectiveMode);
-        if (propagateJoints && !SimulatedRopeScaleBoundary.blocksTransition(subLevel, effectiveStage.scale())) {
-            JointScalePropagation.onCommanded(subLevel, effectiveStage, effectiveMode);
+        if (propagateJoints && !SimulatedRopeScaleBoundary.blocksTransition(subLevel, effectiveScale)
+                && !JointScalePropagation.onCommanded(subLevel, effectiveScale, effectiveMode, effectiveLimits)) {
+            return;
         }
+        ScalePhysicsTransitions.setMode(subLevel, effectiveMode);
 
         final long expires = gameTime + 20L * 20L;
         registerExternalCommandUntil(
-                subLevel, new ForcedStageSource(subLevel, effectiveStage, expires, anchorLocalPoint), expires);
+                subLevel,
+                new ForcedScaleSource(subLevel, effectiveScale, expires, anchorLocalPoint, effectiveLimits),
+                expires);
         final ScaleState.ServerState state = ScaleState.serverState(subLevel);
-        state.requestedStage(effectiveStage);
+        state.requestedScale(effectiveScale);
     }
 
     public static void adoptRestoredScale(final ServerSubLevel subLevel, final double scale) {
-        final CompressionStage stage = CompressionStage.nearest(scale);
-        final double canonical = stage.scale();
+        final double canonical = CompressionStage.snap(scale);
         PocketTrace.scale(
-                "adoptRestoredScale {} requested={} canonical={} stage={}",
-                PocketTrace.context(subLevel), scale, canonical, stage);
-        final ScaleState.ServerState state = ScaleState.restoreServerState(
-                subLevel, canonical, stage, stage, null
-        );
+                "adoptRestoredScale {} requested={} canonical={}",
+                PocketTrace.context(subLevel), scale, canonical);
+        final ScaleState.ServerState state = ScaleState.restoreSettledState(subLevel, canonical);
         forcePoseScale(subLevel, canonical);
 
         if (!SubLevelPhysicsSystem.IN_PHYSICS_STEP) {
@@ -189,14 +227,12 @@ public final class ScaleController {
     }
 
     public static void adoptSplitScale(final ServerSubLevel subLevel, final double inheritedScale) {
-        final CompressionStage stage = CompressionStage.nearest(inheritedScale);
+        final double canonical = CompressionStage.snap(inheritedScale);
         PocketTrace.scale(
-                "adoptSplitScale {} inherited={} stage={}",
-                PocketTrace.context(subLevel), inheritedScale, stage);
-        final ScaleState.ServerState state = ScaleState.restoreServerState(
-                subLevel, stage.scale(), stage, stage, null
-        );
-        forcePoseScale(subLevel, stage.scale());
+                "adoptSplitScale {} inherited={} canonical={}",
+                PocketTrace.context(subLevel), inheritedScale, canonical);
+        final ScaleState.ServerState state = ScaleState.restoreSettledState(subLevel, canonical);
+        forcePoseScale(subLevel, canonical);
         subLevel.updateLastPose();
         ScalePersistence.persist(subLevel, state);
 
@@ -205,7 +241,7 @@ public final class ScaleController {
                 "deferred split collider refresh until normal physics tick {} bodyId={}",
                 PocketTrace.context(subLevel),
                 com.misterblusky9.pocket.physics.RapierBridge.bodyId(subLevel));
-        ScaleNetwork.sendScale(subLevel, stage.scale(), stage.scale(), true);
+        ScaleNetwork.sendScale(subLevel, canonical, canonical, true);
     }
 
     public static void tickServer(final ServerSubLevelContainer container) {
@@ -240,61 +276,52 @@ public final class ScaleController {
                 continue;
             }
 
-            if (!welded) {
-                final boolean couldBeCompressed = state.currentScale() < 1.0D - PocketSized.EPSILON
-                        || state.stableStage().isCompressed()
-                        || state.requestedStage().isCompressed()
-                        || state.transitionStage() != null && state.transitionStage().isCompressed()
-                        || choice != null && choice.stage().isCompressed();
-                if (couldBeCompressed) {
-                    final CompressionBlacklist.Result noShrink = CompressionBlacklist.find(
-                            subLevel, subLevel.getLevel().getGameTime());
-                    if (noShrink.blocked()) {
-                        if (choice != null) choice.source().setJamMessage(noShrink.message());
-                        choice = new CommandChoice(new NoShrinkSource(subLevel), CompressionStage.NORMAL);
-                    }
+            if (!welded && couldBeCompressed(state, choice)) {
+                final CompressionBlacklist.Result noShrink = CompressionBlacklist.find(
+                        subLevel, subLevel.getLevel().getGameTime());
+                if (noShrink.blocked()) {
+                    if (choice != null) choice.source().setJamMessage(noShrink.message());
+                    choice = new CommandChoice(new NoShrinkSource(subLevel), PocketSized.FULL_SCALE);
                 }
             }
 
-            if (choice != null) state.requestedStage(choice.stage());
+            if (choice != null) state.requestedScale(choice.scale());
 
             if (choice != null && !choice.source().stepwiseTransitions()
-                    && state.transitionStage() != null
-                    && state.transitionStage() != state.requestedStage()) {
+                    && state.transitioning()
+                    && !sameScale(state.transitionScale(), state.requestedScale())) {
                 state.beginTransition(
-                        state.requestedStage(),
+                        state.requestedScale(),
                         state.currentScale(),
                         choice.source().transitionSpeedFactor());
             }
 
-            if (state.transitionStage() == null && choice != null
-                    && state.stableStage() != state.requestedStage()) {
+            if (!state.transitioning() && choice != null
+                    && !sameScale(state.stableScale(), state.requestedScale())) {
                 beginNextStage(container, subLevel, state, choice);
             }
 
-            final CompressionStage activeTarget = state.transitionStage();
-            final double target = activeTarget == null
-                    ? state.stableStage().scale()
-                    : activeTarget.scale();
+            final boolean transitioning = state.transitioning();
+            final double target = state.goalScale();
             final double previous = state.currentScale();
             final double stepFactor = weldStepFactors.getOrDefault(
                     subLevel.getUniqueId(), rawStepFactorFor(subLevel));
-            final double computed = squeezeStep(subLevel, state, activeTarget, target, stepFactor);
+            final double computed = squeezeStep(subLevel, state, transitioning, target, stepFactor);
 
             final double next;
             if (PocketSized.isValidScale(computed)) {
                 next = computed;
             } else {
                 PocketTrace.warn(
-                        "rejected invalid computed scale {} (previous={} target={} stage={}) {}",
-                        computed, previous, target, activeTarget, PocketTrace.context(subLevel));
+                        "rejected invalid computed scale {} (previous={} target={} transitioning={}) {}",
+                        computed, previous, target, transitioning, PocketTrace.context(subLevel));
                 next = previous;
             }
             final boolean scaleChanged = Math.abs(next - previous) > PocketSized.EPSILON;
 
             final PhysicsPipeline tracePipeline = container.physicsSystem().getPipeline();
             if (scaleChanged) {
-                logScaleTransition(tracePipeline, subLevel, previous, next, activeTarget, choice);
+                logScaleTransition(tracePipeline, subLevel, previous, next, target, choice);
             }
 
             state.currentScale(next);
@@ -304,29 +331,27 @@ public final class ScaleController {
                 forcePoseScale(subLevel, next);
             }
 
-            final boolean reachedTarget = activeTarget != null
-                    && Math.abs(next - activeTarget.scale()) <= PocketSized.EPSILON;
+            final boolean reachedTarget = transitioning && Math.abs(next - target) <= PocketSized.EPSILON;
             if (reachedTarget) {
                 PocketTrace.scale(
-                        "stageSettled {} stage={} scale={}",
-                        PocketTrace.context(subLevel), activeTarget, activeTarget.scale());
-                state.currentScale(activeTarget.scale());
-                state.stableStage(activeTarget);
-                state.transitionStage(null);
-                forcePoseScale(subLevel, activeTarget.scale());
-                if (welded) CrossScaleWelds.restageWorldWelds(subLevel, activeTarget);
+                        "stageSettled {} scale={}", PocketTrace.context(subLevel), target);
+                state.currentScale(target);
+                state.stableScale(target);
+                state.endTransition();
+                forcePoseScale(subLevel, target);
+                if (welded) CrossScaleWelds.restageWorldWelds(subLevel, target);
                 if (choice != null) {
                     choice.source().clearJamMessage();
-                    choice.source().onTransitionCompleted(subLevel, activeTarget);
+                    choice.source().onTransitionCompleted(subLevel, target);
                 } else {
-                    state.requestedStage(activeTarget);
+                    state.requestedScale(target);
                 }
             }
 
             final boolean boundsChanged = ScaleState.serverBoundsChanged(subLevel);
             final PhysicsPipeline pipeline = container.physicsSystem().getPipeline();
 
-            if (next < 1.0D - PocketSized.EPSILON) {
+            if (!sameScale(next, PocketSized.FULL_SCALE)) {
                 KinematicCollisionSuppression.ensureSuppressed(subLevel, pipeline);
             } else {
                 KinematicCollisionSuppression.ensureRestored(subLevel, pipeline);
@@ -360,6 +385,22 @@ public final class ScaleController {
         }
     }
 
+    public static boolean sameScale(final double a, final double b) {
+        return Math.abs(a - b) <= PocketSized.EPSILON;
+    }
+
+    private static boolean compressed(final double scale) {
+        return scale < PocketSized.FULL_SCALE - PocketSized.EPSILON;
+    }
+
+    private static boolean couldBeCompressed(final ScaleState.ServerState state, final CommandChoice choice) {
+        return compressed(state.currentScale())
+                || compressed(state.stableScale())
+                || compressed(state.requestedScale())
+                || state.transitioning() && compressed(state.transitionScale())
+                || choice != null && compressed(choice.scale());
+    }
+
     private static Set<UUID> prepareWeldChoices(
             final ServerSubLevelContainer container,
             final CrossScaleWelds.WeldGraph graph,
@@ -391,23 +432,18 @@ public final class ScaleController {
             final ServerSubLevel subLevel,
             final long gameTime
     ) {
-        CommandChoice choice = commandSource(subLevel, gameTime);
+        final CommandChoice choice = commandSource(subLevel, gameTime);
         final boolean alreadyManaged = ScaleState.hasServerState(subLevel.getUniqueId());
         final boolean physicallyCompressed = ScaleState.isScaled(subLevel);
         if (choice == null && !alreadyManaged && !physicallyCompressed) return null;
 
         final ScaleState.ServerState state = ScaleState.serverState(subLevel);
-        final boolean couldBeCompressed = state.currentScale() < 1.0D - PocketSized.EPSILON
-                || state.stableStage().isCompressed()
-                || state.requestedStage().isCompressed()
-                || state.transitionStage() != null && state.transitionStage().isCompressed()
-                || choice != null && choice.stage().isCompressed();
-        if (!couldBeCompressed) return choice;
+        if (!couldBeCompressed(state, choice)) return choice;
 
         final CompressionBlacklist.Result noShrink = CompressionBlacklist.find(subLevel, gameTime);
         if (!noShrink.blocked()) return choice;
         if (choice != null) choice.source().setJamMessage(noShrink.message());
-        return new CommandChoice(new NoShrinkSource(subLevel), CompressionStage.NORMAL);
+        return new CommandChoice(new NoShrinkSource(subLevel), PocketSized.FULL_SCALE);
     }
 
     private static void normalizeWeldChoices(
@@ -430,7 +466,7 @@ public final class ScaleController {
                 continue;
             }
 
-            Integer delta = null;
+            double ratio = Double.NaN;
             ServerSubLevel driver = null;
             CommandChoice driverChoice = null;
             boolean conflict = false;
@@ -442,10 +478,10 @@ public final class ScaleController {
                     conflict = true;
                     break;
                 }
-                final int memberDelta = choice.stage().depth() - CrossScaleWelds.commandedDepth(member);
-                if (delta == null) {
-                    delta = memberDelta;
-                } else if (delta != memberDelta) {
+                final double memberRatio = choice.scale() / CrossScaleWelds.commandedScale(member);
+                if (Double.isNaN(ratio)) {
+                    ratio = memberRatio;
+                } else if (Math.abs(memberRatio / ratio - 1.0D) > RATIO_TOLERANCE) {
                     conflict = true;
                     break;
                 }
@@ -466,7 +502,8 @@ public final class ScaleController {
             }
 
             final CrossScaleWelds.ScalePlan plan = CrossScaleWelds.planScale(
-                    driver, driverChoice.stage(), driver.getLevel().getGameTime());
+                    driver, driverChoice.scale(), driver.getLevel().getGameTime(),
+                    driverChoice.source().scaleLimits());
             if (!plan.allowed()) {
                 jamSources(choices, component, CrossScaleWelds.SCALE_LIMIT);
                 component.forEach(choices::remove);
@@ -480,7 +517,7 @@ public final class ScaleController {
                     component.forEach(choices::remove);
                     break;
                 }
-                final CompressionStage goal = plan.goals().get(id);
+                final Double goal = plan.goals().get(id);
                 if (goal == null) {
                     jamSources(choices, component, CrossScaleWelds.SCALE_LIMIT);
                     component.forEach(choices::remove);
@@ -538,7 +575,7 @@ public final class ScaleController {
             final ServerSubLevel subLevel,
             final double oldScale,
             final double newScale,
-            final CompressionStage activeTarget,
+            final double target,
             final CommandChoice choice
     ) {
         if (!PocketTrace.SCALE) return;
@@ -551,7 +588,7 @@ public final class ScaleController {
                 PocketTrace.context(subLevel),
                 oldScale,
                 newScale,
-                activeTarget,
+                target,
                 subLevel.logicalPose().position(),
                 linear,
                 angular,
@@ -564,13 +601,13 @@ public final class ScaleController {
             final ScaleState.ServerState state,
             final CommandChoice choice
     ) {
-        final CompressionStage from = state.stableStage();
-        final CompressionStage to = choice.source().stepwiseTransitions()
-                ? from.stepToward(state.requestedStage())
-                : state.requestedStage();
-        if (to == from) return;
+        final double from = state.stableScale();
+        final double to = choice.source().stepwiseTransitions()
+                ? CompressionStage.stepToward(from, state.requestedScale())
+                : state.requestedScale();
+        if (sameScale(to, from)) return;
 
-        if (SimulatedRopeScaleBoundary.blocksTransition(subLevel, to.scale())) {
+        if (SimulatedRopeScaleBoundary.blocksTransition(subLevel, to)) {
             choice.source().setJamMessage("Remove rope before scaling");
             return;
         }
@@ -583,7 +620,7 @@ public final class ScaleController {
         choice.source().clearJamMessage();
         PocketTrace.scale(
                 "beginStage {} from={} to={} requested={} fromScale={}",
-                PocketTrace.context(subLevel), from, to, state.requestedStage(), state.currentScale());
+                PocketTrace.context(subLevel), from, to, state.requestedScale(), state.currentScale());
         state.beginTransition(to, state.currentScale(), choice.source().transitionSpeedFactor());
     }
 
@@ -597,7 +634,7 @@ public final class ScaleController {
 
     private static CommandChoice commandSource(final ServerSubLevel subLevel, final long gameTime) {
         ScaleCommandSource best = null;
-        CompressionStage deepest = CompressionStage.NORMAL;
+        double deepest = PocketSized.MAX_SCALE;
 
         final boolean suspended = ManualScaleOverride.isSuspended(subLevel.getUniqueId(), gameTime);
 
@@ -605,10 +642,10 @@ public final class ScaleController {
             if (!(actor instanceof final ScaleCommandSource source) || source.isRemoved()) continue;
             if (suspended && source.yieldsToManualOverride()) continue;
 
-            final CompressionStage command = source.commandedStage();
-            if (command == null) continue;
+            final double command = source.commandedScale();
+            if (!Double.isFinite(command)) continue;
 
-            if (best == null || command.depth() > deepest.depth()) {
+            if (best == null || command < deepest - PocketSized.EPSILON) {
                 best = source;
                 deepest = command;
             }
@@ -619,12 +656,12 @@ public final class ScaleController {
             if (external.source().isRemoved() || gameTime > external.validUntilTick()) {
                 EXTERNAL_COMMANDS.remove(subLevel.getUniqueId(), external);
             } else {
-                final CompressionStage externalStage =
+                final double externalScale =
                         suspended && external.source().yieldsToManualOverride()
-                                ? null
-                                : external.source().commandedStage();
-                if (externalStage != null) {
-                    return new CommandChoice(external.source(), externalStage);
+                                ? ScaleCommandSource.NO_COMMAND
+                                : external.source().commandedScale();
+                if (Double.isFinite(externalScale)) {
+                    return new CommandChoice(external.source(), externalScale);
                 }
             }
         }
@@ -634,7 +671,7 @@ public final class ScaleController {
         final PocketMetrics metrics = PocketMetrics.measureForCompression(subLevel, gameTime);
         if (metrics.blocks() > PocketSized.MAX_COMPRESSED_BLOCKS) {
             best.setJamMessage("Hard limit exceeded: " + metrics.blocks() + " blocks");
-            return new CommandChoice(best, CompressionStage.NORMAL);
+            return new CommandChoice(best, PocketSized.FULL_SCALE);
         }
 
         best.clearJamMessage();
@@ -644,31 +681,22 @@ public final class ScaleController {
     private static double squeezeStep(
             final ServerSubLevel subLevel,
             final ScaleState.ServerState state,
-            final CompressionStage activeTarget,
+            final boolean transitioning,
             final double target,
             final double stepFactor
     ) {
         final double current = state.currentScale();
         if (Math.abs(target - current) <= PocketSized.EPSILON) return target;
 
-        if (activeTarget == null) return target;
+        if (!transitioning) return target;
 
         state.tickTransition();
-
-        final double ticks = STEP_TICKS
-                / Math.max(0.05D,
-                        stepFactor * sanitizeSpeedFactor(state.transitionSpeedFactor()));
-        final double progress = Math.min(1.0D, state.transitionTicks() / Math.max(1.0D, ticks));
-        if (progress >= 1.0D) return target;
-
-        final double eased = 1.0D - (1.0D - progress) * (1.0D - progress);
-        final double from = state.transitionFrom();
-        return PocketSized.clampScale(from + (target - from) * eased);
-    }
-
-    private static double sanitizeSpeedFactor(final double factor) {
-        if (!Double.isFinite(factor) || factor <= 0.0D) return 1.0D;
-        return Math.min(4.0D, factor);
+        return ScaleTransitionCurve.interpolate(
+                state.transitionFrom(),
+                target,
+                state.transitionTicks(),
+                stepFactor * ScaleTransitionCurve.sanitizeSpeedFactor(state.transitionSpeedFactor())
+        );
     }
 
     private static double rawStepFactorFor(final ServerSubLevel subLevel) {
@@ -803,19 +831,23 @@ public final class ScaleController {
         subLevel.updateBoundingBox();
     }
 
-    private record CommandChoice(ScaleCommandSource source, CompressionStage stage) {}
+    private record CommandChoice(ScaleCommandSource source, double scale) {
+        private CommandChoice {
+            scale = CompressionStage.snap(scale);
+        }
+    }
 
     private static final class WeldCommandGate {
         private final ServerSubLevel driver;
         private final ScaleCommandSource source;
-        private final CompressionStage goal;
+        private final Double goal;
         private final Vector3d worldAnchor;
         private Boolean consumed;
 
         private WeldCommandGate(
                 final ServerSubLevel driver,
                 final ScaleCommandSource source,
-                final CompressionStage goal
+                final Double goal
         ) {
             this.driver = driver;
             this.source = source;
@@ -837,9 +869,9 @@ public final class ScaleController {
                 return false;
             }
             final ScaleState.ServerState state = ScaleState.serverState(this.driver);
-            final CompressionStage from = state.stableStage();
-            final CompressionStage to = this.source.stepwiseTransitions()
-                    ? from.stepToward(this.goal)
+            final double from = state.stableScale();
+            final double to = this.source.stepwiseTransitions()
+                    ? CompressionStage.stepToward(from, this.goal)
                     : this.goal;
             this.consumed = this.source.tryConsumeTransition(this.driver, from, to);
             return this.consumed;
@@ -849,35 +881,36 @@ public final class ScaleController {
     private static final class WeldCommandSource implements ScaleCommandSource {
         private final ServerSubLevel member;
         private final WeldCommandGate gate;
-        private final CompressionStage goal;
+        private final double goal;
 
         private WeldCommandSource(
                 final ServerSubLevel member,
                 final WeldCommandGate gate,
-                final CompressionStage goal
+                final double goal
         ) {
             this.member = member;
             this.gate = gate;
             this.goal = goal;
         }
 
-        @Override public CompressionStage commandedStage() { return this.goal; }
+        @Override public double commandedScale() { return this.goal; }
         @Override public boolean stepwiseTransitions() { return this.gate.source.stepwiseTransitions(); }
         @Override public boolean yieldsToManualOverride() { return this.gate.source.yieldsToManualOverride(); }
         @Override public double transitionSpeedFactor() { return this.gate.source.transitionSpeedFactor(); }
+        @Override public ScaleLimits scaleLimits() { return this.gate.source.scaleLimits(); }
         @Override public Vector3d anchorLocalPoint() {
             return this.member == this.gate.driver ? this.gate.source.anchorLocalPoint() : null;
         }
         @Override public boolean tryConsumeTransition(
                 final ServerSubLevel subLevel,
-                final CompressionStage from,
-                final CompressionStage to
+                final double from,
+                final double to
         ) { return this.gate.consume(); }
         @Override public void onTransitionCompleted(
                 final ServerSubLevel subLevel,
-                final CompressionStage stage
+                final double scale
         ) {
-            if (this.member == this.gate.driver) this.gate.source.onTransitionCompleted(subLevel, stage);
+            if (this.member == this.gate.driver) this.gate.source.onTransitionCompleted(subLevel, scale);
         }
         @Override public void setJamMessage(final String message) { this.gate.source.setJamMessage(message); }
         @Override public void clearJamMessage() { this.gate.source.clearJamMessage(); }
@@ -891,35 +924,39 @@ public final class ScaleController {
             this.subLevel = subLevel;
         }
 
-        @Override public CompressionStage commandedStage() { return CompressionStage.NORMAL; }
+        @Override public double commandedScale() { return PocketSized.FULL_SCALE; }
         @Override public boolean yieldsToManualOverride() { return false; }
         @Override public boolean isRemoved() { return this.subLevel.isRemoved(); }
     }
 
-    private static final class ForcedStageSource implements ScaleCommandSource {
+    private static final class ForcedScaleSource implements ScaleCommandSource {
         private final ServerSubLevel subLevel;
-        private final CompressionStage stage;
+        private final double scale;
         private final long expiresAt;
         private final Vector3d anchor;
+        private final ScaleLimits limits;
 
-        private ForcedStageSource(
+        private ForcedScaleSource(
                 final ServerSubLevel subLevel,
-                final CompressionStage stage,
+                final double scale,
                 final long expiresAt,
-                final Vector3d anchor
+                final Vector3d anchor,
+                final ScaleLimits limits
         ) {
             this.subLevel = subLevel;
-            this.stage = stage;
+            this.scale = scale;
             this.expiresAt = expiresAt;
             this.anchor = anchor;
+            this.limits = limits;
         }
 
-        @Override public CompressionStage commandedStage() { return this.stage; }
+        @Override public double commandedScale() { return this.scale; }
+        @Override public ScaleLimits scaleLimits() { return this.limits; }
         @Override public boolean yieldsToManualOverride() { return false; }
         @Override public Vector3d anchorLocalPoint() {
             return this.anchor == null ? null : new Vector3d(this.anchor);
         }
-        @Override public boolean tryConsumeTransition(final ServerSubLevel sub, final CompressionStage from, final CompressionStage to) { return true; }
+        @Override public boolean tryConsumeTransition(final ServerSubLevel sub, final double from, final double to) { return true; }
         @Override public boolean isRemoved() { return this.subLevel.isRemoved() || this.subLevel.getLevel().getGameTime() > this.expiresAt; }
     }
 

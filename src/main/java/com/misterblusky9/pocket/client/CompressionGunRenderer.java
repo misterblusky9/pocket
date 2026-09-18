@@ -40,10 +40,6 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
 
     private static final float MAX_SPIN_SPEED = 62.0F;
 
-    private static final float DRAG = 0.145F;
-
-    private static final float DRIVE_TORQUE = MAX_SPIN_SPEED * DRAG;
-
     private static final float COAST_RATE = 0.045F;
 
     private static BakedModel cogSource;
@@ -51,11 +47,6 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
     private static float cogPivotY;
 
     private static final float GLOW_THRESHOLD = 0.55F;
-
-    private static final net.minecraft.world.phys.Vec3 VENT_OFFSET =
-            new net.minecraft.world.phys.Vec3(0.55D, -0.1D, 0.9D);
-    private static final int VENT_PARTICLES = 2;
-    private static final double VENT_SPREAD = 0.035D;
 
     private static final float IDLE_SPIN_SPEED = 1.0F;
 
@@ -68,9 +59,6 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
     private static final java.util.Map<Object, Spin> SPINS = new java.util.HashMap<>();
 
     private record LocalSlot(int slot) {}
-
-    private static long lastVentTick = -1L;
-    private static final java.util.Random RANDOM = new java.util.Random();
 
     @Override
     protected void render(
@@ -92,20 +80,26 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         CompressionGunMuzzleTracker.capture(stack, transformType, ms, CompressionGunStateModel.muzzle(body));
         renderer.render(CompressionGunStateModel.get(body, panelState(holder), growing), light);
 
-        final Spin state = advanceSpin(stack, holder);
+        final Spin state = advanceSpin(stack, holder, body);
         CompressionGunTankMesh.render(levititeModel.get(), state.fill, ms, buffer, light);
 
         syncCogPivot(COG.get());
         ms.pushPose();
-        ms.translate(cogPivotX, cogPivotY, 0.0F);
-        ms.mulPose(Axis.ZP.rotationDegrees(state.angle));
-        ms.translate(-cogPivotX, -cogPivotY, 0.0F);
+        spinCog(ms, state.angle);
 
         renderer.render(cogModel.get(), glowingLight(light, state.speed));
         ms.popPose();
-        ms.popPose();
 
-        emitVentParticles(holder, growing, state.speed);
+        CompressionGunSweep.render(
+                body, state.source, state.sweep, growing, transformType,
+                AnimationTickHolder.getRenderTime(), ms, buffer, pose -> spinCog(pose, state.angle));
+        ms.popPose();
+    }
+
+    private static void spinCog(final PoseStack ms, final float angle) {
+        ms.translate(cogPivotX, cogPivotY, 0.0F);
+        ms.mulPose(Axis.ZP.rotationDegrees(angle));
+        ms.translate(-cogPivotX, -cogPivotY, 0.0F);
     }
 
     private static void syncCogPivot(final BakedModel cog) {
@@ -150,41 +144,7 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         return Mth.clamp((fraction - GLOW_THRESHOLD) / (1.0F - GLOW_THRESHOLD), 0.0F, 1.0F);
     }
 
-    private static void emitVentParticles(
-            final Holder holder,
-            final boolean growing,
-            final float speed
-    ) {
-        if (heat(speed) < 1.0F || !isDriving(holder)) return;
-
-        final Minecraft minecraft = Minecraft.getInstance();
-        final LocalPlayer player = minecraft.player;
-        if (player == null || minecraft.level == null) return;
-        if (minecraft.options.getCameraType() != net.minecraft.client.CameraType.FIRST_PERSON) return;
-
-        final long tick = minecraft.level.getGameTime();
-        if (tick == lastVentTick) return;
-        lastVentTick = tick;
-
-        final var trackedMuzzle = CompressionGunMuzzleTracker.muzzle(player.getUUID());
-        final var muzzle = trackedMuzzle != null
-                ? trackedMuzzle
-                : com.simibubi.create.content.equipment.zapper.ShootableGadgetItemMethods
-                        .getGunBarrelVec(player, player.getUsedItemHand() == net.minecraft.world.InteractionHand.MAIN_HAND,
-                                VENT_OFFSET);
-
-        for (int i = 0; i < VENT_PARTICLES; i++) {
-            minecraft.level.addParticle(
-                    growing ? net.minecraft.core.particles.ParticleTypes.END_ROD
-                            : net.minecraft.core.particles.ParticleTypes.ELECTRIC_SPARK,
-                    muzzle.x, muzzle.y, muzzle.z,
-                    (RANDOM.nextDouble() - 0.5D) * VENT_SPREAD,
-                    RANDOM.nextDouble() * VENT_SPREAD,
-                    (RANDOM.nextDouble() - 0.5D) * VENT_SPREAD);
-        }
-    }
-
-    private static Spin advanceSpin(final ItemStack rendered, final Holder holder) {
+    private static Spin advanceSpin(final ItemStack rendered, final Holder holder, final BakedModel body) {
         final ItemStack stack = holder.live();
         final Spin state = stateFor(stack, holder);
         final float targetFill = CompressionGunTank.amount(stack) / (float) CompressionGunTank.CAPACITY;
@@ -197,13 +157,24 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         state.fill = Float.isNaN(state.fill)
                 ? targetFill
                 : state.fill + (targetFill - state.fill) * Math.min(1.0F, FILL_EASE * delta);
+
+        final Player holderPlayer = holder.player();
+        final boolean spooling = holderPlayer != null && isSpooling(holder);
+        final float ticksUsing = spooling
+                ? holderPlayer.getTicksUsingItem() + AnimationTickHolder.getPartialTicks()
+                : 0.0F;
+        state.source = CompressionGunSweep.advanceSource(state.source, spooling, ticksUsing, delta);
+        state.sweep = CompressionGunSweep.advance(body, state.sweep, spooling, ticksUsing, delta);
+
         if (delta <= 0.0F) return state;
 
         final float direction = com.misterblusky9.pocket.item.CompressionGunItem.isGrowing(stack)
                 ? 1.0F : -1.0F;
 
         if (isDriving(holder)) {
-            state.speed += (DRIVE_TORQUE * direction - state.speed * DRAG) * delta;
+            final float curve = MAX_SPIN_SPEED * com.misterblusky9.pocket.item.CompressionGunItem.spinFraction(ticksUsing);
+            final float coasting = state.speed * direction > 0.0F ? Math.abs(state.speed) : 0.0F;
+            state.speed = direction * Math.max(curve, coasting);
         } else {
             final float rest = CompressionGunTank.hasAirPressure(holder.player()) ? IDLE_SPIN_SPEED * direction : 0.0F;
             state.speed += (rest - state.speed) * COAST_RATE * delta;
@@ -265,6 +236,8 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         private float speed;
         private float lastTime = Float.NaN;
         private float fill = Float.NaN;
+        private float source;
+        private float sweep;
     }
 
     private static CompressionGunStateModel.State panelState(final Holder holder) {

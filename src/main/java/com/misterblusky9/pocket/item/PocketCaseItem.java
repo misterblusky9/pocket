@@ -91,6 +91,7 @@ public class PocketCaseItem extends PackageItem {
     private static final String BLOCKS_KEY = "pocket_blocks";
     private static final String BLOCK_ENTITIES_KEY = "pocket_block_entities";
     private static final String MASS_KEY = "pocket_mass";
+    private static final String SCALE_KEY = "pocket_scale";
     private static final String PACKED_BY_KEY = "packed_by";
 
     private static final String CONTAINER_KEY = "pocket_container";
@@ -113,6 +114,7 @@ public class PocketCaseItem extends PackageItem {
 
     private static final int IMPACT_TIMEOUT_TICKS = 20 * 60;
     private static final double CANNON_BLOOM_DISTANCE = 16.0D;
+    public static final double POCKETABLE_SCALE = com.misterblusky9.pocket.scale.CompressionStage.SIXTEENTH.scale();
 
     private static final int CANNON_BLOOM_TIMEOUT_TICKS = 80;
 
@@ -259,6 +261,21 @@ public class PocketCaseItem extends PackageItem {
                 token, subLevel.getUniqueId(), structure.blocks(), structure.chunks(),
                 structure.blockEntities(), audit.orphans().size(), Long.toHexString(structure.structureHash()));
         return new PocketMetrics(structure.blocks(), structure.blockEntities());
+    }
+
+    public static void setPocketedScale(final ItemStack stack, final double scale) {
+        final CompoundTag tag = customTag(stack);
+        if (tag == null) return;
+        tag.putDouble(SCALE_KEY, scale);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+    }
+
+    public static double pocketedScale(final ItemStack stack) {
+        final CompoundTag tag = customTag(stack);
+        if (tag == null || !tag.contains(SCALE_KEY, net.minecraft.nbt.Tag.TAG_ANY_NUMERIC)) return POCKETABLE_SCALE;
+        final double scale = tag.getDouble(SCALE_KEY);
+        if (!PocketSized.isValidScale(scale)) return POCKETABLE_SCALE;
+        return Math.min(POCKETABLE_SCALE, com.misterblusky9.pocket.scale.CompressionStage.snap(scale));
     }
 
     public static void setPackedBy(final ItemStack stack, final String playerName) {
@@ -717,9 +734,10 @@ public class PocketCaseItem extends PackageItem {
                     : storedFront;
             pose.orientation().set(new Quaterniond().rotationY(placementYaw));
         }
-        pose.scale().set(PocketSized.MIN_SCALE, PocketSized.MIN_SCALE, PocketSized.MIN_SCALE);
+        final double pocketedScale = pocketedScale(stack);
+        pose.scale().set(pocketedScale, pocketedScale, pocketedScale);
 
-        final PlacementExtents extents = placementExtents(snapshot, original, pose);
+        final PlacementExtents extents = placementExtents(snapshot, original, pose, pocketedScale);
         Vector3d newPosition = checkPlacement
                 ? safePosition(click, face, extents)
                 : new Vector3d(click.x - extents.centerX(), click.y - extents.centerY(), click.z - extents.centerZ());
@@ -811,14 +829,14 @@ public class PocketCaseItem extends PackageItem {
         }
 
         try {
-            ScaleController.adoptRestoredScale(restored, PocketSized.MIN_SCALE);
+            ScaleController.adoptRestoredScale(restored, pocketedScale);
 
             if (checkPlacement) {
                 for (final var actor : restored.getPlot().getBlockEntityActors()) {
                 }
             }
 
-            ScaleNetwork.sendScale(restored, PocketSized.MIN_SCALE, PocketSized.MIN_SCALE, true);
+            ScaleNetwork.sendScale(restored, pocketedScale, pocketedScale, true);
         } catch (final RuntimeException exception) {
             rollbackDestination(serverLevel, destinationContainer, transfer, positioned.uuid(), token,
                     "scale initialization failed", exception);
@@ -1500,7 +1518,8 @@ public class PocketCaseItem extends PackageItem {
     private static PlacementExtents placementExtents(
             final PocketRenderSnapshot snapshot,
             final SubLevelData original,
-            final Pose3d pose
+            final Pose3d pose,
+            final double scale
     ) {
         if (snapshot == null || !snapshot.hasPlacementGeometry()) {
             final BoundingBox3d oldBounds = original.bounds();
@@ -1514,7 +1533,7 @@ public class PocketCaseItem extends PackageItem {
         final int[] b = snapshot.localBounds();
         final Vector3d rp = snapshot.rotationPoint();
         final Quaterniond q = new Quaterniond(pose.orientation());
-        final double s = PocketSized.MIN_SCALE;
+        final double s = scale;
         double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY, minZ = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY, maxZ = Double.NEGATIVE_INFINITY;
         final double[] xs = {b[0], b[3] + 1.0D};
@@ -1577,8 +1596,8 @@ public class PocketCaseItem extends PackageItem {
         final CompoundTag tag = customTag(stack);
 
         if (tag != null && tag.getBoolean(ORPHANED_KEY)) {
-            tooltip.add(Component.literal("⚠ Payload unreachable").withStyle(ChatFormatting.RED));
-            tooltip.add(Component.literal("Kept safe — works again if the payload returns")
+            tooltip.add(Component.translatable("pocket.tooltip.payload_unreachable").withStyle(ChatFormatting.RED));
+            tooltip.add(Component.translatable("pocket.tooltip.payload_kept_safe")
                     .withStyle(ChatFormatting.GRAY));
             if (flag.isAdvanced()) {
                 final String reason = tag.getString(ORPHANED_REASON_KEY);
@@ -1601,7 +1620,7 @@ public class PocketCaseItem extends PackageItem {
         }
 
         if (tag.contains(PACKED_BY_KEY)) {
-            tooltip.add(Component.literal("Captured by: " + tag.getString(PACKED_BY_KEY))
+            tooltip.add(Component.translatable("pocket.tooltip.captured_by", tag.getString(PACKED_BY_KEY))
                     .withStyle(ChatFormatting.AQUA));
         }
 
@@ -1625,17 +1644,17 @@ public class PocketCaseItem extends PackageItem {
 
         if (!flag.isAdvanced()) return;
 
-        tooltip.add(Component.literal("Compressed: 1/16×").withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("pocket.tooltip.compressed", "1/16×").withStyle(ChatFormatting.DARK_GRAY));
         if (tag.contains(BLOCKS_KEY)) {
-            tooltip.add(Component.literal(tag.getInt(BLOCKS_KEY) + " blocks • "
-                    + tag.getInt(BLOCK_ENTITIES_KEY) + " block entities").withStyle(ChatFormatting.DARK_GRAY));
+            tooltip.add(Component.translatable("pocket.tooltip.contents",
+                    tag.getInt(BLOCKS_KEY), tag.getInt(BLOCK_ENTITIES_KEY)).withStyle(ChatFormatting.DARK_GRAY));
         }
         final int passengers = com.misterblusky9.pocket.pocket.PocketedEntities.count(tag);
         if (passengers > 0) {
-            tooltip.add(Component.literal(passengers + (passengers == 1 ? " passenger" : " passengers"))
+            tooltip.add(Component.translatable(passengers == 1 ? "pocket.tooltip.passenger" : "pocket.tooltip.passengers", passengers)
                     .withStyle(ChatFormatting.DARK_GRAY));
         }
-        tooltip.add(Component.literal("Potato Cannon ammo").withStyle(ChatFormatting.GOLD));
+        tooltip.add(Component.translatable("pocket.tooltip.potato_cannon_ammo").withStyle(ChatFormatting.GOLD));
     }
 
     private static String describeMass(final double mass) {

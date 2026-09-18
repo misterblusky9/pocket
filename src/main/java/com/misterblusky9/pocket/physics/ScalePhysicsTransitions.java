@@ -84,14 +84,14 @@ public final class ScalePhysicsTransitions {
             ScaledColliderRebuildQueue.mark(subLevel);
         }
 
-        if (scaleChanged && currentScale < 1.0D - PocketSized.EPSILON) {
+        if (scaleChanged && Math.abs(currentScale - PocketSized.FULL_SCALE) > PocketSized.EPSILON) {
             ScaledColliderRebuildQueue.mark(subLevel);
         }
 
         if (!reachedTarget) return;
 
         state.settling = true;
-        if (targetScale >= 1.0D - PocketSized.EPSILON) {
+        if (Math.abs(targetScale - PocketSized.FULL_SCALE) <= PocketSized.EPSILON) {
             state.pendingRestore = true;
         } else {
             ScaledColliderRebuildQueue.mark(subLevel);

@@ -68,6 +68,48 @@ public final class PehkuiScaleBridge {
         }
     }
 
+    public static double personalScale(final Entity entity) {
+        if (entity == null || !ownsScaling()) return 1.0D;
+
+        final Backend current = backend;
+        if (current == null) return 1.0D;
+
+        try {
+            return current.personalScale(entity);
+        } catch (final RuntimeException | LinkageError exception) {
+            fail(current, exception);
+            return 1.0D;
+        }
+    }
+
+    public static double personalTargetScale(final Entity entity) {
+        if (entity == null || !ownsScaling()) return 1.0D;
+
+        final Backend current = backend;
+        if (current == null) return 1.0D;
+
+        try {
+            return current.personalTargetScale(entity);
+        } catch (final RuntimeException | LinkageError exception) {
+            fail(current, exception);
+            return 1.0D;
+        }
+    }
+
+    public static double unscaledBoxSize(final Entity entity, final double scaledSize) {
+        if (entity == null || !ownsScaling()) return scaledSize;
+
+        final Backend current = backend;
+        if (current == null) return scaledSize;
+
+        try {
+            return current.unscaledBoxSize(entity, scaledSize);
+        } catch (final RuntimeException | LinkageError exception) {
+            fail(current, exception);
+            return scaledSize;
+        }
+    }
+
     public static void setPersonalScale(final Entity entity, final double scale) {
         if (entity == null || !ownsScaling()) return;
 
@@ -107,6 +149,20 @@ public final class PehkuiScaleBridge {
         }
     }
 
+    public static float motionScale(final Entity entity) {
+        if (entity == null || !ownsScaling()) return 1.0F;
+
+        final Backend current = backend;
+        if (current == null) return 1.0F;
+
+        try {
+            return current.motionScale(entity);
+        } catch (final RuntimeException | LinkageError exception) {
+            fail(current, exception);
+            return 1.0F;
+        }
+    }
+
     private static synchronized void fail(
             final Backend failed,
             final Throwable exception
@@ -125,9 +181,13 @@ public final class PehkuiScaleBridge {
     public interface Backend {
         void apply(Entity entity, double inheritedBaseScale, double containedModelScale);
         void clear(Entity entity);
+        double personalScale(Entity entity);
+        double personalTargetScale(Entity entity);
+        double unscaledBoxSize(Entity entity, double scaledSize);
         void setPersonalScale(Entity entity, double scale);
         void snapPersonalScale(Entity entity, double scale);
         void clearPersonalScale(Entity entity);
+        float motionScale(Entity entity);
         void disable();
     }
 

@@ -11,19 +11,19 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 public final class MoonCompressionLifecycle {
     @SubscribeEvent
     public static void loginReset(final ServerStartingEvent event) {
-        MoonCompressionSessions.release(null);
+        MoonCompressionSessions.reset();
     }
 
     @SubscribeEvent
     public static void logout(final PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof final ServerPlayer player) {
-            MoonCompressionSessions.release(player);
+            MoonCompressionSessions.abandon(player);
         }
     }
 
     @SubscribeEvent
     public static void stopping(final ServerStoppingEvent event) {
-        MoonCompressionSessions.release(null);
+        MoonCompressionSessions.reset();
     }
 
     private MoonCompressionLifecycle() {}
