@@ -43,10 +43,12 @@ public final class CreativeShrinkRayRenderer extends ZapperItemRenderer {
         final boolean mainHand = player.getMainHandItem() == stack;
         final boolean offHand = player.getOffhandItem() == stack;
         final float animation = getAnimationProgress(pt, leftHanded, mainHand);
+
         final float multiplier = (mainHand || offHand) ? animation : Mth.sin(worldTime * 5.0F);
         final int intensity = (int) (15 * Mth.clamp(multiplier, 0, 1));
         final int glowLight = LightTexture.pack(intensity, max(intensity, 4));
-        renderer.renderSolidGlowing(CORE.get(), glowLight);
+
+        renderer.renderSolidGlowing(CORE.get(), LightTexture.FULL_BRIGHT);
         renderer.renderGlowing(CORE_GLOW.get(), glowLight);
 
         float angle = worldTime * -25.0F;

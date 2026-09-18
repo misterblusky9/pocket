@@ -31,8 +31,8 @@ public abstract class SubLevelSerializerScaleMixin {
         ScalePersistence.persist(subLevel, state);
         PocketTrace.scale(
                 "serialize snapshot {} scale={} stable={} requested={} transition={}",
-                PocketTrace.context(subLevel), state.currentScale(), state.stableStage(),
-                state.requestedStage(), state.transitionStage());
+                PocketTrace.context(subLevel), state.currentScale(), state.stableScale(),
+                state.requestedScale(), state.transitionScale());
     }
 
     @WrapMethod(method = "fullyLoad")

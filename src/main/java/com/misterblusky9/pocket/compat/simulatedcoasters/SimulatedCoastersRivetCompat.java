@@ -71,9 +71,7 @@ public final class SimulatedCoastersRivetCompat {
                     rivet, correctedPosition, rivet.logicalPose().orientation());
         }
 
-        final CompressionStage stage = CompressionStage.nearest(targetScale);
-        final ScaleState.ServerState state = ScaleState.restoreServerState(
-                rivet, targetScale, stage, stage, null);
+        final ScaleState.ServerState state = ScaleState.restoreSettledState(rivet, targetScale);
         rivet.updateLastPose();
         ScalePersistence.persist(rivet, state);
         ScaleNetwork.sendScale(rivet, targetScale, targetScale, true);

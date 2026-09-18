@@ -9,6 +9,7 @@ import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleCommandSource;
 import com.misterblusky9.pocket.scale.ManualScaleOverride;
 import com.misterblusky9.pocket.scale.ScaleController;
+import com.misterblusky9.pocket.scale.ScaleLimits;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
@@ -75,7 +76,7 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
     private UUID targetId;
     private ServerSubLevel target;
     private BlockPos hitLocalPos;
-    private CompressionStage commandedStage;
+    private double commandedScale = NO_COMMAND;
     private CompressionStage inFlightStage;
 
     public StaticSubspaceCompressorBlockEntity(
@@ -213,7 +214,7 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
             this.completedSteps = 0;
             this.pulseSent = false;
             this.inFlightStage = null;
-            this.commandedStage = ScaleState.getStage(this.target);
+            this.commandedScale = ScaleState.getSettledScale(this.target);
         }
 
         driveShrink(level);
@@ -236,8 +237,8 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         final long now = level.getGameTime();
         if (ManualScaleOverride.isSuspended(hit.subLevel().getUniqueId(), now)) return false;
 
-        final CompressionStage current = ScaleState.getStage(hit.subLevel());
-        if (current == targetStage()) return false;
+        final double current = ScaleState.getSettledScale(hit.subLevel());
+        if (ScaleState.isAt(hit.subLevel(), targetStage().scale())) return false;
 
         final CompressionBlacklist.Result blocked = CompressionBlacklist.find(hit.subLevel(), now);
         if (blocked.blocked()) return false;
@@ -259,7 +260,7 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
                 hit.subLevel(),
                 this.hitLocalPos,
                 this.acquisitionTicks,
-                targetStage().depth() < current.depth()
+                targetStage().scale() > current
         );
         return true;
     }
@@ -278,15 +279,15 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         }
 
         if (!ScaleState.isSettled(this.targetId)) {
-            if (this.inFlightStage != null) this.commandedStage = this.inFlightStage;
+            if (this.inFlightStage != null) this.commandedScale = this.inFlightStage.scale();
             ScaleController.registerExternalCommand(this.target, this, level.getGameTime());
             return;
         }
 
-        final CompressionStage current = ScaleState.getStage(this.target);
+        final double current = ScaleState.getSettledScale(this.target);
 
         if (this.inFlightStage != null) {
-            if (current == this.inFlightStage) {
+            if (ScaleController.sameScale(current, this.inFlightStage.scale())) {
                 this.completedSteps++;
                 this.stepAge = 0;
             }
@@ -294,9 +295,9 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
             this.pulseSent = false;
         }
 
-        this.commandedStage = current;
+        this.commandedScale = current;
 
-        if (current == targetStage()) {
+        if (ScaleController.sameScale(current, targetStage().scale())) {
             clearTarget(true);
             return;
         }
@@ -317,27 +318,27 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         }
 
         if (this.stepAge >= delay) {
-            final CompressionStage next = current.stepToward(targetStage());
+            final CompressionStage next = CompressionStage.exact(CompressionStage.stepToward(current, targetStage().scale()));
             this.inFlightStage = next;
-            this.commandedStage = next;
+            this.commandedScale = next.scale();
             this.pulseSent = false;
         }
 
         ScaleController.registerExternalCommand(this.target, this, level.getGameTime());
     }
 
-    private boolean isOpposed(final CompressionStage current) {
+    private boolean isOpposed(final double current) {
         if (this.targetId == null) return false;
 
         final Set<StaticSubspaceCompressorBlockEntity> drivers = DRIVERS.get(this.targetId);
         if (drivers == null) return false;
 
-        final int direction = Integer.signum(targetStage().depth() - current.depth());
+        final int direction = Double.compare(targetStage().scale(), current);
         if (direction == 0) return false;
 
         for (final StaticSubspaceCompressorBlockEntity other : drivers) {
             if (other == this || other.isRemoved() || !other.sealed) continue;
-            if (Integer.signum(other.targetStage().depth() - current.depth()) == -direction) {
+            if (Double.compare(other.targetStage().scale(), current) == -direction) {
                 return true;
             }
         }
@@ -346,11 +347,11 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
 
     private static int stepDelay(
             final int completedSteps,
-            final CompressionStage current,
+            final double current,
             final CompressionStage target
     ) {
         final int base = Math.round(STEP_BASE_TICKS * (1.0F + completedSteps * STEP_GROWTH));
-        final boolean finalStep = current.stepToward(target) == target;
+        final boolean finalStep = ScaleController.sameScale(CompressionStage.stepToward(current, target.scale()), target.scale());
         return finalStep ? base + FINAL_STEP_EXTRA_TICKS : base;
     }
 
@@ -473,7 +474,7 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         this.target = null;
         this.targetId = null;
         this.hitLocalPos = null;
-        this.commandedStage = null;
+        this.commandedScale = NO_COMMAND;
         this.inFlightStage = null;
         this.acquisitionAge = 0;
         this.acquisitionTicks = 0;
@@ -490,8 +491,13 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
     }
 
     @Override
-    public CompressionStage commandedStage() {
-        return this.sealed ? this.commandedStage : null;
+    public double commandedScale() {
+        return this.sealed ? this.commandedScale : NO_COMMAND;
+    }
+
+    @Override
+    public ScaleLimits scaleLimits() {
+        return ScaleLimits.STANDARD;
     }
 
     @Override

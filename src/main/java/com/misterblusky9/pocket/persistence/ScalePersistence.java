@@ -15,6 +15,9 @@ import org.joml.Vector3d;
 public final class ScalePersistence {
     private static final String ROOT_KEY = "pocket_scale";
     private static final String CURRENT_KEY = "current";
+    private static final String STABLE_KEY = "stable";
+    private static final String REQUESTED_KEY = "requested";
+    private static final String TRANSITION_KEY = "transition";
     private static final String STABLE_STAGE_KEY = "stable_stage";
     private static final String REQUESTED_STAGE_KEY = "requested_stage";
     private static final String TRANSITION_STAGE_KEY = "transition_stage";
@@ -24,10 +27,10 @@ public final class ScalePersistence {
         if (subLevel == null || state == null) return;
 
         CompoundTag userData = subLevel.getUserDataTag();
-        final boolean completelyNormal = state.transitionStage() == null
-                && state.stableStage() == CompressionStage.NORMAL
-                && state.requestedStage() == CompressionStage.NORMAL
-                && Math.abs(state.currentScale() - 1.0D) <= PocketSized.EPSILON;
+        final boolean completelyNormal = !state.transitioning()
+                && atFullSize(state.stableScale())
+                && atFullSize(state.requestedScale())
+                && atFullSize(state.currentScale());
 
         if (completelyNormal) {
             if (userData != null && userData.contains(ROOT_KEY)) {
@@ -41,10 +44,13 @@ public final class ScalePersistence {
         if (userData == null) userData = new CompoundTag();
         final CompoundTag scaleTag = new CompoundTag();
         scaleTag.putDouble(CURRENT_KEY, PocketSized.clampScale(state.currentScale()));
-        scaleTag.putInt(STABLE_STAGE_KEY, state.stableStage().depth());
-        scaleTag.putInt(REQUESTED_STAGE_KEY, state.requestedStage().depth());
-        if (state.transitionStage() != null) {
-            scaleTag.putInt(TRANSITION_STAGE_KEY, state.transitionStage().depth());
+        scaleTag.putDouble(STABLE_KEY, state.stableScale());
+        scaleTag.putDouble(REQUESTED_KEY, state.requestedScale());
+        scaleTag.putInt(STABLE_STAGE_KEY, CompressionStage.nearest(state.stableScale()).depth());
+        scaleTag.putInt(REQUESTED_STAGE_KEY, CompressionStage.nearest(state.requestedScale()).depth());
+        if (state.transitioning()) {
+            scaleTag.putDouble(TRANSITION_KEY, state.transitionScale());
+            scaleTag.putInt(TRANSITION_STAGE_KEY, CompressionStage.nearest(state.transitionScale()).depth());
         }
         userData.put(ROOT_KEY, scaleTag);
         subLevel.setUserDataTag(userData);
@@ -67,18 +73,16 @@ public final class ScalePersistence {
         final CompoundTag tag = userData.getCompound(ROOT_KEY);
         if (!tag.contains(CURRENT_KEY, Tag.TAG_ANY_NUMERIC)) return;
 
-        final double current = PocketSized.clampScale(tag.getDouble(CURRENT_KEY));
-        final CompressionStage stable = tag.contains(STABLE_STAGE_KEY, Tag.TAG_ANY_NUMERIC)
-                ? CompressionStage.fromDepth(tag.getInt(STABLE_STAGE_KEY))
-                : CompressionStage.nearest(current);
-        final CompressionStage requested = tag.contains(REQUESTED_STAGE_KEY, Tag.TAG_ANY_NUMERIC)
-                ? CompressionStage.fromDepth(tag.getInt(REQUESTED_STAGE_KEY))
-                : tag.contains(LEGACY_TARGET_KEY, Tag.TAG_ANY_NUMERIC)
-                    ? CompressionStage.nearest(tag.getDouble(LEGACY_TARGET_KEY))
-                    : stable;
-        final CompressionStage transition = tag.contains(TRANSITION_STAGE_KEY, Tag.TAG_ANY_NUMERIC)
-                ? CompressionStage.fromDepth(tag.getInt(TRANSITION_STAGE_KEY))
-                : null;
+        final double savedCurrent = tag.getDouble(CURRENT_KEY);
+        if (!PocketSized.isValidScale(savedCurrent)) return;
+        final double current = PocketSized.clampScale(savedCurrent);
+        final double stable = read(tag, STABLE_KEY, STABLE_STAGE_KEY, CompressionStage.snap(current));
+        final double requested = tag.contains(LEGACY_TARGET_KEY, Tag.TAG_ANY_NUMERIC)
+                && !tag.contains(REQUESTED_STAGE_KEY, Tag.TAG_ANY_NUMERIC)
+                && !tag.contains(REQUESTED_KEY, Tag.TAG_ANY_NUMERIC)
+                ? CompressionStage.nearest(tag.getDouble(LEGACY_TARGET_KEY)).scale()
+                : read(tag, REQUESTED_KEY, REQUESTED_STAGE_KEY, stable);
+        final double transition = read(tag, TRANSITION_KEY, TRANSITION_STAGE_KEY, ScaleState.NO_TRANSITION);
 
         ScaleState.restoreServerState(subLevel, current, stable, requested, transition);
         subLevel.logicalPose().scale().set(current, current, current);
@@ -103,6 +107,26 @@ public final class ScalePersistence {
                 PocketTrace.context(subLevel));
         pipeline.onStatsChanged(subLevel);
         PocketTrace.exit("PhysicsPipeline.onStatsChanged(restore) uuid=" + subLevel.getUniqueId());
+    }
+
+    private static double read(
+            final CompoundTag tag,
+            final String scaleKey,
+            final String stageKey,
+            final double fallback
+    ) {
+        if (tag.contains(scaleKey, Tag.TAG_ANY_NUMERIC)) {
+            final double scale = tag.getDouble(scaleKey);
+            if (PocketSized.isValidScale(scale)) return PocketSized.clampScale(scale);
+        }
+        if (tag.contains(stageKey, Tag.TAG_ANY_NUMERIC)) {
+            return CompressionStage.fromDepth(tag.getInt(stageKey)).scale();
+        }
+        return fallback;
+    }
+
+    private static boolean atFullSize(final double scale) {
+        return Math.abs(scale - PocketSized.FULL_SCALE) <= PocketSized.EPSILON;
     }
 
     private ScalePersistence() {}

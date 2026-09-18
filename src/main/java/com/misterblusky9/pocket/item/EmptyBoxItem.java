@@ -20,7 +20,7 @@ public class EmptyBoxItem extends Item {
             final List<Component> tooltip,
             final TooltipFlag flag
     ) {
-        tooltip.add(Component.literal("Sneak-use on a 1/16\u00d7 contraption to pack it")
+        tooltip.add(Component.translatable("item.pocket.empty_box.tooltip.hint")
                 .withStyle(ChatFormatting.GRAY));
     }
 }

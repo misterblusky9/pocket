@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.client;
 
-import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CompressionGunTargetingMode;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
@@ -27,7 +26,7 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
     private final ItemStack tool;
     private final InteractionHand hand;
     private final boolean creativeRay;
-    private final Component title = Component.literal("Targeting Mode");
+    private final Component title = Component.translatable("pocket.screen.targeting_mode");
     private final List<ModeButton> modeButtons = new ArrayList<>(3);
 
     private CompressionGunTargetingMode selected;
@@ -48,10 +47,6 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
         setWindowOffset(-10, 0);
         super.init();
 
-        if (this.selected == CompressionGunTargetingMode.SELF && !PehkuiScaleBridge.ownsScaling()) {
-            this.selected = CompressionGunTargetingMode.SUBLEVEL;
-        }
-
         final int x = this.guiLeft;
         final int y = this.guiTop;
 
@@ -65,12 +60,9 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
 
         this.modeButtons.clear();
 
-        final List<CompressionGunTargetingMode> availableModes = new ArrayList<>(3);
+        final List<CompressionGunTargetingMode> availableModes = new ArrayList<>(2);
         availableModes.add(CompressionGunTargetingMode.SUBLEVEL);
         availableModes.add(CompressionGunTargetingMode.CONNECTED_SUBLEVELS);
-        if (PehkuiScaleBridge.ownsScaling()) {
-            availableModes.add(CompressionGunTargetingMode.SELF);
-        }
 
         final int rowWidth = availableModes.size() * BUTTON_PITCH;
         final int rowLeft = (this.background.getWidth() - rowWidth) / 2 - 4;
@@ -156,7 +148,6 @@ public final class CompressionGunTargetingScreen extends AbstractSimiScreen {
         return switch (mode) {
             case SUBLEVEL -> AllIcons.I_TARGET;
             case CONNECTED_SUBLEVELS -> AllIcons.I_ACTIVE;
-            case SELF -> AllIcons.I_CONFIRM;
         };
     }
 

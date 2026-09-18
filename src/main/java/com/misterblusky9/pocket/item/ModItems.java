@@ -40,7 +40,7 @@ public final class ModItems {
     );
 
     public static final DeferredItem<CreativeShrinkRayItem> CREATIVE_SHRINK_RAY = ITEMS.register(
-            "creative_shrink_ray", () -> new CreativeShrinkRayItem(new Item.Properties().stacksTo(1).rarity(Rarity.RARE))
+            "creative_shrink_ray", () -> new CreativeShrinkRayItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC))
     );
 
     public static final DeferredItem<CompressionGunItem> COMPRESSION_GUN = ITEMS.register(
@@ -50,7 +50,7 @@ public final class ModItems {
 
     public static final DeferredItem<CompressionGunItem> PEARLESCENT_COMPRESSION_GUN = ITEMS.register(
             "pearlescent_compression_gun",
-            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512), true)
+            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512).rarity(Rarity.UNCOMMON), true)
     );
 
     public static final DeferredItem<BlockItem> PORTABLE_SUBSPACE_COMPRESSOR = ITEMS.register(
@@ -66,6 +66,10 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> STATIC_SUBSPACE_COMPRESSOR = ITEMS.register(
             "static_subspace_compressor",
             () -> new BlockItem(ModBlocks.STATIC_SUBSPACE_COMPRESSOR.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<SelfResizeDeviceItem> SELF_RESIZE_DEVICE = ITEMS.register(
+            "self_resize_device", () -> new SelfResizeDeviceItem(new Item.Properties().stacksTo(1).durability(512))
     );
 
     public static final DeferredItem<TweezersItem> TWEEZERS = ITEMS.register(

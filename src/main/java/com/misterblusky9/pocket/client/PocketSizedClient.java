@@ -32,10 +32,13 @@ public final class PocketSizedClient {
     }
 
     public PocketSizedClient(final IEventBus modBus) {
+        com.misterblusky9.pocket.item.CreativeShrinkRayInteractionHandler.clientFeedback =
+                ShrinkRayControls::onPicked;
         SwitchBearingPartials.init();
         HelmBearingPartials.init();
         HelmBearingHandler.register();
         modBus.addListener(PocketPackageModels::register);
+        modBus.addListener(PocketItemTooltips::register);
         modBus.addListener(TheMoonPackageRenderer::register);
         modBus.addListener(PocketShaders::register);
         modBus.addListener(PortableSubspaceCompressorRenderer::register);

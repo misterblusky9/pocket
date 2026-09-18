@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
@@ -213,6 +214,12 @@ public final class CompressionBeamRenderer {
     private record Landing(Vec3 point, boolean struck, boolean targetSurface) {}
 
     private static Landing endpointOf(final Player player, final Level level, final UUID lockedTarget) {
+        final EntityCompressionTargeting.Target entityTarget =
+                EntityCompressionTargeting.find(player, RANGE);
+        if (entityTarget != null) {
+            return new Landing(entityTarget.hitPos(), true, false);
+        }
+
         final Vec3 eye = player.getEyePosition();
         final Vec3 end = eye.add(player.getViewVector(1.0F).scale(RANGE));
 

@@ -1,21 +1,25 @@
 package com.misterblusky9.pocket.item;
 
+import com.misterblusky9.pocket.Overclocking;
+import com.misterblusky9.pocket.client.CompressionGunRenderHandler;
 import com.misterblusky9.pocket.client.CompressionGunRenderer;
 import com.misterblusky9.pocket.compression.CompressionSessions;
 import com.misterblusky9.pocket.compression.CompressionTargeting;
-import com.misterblusky9.pocket.compression.SelfCompressionSessions;
-import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
+import com.misterblusky9.pocket.compression.EntityCompressionSessions;
+import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.misterblusky9.pocket.moon.MoonCompressionSessions;
 import com.misterblusky9.pocket.moon.MoonScale;
 import com.misterblusky9.pocket.moon.MoonTargeting;
 import com.misterblusky9.pocket.network.CompressionBeamPayload;
 import com.misterblusky9.pocket.network.CompressionGunOpenMenuPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
+import com.misterblusky9.pocket.scale.ScaleLimits;
 import com.simibubi.create.foundation.item.CustomArmPoseItem;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -33,6 +37,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
@@ -47,14 +52,19 @@ import java.util.function.Consumer;
 public final class CompressionGunItem extends Item implements CustomArmPoseItem, PriorityInteractionItem {
     private static final double RANGE = 160.0D;
 
-    public static final int CHARGE_TICKS = 40;
+    public static final int SPIN_UP_TICKS = 32;
+    public static final int SOURCE_TICKS = SPIN_UP_TICKS;
+    public static final int SOURCE_IGNITE_TICKS = 8;
+    public static final int SOURCE_HOLD_TICKS = 4;
+    public static final int SWEEP_START_TICKS = SOURCE_TICKS + SOURCE_IGNITE_TICKS + SOURCE_HOLD_TICKS;
+    public static final int SWEEP_TICKS = 20;
+    public static final int CHARGE_TICKS = SWEEP_START_TICKS + SWEEP_TICKS;
 
     private static final String MODE_KEY = "PocketGrow";
     private static final String TARGETING_MODE_KEY = "PocketTargetingMode";
 
-    private static final CompressionStage SURVIVAL_FLOOR = CompressionStage.SIXTEENTH;
 
-    private static final int LEVITITE_BAR_COLOUR = 0x46C8BE;
+    static final int LEVITITE_BAR_COLOUR = 0x46C8BE;
 
     private static final Map<UUID, Boolean> BEAMS = new ConcurrentHashMap<>();
 
@@ -77,6 +87,16 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
     }
 
     @Override
+    public boolean canAttackBlock(
+            final BlockState state,
+            final Level level,
+            final BlockPos pos,
+            final Player player
+    ) {
+        return false;
+    }
+
+    @Override
     public boolean shouldCauseReequipAnimation(
             final ItemStack oldStack,
             final ItemStack newStack,
@@ -93,6 +113,8 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
     ) {
         final ItemStack stack = player.getItemInHand(hand);
 
+        if (level.isClientSide) CompressionGunRenderHandler.INSTANCE.dontAnimateItem(hand);
+
         if (player.isShiftKeyDown()) {
             if (!level.isClientSide && player instanceof final ServerPlayer serverPlayer) {
                 PacketDistributor.sendToPlayer(serverPlayer, new CompressionGunOpenMenuPayload(hand));
@@ -104,8 +126,7 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         if (player instanceof final ServerPlayer serverPlayer) {
             BEAMS.remove(serverPlayer.getUUID());
             CompressionGunTank.stopEngine(serverPlayer);
-            if (targetingMode(stack) != CompressionGunTargetingMode.SELF
-                    && CompressionGunTank.canFire(serverPlayer, stack)) {
+            if (CompressionGunTank.canFire(serverPlayer, stack)) {
                 beam(serverPlayer, true, isGrowing(stack));
             }
         }
@@ -126,43 +147,39 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         final CompressionGunTargetingMode targeting = targetingMode(stack);
 
         if (!CompressionGunTank.runEngine(player, stack, player.getUsedItemHand(), elapsed)) {
-            player.displayClientMessage(Component.literal("No air pressure"), true);
+            player.displayClientMessage(Component.translatable("pocket.message.no_air_pressure"), true);
             shutDown(player);
             return;
         }
 
         final boolean fueled = CompressionGunTank.amount(stack) > 0;
         if (elapsed < CHARGE_TICKS) {
-            if (targeting != CompressionGunTargetingMode.SELF) beam(player, fueled, growing);
+            beam(player, fueled, growing);
             return;
         }
 
-        final CompressionStage goal = growing ? CompressionStage.NORMAL : SURVIVAL_FLOOR;
+        final ScaleLimits limits = Overclocking.limits(player, ScaleLimits.CREATIVE);
+        final double goal = growing ? limits.max() : limits.min();
+        final CompressionStage moonGoal = CompressionStage.nearest(goal);
 
-        if (targeting == CompressionGunTargetingMode.SELF) {
-            if (!PehkuiScaleBridge.isOperational()) {
-                player.displayClientMessage(Component.literal("Pehkui integration unavailable"), true);
-                return;
-            }
-
-            if (SelfCompressionSessions.renew(player, goal)) return;
-            if (!fueled) {
-                player.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
-                return;
-            }
-            SelfCompressionSessions.begin(player, goal, player.getUsedItemHand(), growing);
-            return;
-        }
-
-        if (MoonCompressionSessions.renew(player, goal)) return;
+        if (EntityCompressionSessions.renewCannon(player, goal, RANGE)) return;
+        if (MoonCompressionSessions.renew(player, moonGoal)) return;
         if (CompressionSessions.renew(player, goal)) return;
 
         if (!fueled) {
-            player.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
+            player.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
             beam(player, false, growing);
             return;
         }
         beam(player, true, growing);
+
+        final EntityCompressionTargeting.Target entityTarget =
+                EntityCompressionTargeting.find(player, RANGE);
+        if (entityTarget != null) {
+            EntityCompressionSessions.holdCannon(
+                    player, entityTarget.entity(), goal, player.getUsedItemHand());
+            return;
+        }
 
         final MoonTargeting.Hit moonHit = MoonTargeting.hit(
                 player,
@@ -171,7 +188,13 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
                 RANGE
         );
         if (moonHit != null) {
-            MoonCompressionSessions.hold(player, goal, player.getUsedItemHand(), moonHit, growing);
+            MoonCompressionSessions.hold(player, moonGoal, player.getUsedItemHand(), moonHit, growing);
+            return;
+        }
+        if (!growing
+                && moonGoal.isDeeperThan(MoonScale.stage(player.serverLevel().getServer()))
+                && MoonTargeting.aimedAtNonFullMoon(player, MoonScale.get(player.serverLevel().getServer()), RANGE)) {
+            player.displayClientMessage(MoonTargeting.NOT_FULL_MESSAGE, true);
             return;
         }
 
@@ -186,7 +209,8 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
                 false,
                 player.getUsedItemHand(),
                 growing,
-                targeting == CompressionGunTargetingMode.CONNECTED_SUBLEVELS
+                targeting == CompressionGunTargetingMode.CONNECTED_SUBLEVELS,
+                limits
         );
     }
 
@@ -216,9 +240,9 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
     }
 
     private static void shutDown(final ServerPlayer player) {
+        EntityCompressionSessions.releaseCannon(player);
         CompressionSessions.releaseAll(player);
         MoonCompressionSessions.release(player);
-        SelfCompressionSessions.release(player);
         beam(player, false, false);
     }
 
@@ -233,6 +257,34 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
             BEAMS.remove(id);
         }
         CompressionBeamPayload.send(player, firing, growing);
+    }
+
+    private static final float SPIN_KICK_TICKS = 3.0F;
+    private static final float SPIN_KICK_SPEED = 0.24F;
+
+    public static float spinFraction(final float ticksUsing) {
+        final float ticks = Math.min(SPIN_UP_TICKS, Math.max(0.0F, ticksUsing));
+
+        if (ticks < SPIN_KICK_TICKS) {
+            final float t = ticks / SPIN_KICK_TICKS;
+            final float eased = 1.0F - (1.0F - t) * (1.0F - t);
+            return SPIN_KICK_SPEED * eased;
+        }
+
+        final float t = (ticks - SPIN_KICK_TICKS) / (SPIN_UP_TICKS - SPIN_KICK_TICKS);
+        final float eased = t * (0.65F + 0.35F * t);
+        return SPIN_KICK_SPEED + (1.0F - SPIN_KICK_SPEED) * eased;
+    }
+
+    public static float sweepProgress(final float ticksUsing) {
+        return (ticksUsing - SWEEP_START_TICKS) / SWEEP_TICKS;
+    }
+
+    public static boolean modeLocked(final Player player, final InteractionHand hand) {
+        return player.isUsingItem()
+                && player.getUsedItemHand() == hand
+                && player.getTicksUsingItem() >= SPIN_UP_TICKS
+                && CompressionGunTank.hasPower(player, player.getItemInHand(hand));
     }
 
     public static boolean isGrowing(final ItemStack stack) {
@@ -251,25 +303,16 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         final CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
         if (custom == null) return CompressionGunTargetingMode.SUBLEVEL;
 
-        final CompressionGunTargetingMode mode = CompressionGunTargetingMode.fromId(
-                custom.copyTag().getInt(TARGETING_MODE_KEY)
-        );
-        if (mode == CompressionGunTargetingMode.SELF && !PehkuiScaleBridge.ownsScaling()) {
-            return CompressionGunTargetingMode.SUBLEVEL;
-        }
-        return mode;
+        return CompressionGunTargetingMode.fromId(custom.copyTag().getInt(TARGETING_MODE_KEY));
     }
 
     public static void setTargetingMode(
             final ItemStack stack,
             final CompressionGunTargetingMode requested
     ) {
-        CompressionGunTargetingMode mode = requested == null
+        final CompressionGunTargetingMode mode = requested == null
                 ? CompressionGunTargetingMode.SUBLEVEL
                 : requested;
-        if (mode == CompressionGunTargetingMode.SELF && !PehkuiScaleBridge.ownsScaling()) {
-            mode = CompressionGunTargetingMode.SUBLEVEL;
-        }
 
         final CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
         final CompoundTag tag = custom == null ? new CompoundTag() : custom.copyTag();
@@ -298,7 +341,7 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
 
     @Override
     public boolean isBarVisible(final ItemStack stack) {
-        return CompressionGunTank.amount(stack) < CompressionGunTank.CAPACITY;
+        return true;
     }
 
     @Override
@@ -318,7 +361,7 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
             final List<Component> tooltip,
             final TooltipFlag flag
     ) {
-        tooltip.add(Component.literal("Levitite Blend: " + CompressionGunTank.amount(stack)
-                + " / " + CompressionGunTank.CAPACITY + " mB").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("pocket.tooltip.levitite",
+                CompressionGunTank.amount(stack), CompressionGunTank.CAPACITY).withStyle(ChatFormatting.GRAY));
     }
 }

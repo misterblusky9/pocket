@@ -9,8 +9,4 @@ log.txt
 *.zip
 .claude/
 .vscode/
-.patchdeck.json
-patchdeck*.py
-patches/
-minecraft-thread-dump-sampler-python/
 *.bbmodel

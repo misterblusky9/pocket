@@ -1,15 +1,9 @@
 package com.misterblusky9.pocket.mixin.simulatedcoasters;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.misterblusky9.pocket.compat.simulatedcoasters.SimulatedCoastersLinkScale;
-import com.misterblusky9.pocket.physics.ScaleFrame;
-import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintHandle;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import org.joml.Quaterniondc;
-import org.joml.Vector3dc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.objectweb.asm.Opcodes;
@@ -68,42 +62,6 @@ public abstract class CoasterCartTrainLinkConstraintScaleMixin {
     ) {
         return SimulatedCoastersLinkScale.toWorld(
                 nominal, SimulatedCoastersLinkScale.pairScale(cartA, cartB, null));
-    }
-
-    @WrapOperation(
-            method = POCKET$UPDATE,
-            at = @At(value = "INVOKE",
-                    target = "Ldev/ryanhcode/sable/api/physics/constraint/GenericConstraintHandle;"
-                            + "setFrame1(Lorg/joml/Vector3dc;Lorg/joml/Quaterniondc;)V"),
-            remap = false,
-            require = 1
-    )
-    private static void pocket$scaleCartAFrame(
-            final GenericConstraintHandle handle,
-            final Vector3dc position,
-            final Quaterniondc orientation,
-            final Operation<Void> original,
-            @Local(argsOnly = true, index = 2) final ServerSubLevel cartA
-    ) {
-        original.call(handle, cartA == null ? position : ScaleFrame.toBodyMetric(cartA, position), orientation);
-    }
-
-    @WrapOperation(
-            method = POCKET$UPDATE,
-            at = @At(value = "INVOKE",
-                    target = "Ldev/ryanhcode/sable/api/physics/constraint/GenericConstraintHandle;"
-                            + "setFrame2(Lorg/joml/Vector3dc;Lorg/joml/Quaterniondc;)V"),
-            remap = false,
-            require = 1
-    )
-    private static void pocket$scaleCartBFrame(
-            final GenericConstraintHandle handle,
-            final Vector3dc position,
-            final Quaterniondc orientation,
-            final Operation<Void> original,
-            @Local(argsOnly = true, index = 3) final ServerSubLevel cartB
-    ) {
-        original.call(handle, cartB == null ? position : ScaleFrame.toBodyMetric(cartB, position), orientation);
     }
 
     @ModifyExpressionValue(

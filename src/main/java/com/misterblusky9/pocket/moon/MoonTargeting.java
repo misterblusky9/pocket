@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.moon;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.BlockHitResult;
@@ -13,6 +14,8 @@ public final class MoonTargeting {
     public static final double SURFACE_HALF_SIZE = 5.0D;
     private static final double EPSILON = 1.0E-8D;
 
+    public static final Component NOT_FULL_MESSAGE = Component.translatable("pocket.message.moon_not_full");
+
     public record Hit(float surfaceX, float surfaceZ, Vec3 worldPoint) {}
 
     public static Hit hit(
@@ -21,8 +24,26 @@ public final class MoonTargeting {
             final float partialTick,
             final double obstructionRange
     ) {
+        if (player == null || player.level().getMoonPhase() != 0) return null;
+        return anyPhaseHit(player, scale, partialTick, obstructionRange);
+    }
+
+    public static boolean aimedAtNonFullMoon(
+            final Player player,
+            final float scale,
+            final double obstructionRange
+    ) {
+        return player != null && player.level().getMoonPhase() != 0
+                && anyPhaseHit(player, scale, 1.0F, obstructionRange) != null;
+    }
+
+    private static Hit anyPhaseHit(
+            final Player player,
+            final float scale,
+            final float partialTick,
+            final double obstructionRange
+    ) {
         if (player == null || !Float.isFinite(scale) || scale <= 0.0F) return null;
-        if (player.level().getMoonPhase() != 0) return null;
         if (!player.level().dimensionType().hasSkyLight()) return null;
 
         final Vec3 look = player.getViewVector(partialTick);

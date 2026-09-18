@@ -1,0 +1,1 @@
+{ "parent": "minecraft:item/generated", "textures": { "layer0": "pocket:item/personal_subspace_compressor" } }

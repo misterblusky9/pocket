@@ -17,6 +17,10 @@ public final class ColliderBudgetTest {
         cellCapBucketsInsteadOfSolidifying();
         cellCapLeavesAffordableCellsAlone();
         fragmentEstimateBoundsTheRealSplit();
+        growthRaisesTheFragmentEstimate();
+        growthCanPriceACraftOutOfItsBudget();
+        cellDecompositionIsScaleInvariantAcrossTheBand();
+        geometryRejectsOnlyOutOfBandScales();
         ladderCoarsensAndOrders();
         ladderStaysBlockAccurate();
         theFloorOnlyEverRises();
@@ -152,7 +156,7 @@ public final class ColliderBudgetTest {
                 new PlotShape.Box(5.0D, 4.0D, 5.0D, 6.0D, 20.0D, 6.0D),
                 new PlotShape.Box(1.5D, 0.5D, 1.5D, 2.5D, 1.5D, 2.5D));
 
-        for (final double scale : new double[] { 1.0D, 0.5D, 0.25D, 0.125D, 0.0625D }) {
+        for (final double scale : band()) {
             final long estimate = ColliderDetail.estimateFragments(boxes, scale);
             long actual = 0L;
             for (final PlotShape.Box box : boxes) {
@@ -160,13 +164,94 @@ public final class ColliderBudgetTest {
                         * crossed(box.maxY() - box.minY(), scale)
                         * crossed(box.maxZ() - box.minZ(), scale);
             }
-            check(estimate >= actual,
-                    "estimate " + estimate + " under-counted " + actual + " at scale " + scale);
+
+            if (estimate <= ColliderDetail.MAX_FRAGMENTS) {
+                check(estimate >= actual,
+                        "estimate " + estimate + " under-counted " + actual + " at scale " + scale);
+            } else {
+                check(actual > ColliderDetail.MAX_FRAGMENTS,
+                        "the estimate bailed out over budget at scale " + scale
+                                + " but the real split was only " + actual);
+            }
         }
 
         check(ColliderDetail.estimateFragments(boxes, 0.0625D)
                         <= ColliderDetail.estimateFragments(boxes, 1.0D),
                 "a smaller craft must not be estimated as more fragmented");
+    }
+
+    private static void growthRaisesTheFragmentEstimate() {
+        final List<PlotShape.Box> boxes = List.of(new PlotShape.Box(0.0D, 0.0D, 0.0D, 4.0D, 4.0D, 4.0D));
+
+        final double[] band = band();
+        for (int i = 1; i < band.length; i++) {
+            final long coarser = ColliderDetail.estimateFragments(boxes, band[i]);
+            final long finer = ColliderDetail.estimateFragments(boxes, band[i - 1]);
+            check(coarser <= finer,
+                    "shrinking from " + band[i - 1] + " to " + band[i]
+                            + " raised the estimate from " + finer + " to " + coarser);
+        }
+
+        check(ColliderDetail.estimateFragments(boxes, 2.0D)
+                        > ColliderDetail.estimateFragments(boxes, 1.0D),
+                "a grown craft must cost more fragments than the same craft at 1x");
+        check(ColliderDetail.estimateFragments(boxes, 1.0D / 32.0D)
+                        <= ColliderDetail.estimateFragments(boxes, 1.0D / 16.0D),
+                "1/32 must not be estimated as more fragmented than 1/16");
+    }
+
+    private static void growthCanPriceACraftOutOfItsBudget() {
+        final List<PlotShape.Box> boxes = List.of(new PlotShape.Box(0.0D, 0.0D, 0.0D, 4.0D, 4.0D, 4.0D));
+
+        check(ColliderDetail.estimateFragments(boxes, 1.0D) <= ColliderDetail.MAX_FRAGMENTS,
+                "this craft must start comfortably inside the budget");
+        check(ColliderDetail.estimateFragments(boxes, 32.0D) > ColliderDetail.MAX_FRAGMENTS,
+                "growth to 32x must break the fragment budget, not be waved through as if it were 1x");
+
+        final List<PlotShape.Box> wide = List.of(new PlotShape.Box(0.0D, 0.0D, 0.0D, 64.0D, 64.0D, 64.0D));
+        check(ColliderDetail.estimateFragments(wide, 4.0D) > ColliderDetail.MAX_FRAGMENTS,
+                "a large craft grown to the experimental ceiling must be caught by the budget");
+    }
+
+    private static void cellDecompositionIsScaleInvariantAcrossTheBand() {
+        final Set<String> reference = new HashSet<>();
+        for (final ColliderGeometry.CellBox box : ColliderGeometry.prism(0.0D, 0.0D, 0.0D, 3.0D, 3.0D, 3.0D, 1.0D)) {
+            reference.add(cell(box));
+        }
+        check(!reference.isEmpty(), "the reference prism must produce cells");
+
+        for (final double scale : band()) {
+            final List<ColliderGeometry.CellBox> solid =
+                    ColliderGeometry.prism(0.0D, 0.0D, 0.0D, 3.0D, 3.0D, 3.0D, scale);
+            final List<ColliderGeometry.CellBox> shell =
+                    ColliderGeometry.prismShell(0.0D, 0.0D, 0.0D, 3.0D, 3.0D, 3.0D, scale);
+
+            check(!solid.isEmpty(), "scale " + scale + " produced no colliders at all");
+            check(!shell.isEmpty(), "scale " + scale + " produced no shell colliders at all");
+
+            final Set<String> cells = new HashSet<>();
+            for (final ColliderGeometry.CellBox box : solid) cells.add(cell(box));
+            check(cells.equals(reference),
+                    "cell identity drifted at scale " + scale + ": " + cells.size()
+                            + " cells against " + reference.size());
+            check(shell.size() <= solid.size(), "the shell grew past the solid prism at scale " + scale);
+        }
+    }
+
+    private static void geometryRejectsOnlyOutOfBandScales() {
+        check(!ColliderGeometry.prism(0.0D, 0.0D, 0.0D, 3.0D, 3.0D, 3.0D, 32.0D).isEmpty(),
+                "the API ceiling is in band and must still produce colliders");
+
+        for (final double outOfBand : new double[] { 33.0D, 64.0D, 0.0D, -1.0D, Double.NaN }) {
+            check(ColliderGeometry.prism(0.0D, 0.0D, 0.0D, 3.0D, 3.0D, 3.0D, outOfBand).isEmpty(),
+                    "scale " + outOfBand + " is out of band and must produce no colliders");
+        }
+    }
+
+    private static double[] band() {
+        return new double[] {
+                32.0D, 4.0D, 2.0D, 1.0D, 0.5D, 0.25D, 0.125D, 0.0625D, 1.0D / 32.0D, 1.0D / 64.0D
+        };
     }
 
     private static void ladderCoarsensAndOrders() {

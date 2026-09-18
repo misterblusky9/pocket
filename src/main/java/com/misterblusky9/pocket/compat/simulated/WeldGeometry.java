@@ -11,6 +11,8 @@ import org.joml.Vector3dc;
 
 public final class WeldGeometry {
     public static final double PANEL_THICKNESS = 1.0D / 128.0D;
+    public static final int UNSTEPPED = 1;
+    private static final double RATIO_TOLERANCE = 1.0E-6D;
     private static final double CENTRE_MAGNET = 0.2D;
     private static final double QUARTER_TURN = Math.PI * 0.5D;
 
@@ -23,13 +25,27 @@ public final class WeldGeometry {
 
     public static int divisor(final CompressionStage smaller, final CompressionStage larger) {
         if (smaller == null || larger == null) return 0;
-        final int steps = smaller.depth() - larger.depth();
-        return steps < 1 || steps >= CompressionStage.values().length ? 0 : 1 << steps;
+        return divisor(smaller.scale(), larger.scale());
+    }
+
+    public static int divisor(final double smaller, final double larger) {
+        if (!Double.isFinite(smaller) || !Double.isFinite(larger) || smaller <= 0 || larger <= smaller) return 0;
+        final double ratio = larger / smaller;
+        final long whole = Math.round(ratio);
+        if (whole >= 2L && whole <= Integer.MAX_VALUE && Math.abs(ratio / whole - 1.0D) <= RATIO_TOLERANCE) {
+            return (int) whole;
+        }
+        return UNSTEPPED;
     }
 
     public static double span(final CompressionStage own, final CompressionStage peer) {
         if (own == null || peer == null) return 1.0D;
-        return Math.min(1.0D, peer.scale() / own.scale());
+        return span(own.scale(), peer.scale());
+    }
+
+    public static double span(final double own, final double peer) {
+        if (!Double.isFinite(own) || !Double.isFinite(peer) || own <= 0 || peer <= 0) return 1.0D;
+        return Math.min(1.0D, peer / own);
     }
 
     public static double snapAxis(final double value, final int divisor, final SnapMode mode) {
@@ -61,6 +77,19 @@ public final class WeldGeometry {
         return best;
     }
 
+    public static double placeAxis(
+            final double value,
+            final int divisor,
+            final double footprint,
+            final SnapMode mode
+    ) {
+        if (divisor > UNSTEPPED || mode == SnapMode.FREE || !(footprint > 0.0D && footprint < 1.0D)) {
+            return snapAxis(value, divisor, mode);
+        }
+        final double half = footprint * 0.5D;
+        return clamp(clampUnit(value), half, 1.0D - half);
+    }
+
     public static Vector3d anchor(
             final BlockPos pos,
             final Direction facing,
@@ -70,13 +99,26 @@ public final class WeldGeometry {
             final int divisor,
             final SnapMode mode
     ) {
+        return anchor(pos, facing, hitX, hitY, hitZ, divisor, 1.0D, mode);
+    }
+
+    public static Vector3d anchor(
+            final BlockPos pos,
+            final Direction facing,
+            final double hitX,
+            final double hitY,
+            final double hitZ,
+            final int divisor,
+            final double footprint,
+            final SnapMode mode
+    ) {
         double x = clampUnit(hitX);
         double y = clampUnit(hitY);
         double z = clampUnit(hitZ);
 
-        if (facing.getAxis() != Direction.Axis.X) x = snapAxis(x, divisor, mode);
-        if (facing.getAxis() != Direction.Axis.Y) y = snapAxis(y, divisor, mode);
-        if (facing.getAxis() != Direction.Axis.Z) z = snapAxis(z, divisor, mode);
+        if (facing.getAxis() != Direction.Axis.X) x = placeAxis(x, divisor, footprint, mode);
+        if (facing.getAxis() != Direction.Axis.Y) y = placeAxis(y, divisor, footprint, mode);
+        if (facing.getAxis() != Direction.Axis.Z) z = placeAxis(z, divisor, footprint, mode);
 
         switch (facing) {
             case WEST -> x = 0.0D;

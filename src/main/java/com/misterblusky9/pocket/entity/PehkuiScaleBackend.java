@@ -1,13 +1,16 @@
 package com.misterblusky9.pocket.entity;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.scale.ScaleTransitionCurve;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
 import virtuoel.pehkui.api.ScaleData;
 import virtuoel.pehkui.api.ScaleModifier;
 import virtuoel.pehkui.api.ScaleRegistries;
 import virtuoel.pehkui.api.ScaleTypes;
+import virtuoel.pehkui.util.ScaleUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,6 +19,7 @@ import java.util.WeakHashMap;
 
 public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
     private static final float MODIFIER_PRIORITY = 1024.0F;
+    private static final int PERSONAL_RESIZE_TICKS = (int) ScaleTransitionCurve.DEFAULT_TICKS;
 
     private final Map<Entity, Factors> factors =
             Collections.synchronizedMap(new WeakHashMap<>());
@@ -159,9 +163,36 @@ public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
     }
 
     @Override
+    public double personalScale(final Entity entity) {
+        return sanitize(ScaleTypes.BASE.getScaleData(entity).getBaseScale());
+    }
+
+    @Override
+    public double personalTargetScale(final Entity entity) {
+        return sanitize(ScaleTypes.BASE.getScaleData(entity).getTargetScale());
+    }
+
+    @Override
+    public double unscaledBoxSize(final Entity entity, final double scaledSize) {
+        final float width = ScaleUtils.getBoundingBoxWidthScale(entity);
+        final float height = ScaleUtils.getBoundingBoxHeightScale(entity);
+
+        if (!Float.isFinite(width) || !Float.isFinite(height)
+                || width <= 0.0F || height <= 0.0F
+                || (width >= 1.0F && height >= 1.0F)) {
+            return scaledSize;
+        }
+
+        final AABB box = entity.getBoundingBox();
+        return (box.getXsize() / width + box.getZsize() / width + box.getYsize() / height) / 3.0D;
+    }
+
+    @Override
     public void setPersonalScale(final Entity entity, final double scale) {
         final float value = sanitize(scale);
-        ScaleTypes.BASE.getScaleData(entity).setScale(value);
+        final ScaleData base = ScaleTypes.BASE.getScaleData(entity);
+        base.setScaleTickDelay(PERSONAL_RESIZE_TICKS);
+        base.setTargetScale(value);
 
         if (isNeutral(value)) {
             this.baseScaledEntities.remove(entity);
@@ -191,6 +222,11 @@ public final class PehkuiScaleBackend implements PehkuiScaleBridge.Backend {
     public void clearPersonalScale(final Entity entity) {
         this.baseScaledEntities.remove(entity);
         ScaleTypes.BASE.getScaleData(entity).setScale(1.0F);
+    }
+
+    @Override
+    public float motionScale(final Entity entity) {
+        return ScaleUtils.getMotionScale(entity);
     }
 
     @Override

@@ -5,8 +5,11 @@ import com.misterblusky9.pocket.network.CompressionSyncPayload;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.scale.CompressionStage;
+import com.misterblusky9.pocket.scale.JointScalePropagation;
 import com.misterblusky9.pocket.scale.ManualScaleOverride;
 import com.misterblusky9.pocket.scale.ScaleController;
+import com.misterblusky9.pocket.scale.ScaleLimits;
+import com.misterblusky9.pocket.scale.ScalePhysicsMode;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CompressionGunTank;
@@ -40,7 +43,7 @@ public final class CompressionSessions {
 
     public static final int SURVIVAL_BLOCK_LIMIT = PocketSized.MAX_COMPRESSED_BLOCKS;
 
-    private static final float LEVITITE_PER_TICK = 5.0F;
+    static final float LEVITITE_PER_TICK = 5.0F;
 
     private static final int PULSE_LEAD_TICKS = 10;
 
@@ -55,28 +58,25 @@ public final class CompressionSessions {
             final ServerPlayer player,
             final ServerSubLevel subLevel,
             final BlockPos hitLocalPos,
-            final CompressionStage floor,
+            final double floor,
             final boolean instant,
             final net.minecraft.world.InteractionHand hand,
             final boolean growingIntent,
-            final boolean propagateJoints
+            final boolean propagateJoints,
+            final ScaleLimits limits
     ) {
-        if (player == null || subLevel == null || subLevel.isRemoved()) return false;
+        if (player == null || subLevel == null || subLevel.isRemoved() || !PocketSized.isValidScale(floor)) return false;
 
         final UUID id = subLevel.getUniqueId();
         if (id == null) return false;
 
         final long now = player.level().getGameTime();
-        final CrossScaleWelds.ScalePlan weldPlan = CrossScaleWelds.planScale(subLevel, floor, now);
-        if (weldPlan.welded() && !weldPlan.allowed()) {
-            player.displayClientMessage(Component.literal(CrossScaleWelds.SCALE_LIMIT), true);
-            return false;
-        }
+        if (!withinLimits(player, subLevel, floor, now, limits, propagateJoints)) return false;
 
         Session session = SESSIONS.get(id);
 
         if (session != null && session.holder.equals(player.getUUID())) {
-            if (session.floor != floor) {
+            if (!ScaleController.sameScale(session.floor, floor)) {
                 SESSIONS.remove(session.subLevelId);
                 CompressionSyncPayload.sendRelease(subLevel);
             } else {
@@ -120,6 +120,8 @@ public final class CompressionSessions {
         session.blocked = cellLimit > 0;
         session.hand = hand;
         session.propagateJoints = propagateJoints;
+        session.limits = limits;
+        session.growing = growing;
         SESSIONS.put(id, session);
 
         CompressionSyncPayload.sendBegin(
@@ -132,22 +134,30 @@ public final class CompressionSessions {
             final ServerSubLevel subLevel,
             final BlockPos hitLocalPos,
             final CompressionStage requested,
-            final boolean propagateJoints
+            final boolean propagateJoints,
+            final ScaleLimits limits
     ) {
-        if (player == null || subLevel == null || subLevel.isRemoved() || requested == null) return;
+        if (requested != null) instant(player, subLevel, hitLocalPos, requested.scale(), propagateJoints, limits);
+    }
+
+    public static void instant(
+            final ServerPlayer player,
+            final ServerSubLevel subLevel,
+            final BlockPos hitLocalPos,
+            final double requested,
+            final boolean propagateJoints,
+            final ScaleLimits limits
+    ) {
+        if (player == null || subLevel == null || subLevel.isRemoved() || !PocketSized.isValidScale(requested)) return;
 
         final UUID id = subLevel.getUniqueId();
         if (id == null) return;
 
-        final CompressionStage current = ScaleState.getStage(subLevel);
+        final double current = ScaleState.getServerScale(subLevel);
         final long now = player.level().getGameTime();
-        final CrossScaleWelds.ScalePlan weldPlan = CrossScaleWelds.planScale(subLevel, requested, now);
-        if (weldPlan.welded() && !weldPlan.allowed()) {
-            player.displayClientMessage(Component.literal(CrossScaleWelds.SCALE_LIMIT), true);
-            return;
-        }
+        if (!withinLimits(player, subLevel, requested, now, limits, propagateJoints)) return;
 
-        if (requested.depth() > current.depth()) {
+        if (requested < current - PocketSized.EPSILON) {
             final CompressionBlacklist.Result blocked = CompressionBlacklist.find(subLevel, now);
             if (blocked.blocked()) {
                 player.displayClientMessage(Component.literal(blocked.message()), true);
@@ -156,7 +166,7 @@ public final class CompressionSessions {
         }
 
         ManualScaleOverride.engage(subLevel, now);
-        ScaleController.forceStage(subLevel, requested, now, null, propagateJoints);
+        ScaleController.forceScale(subLevel, requested, now, null, propagateJoints, ScalePhysicsMode.TRACKING, limits);
 
         final Session session = new Session(
                 id, player.getUUID(), hitLocalPos.immutable(),
@@ -170,10 +180,27 @@ public final class CompressionSessions {
 
         CompressionSyncPayload.sendBegin(
                 subLevel, player, hitLocalPos, INSTANT_ACQUIRE_TICKS, false,
-                requested.depth() < current.depth(), 0);
+                requested > current + PocketSized.EPSILON, 0);
     }
 
-    public static boolean renew(final ServerPlayer player, final CompressionStage goal) {
+    private static boolean withinLimits(
+            final ServerPlayer player,
+            final ServerSubLevel subLevel,
+            final double requested,
+            final long now,
+            final ScaleLimits limits,
+            final boolean propagateJoints
+    ) {
+        final CrossScaleWelds.ScalePlan weldPlan = CrossScaleWelds.planScale(subLevel, requested, now, limits);
+        if (weldPlan.welded() && !weldPlan.allowed()
+                || propagateJoints && !JointScalePropagation.permits(subLevel, requested, limits)) {
+            player.displayClientMessage(Component.literal(CrossScaleWelds.SCALE_LIMIT), true);
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean renew(final ServerPlayer player, final double goal) {
         if (player == null) return false;
 
         final long now = player.level().getGameTime();
@@ -188,7 +215,7 @@ public final class CompressionSessions {
 
             if (session.autoRelease) continue;
 
-            if (goal != null && session.floor != goal) {
+            if (!ScaleController.sameScale(session.floor, goal)) {
                 iterator.remove();
 
                 final ServerLevel level = session.level != null ? session.level : player.serverLevel();
@@ -308,7 +335,7 @@ public final class CompressionSessions {
 
             session.age++;
             if (session.levititePerTick > 0.0F && !drawLevitite(session, holder)) {
-                holder.displayClientMessage(Component.literal("Levitite Blend depleted"), true);
+                holder.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
                 return false;
             }
 
@@ -320,12 +347,13 @@ public final class CompressionSessions {
             return true;
         }
 
-        final CompressionStage current = ScaleState.getStage(subLevel);
-        if (current.depth() == session.floor.depth()) {
-            return !session.autoRelease;
-        }
+        if (session.directDrive) return !ScaleState.isSettled(subLevel);
 
-        if (session.directDrive) return true;
+        final double current = ScaleState.getSettledScale(subLevel);
+        final boolean arrived = session.growing
+                ? current >= session.floor - PocketSized.EPSILON
+                : current <= session.floor + PocketSized.EPSILON;
+        if (arrived) return !session.autoRelease;
 
         session.sinceStep++;
         final int delay = stepDelay(session, current);
@@ -337,21 +365,18 @@ public final class CompressionSessions {
 
         if (session.sinceStep < delay) return true;
 
-        final int direction = session.floor.depth() > current.depth() ? 1 : -1;
-        final CompressionStage next = CompressionStage.fromDepth(current.depth() + direction);
-        final CrossScaleWelds.ScalePlan weldPlan = CrossScaleWelds.planScale(
-                subLevel, next, subLevel.getLevel().getGameTime());
-        if (weldPlan.welded() && !weldPlan.allowed()) {
-            holder.displayClientMessage(Component.literal(CrossScaleWelds.SCALE_LIMIT), true);
-            return false;
-        }
+        final double next = CompressionStage.stepToward(current, session.floor);
+        final long now = subLevel.getLevel().getGameTime();
+        if (!withinLimits(holder, subLevel, next, now, session.limits, session.propagateJoints)) return false;
 
-        ScaleController.forceStage(
+        ScaleController.forceScale(
                 subLevel,
                 next,
-                subLevel.getLevel().getGameTime(),
+                now,
                 null,
-                session.propagateJoints
+                session.propagateJoints,
+                ScalePhysicsMode.TRACKING,
+                session.limits
         );
         session.sinceStep = 0;
         session.pulsed = false;
@@ -359,12 +384,15 @@ public final class CompressionSessions {
         return true;
     }
 
-    private static int stepDelay(final Session session, final CompressionStage current) {
+    private static int stepDelay(final Session session, final double current) {
         if (session.uniformSteps) return CREATIVE_STEP_TICKS;
+        return cannonStepDelay(session.steps, current, session.floor);
+    }
 
-        final int base = Math.round(STEP_BASE_TICKS * (1.0F + session.steps * STEP_GROWTH));
-        final int direction = session.floor.depth() > current.depth() ? 1 : -1;
-        final boolean isFinalStep = current.depth() + direction == session.floor.depth();
+    static int cannonStepDelay(final int steps, final double current, final double floor) {
+        final int base = Math.round(STEP_BASE_TICKS * (1.0F + steps * STEP_GROWTH));
+        final boolean isFinalStep = ScaleController.sameScale(
+                CompressionStage.stepToward(current, floor), floor);
         return isFinalStep ? base + FINAL_STEP_EXTRA_TICKS : base;
     }
 
@@ -434,7 +462,7 @@ public final class CompressionSessions {
         private final float levititePerTick;
 
         private ServerLevel level;
-        private CompressionStage floor;
+        private double floor;
         private long lastHeldTick;
         private int age;
         private boolean sealed;
@@ -450,6 +478,8 @@ public final class CompressionSessions {
         private boolean blocked;
         private boolean illuminated = true;
         private boolean propagateJoints = true;
+        private boolean growing;
+        private ScaleLimits limits = ScaleLimits.STANDARD;
         private net.minecraft.world.InteractionHand hand =
                 net.minecraft.world.InteractionHand.MAIN_HAND;
 
@@ -459,7 +489,7 @@ public final class CompressionSessions {
                 final BlockPos hitLocalPos,
                 final int acquireTicks,
                 final float levititePerTick,
-                final CompressionStage floor,
+                final double floor,
                 final long now
         ) {
             this.subLevelId = subLevelId;

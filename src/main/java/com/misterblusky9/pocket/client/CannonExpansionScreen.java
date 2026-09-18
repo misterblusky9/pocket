@@ -24,7 +24,7 @@ public class CannonExpansionScreen extends AbstractSimiScreen {
     private final PocketGuiTexture background = PocketGuiTexture.POTATO_CANNON;
     private final ItemStack cannon;
     private final InteractionHand hand;
-    private final Component title = Component.literal("Projectile Expansion");
+    private final Component title = Component.translatable("pocket.screen.projectile_expansion");
     private final List<IconButton> modeButtons = new ArrayList<>(CannonExpansionMode.values().length);
 
     private CannonExpansionMode selected;

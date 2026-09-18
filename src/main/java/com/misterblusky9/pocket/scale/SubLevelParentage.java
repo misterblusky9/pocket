@@ -107,24 +107,22 @@ public final class SubLevelParentage {
             if (com.misterblusky9.pocket.compression.CompressionSessions.isHeld(childId)) continue;
 
             final ScaleState.ServerState parentState = ScaleState.serverState(parent);
-            final CompressionStage commanded = parentState.transitionStage() != null
-                    ? parentState.transitionStage()
-                    : parentState.stableStage();
-            if (commanded == null) continue;
+            final double commanded = parentState.goalScale();
 
             if (isBarePlate(child) && requestRelease(parent, child)) continue;
 
             final ScaleState.ServerState childState = ScaleState.serverState(child);
-            final CompressionStage childGoal = childState.transitionStage() != null
-                    ? childState.transitionStage()
-                    : childState.stableStage();
-            if (childGoal == commanded && childState.requestedStage() == commanded) continue;
+            final double childGoal = childState.goalScale();
+            if (ScaleController.sameScale(childGoal, commanded)
+                    && ScaleController.sameScale(childState.requestedScale(), commanded)) {
+                continue;
+            }
 
             PocketTrace.scale(
-                    "parent stage propagated child={} parent={} stage={} from={}",
+                    "parent scale propagated child={} parent={} scale={} from={}",
                     childId, parentId, commanded, childGoal);
 
-            ScaleController.forceStage(
+            ScaleController.forceScale(
                     child, commanded, child.getLevel().getGameTime(), null, true,
                     com.misterblusky9.pocket.physics.ScalePhysicsTransitions.modeOf(parent));
         }

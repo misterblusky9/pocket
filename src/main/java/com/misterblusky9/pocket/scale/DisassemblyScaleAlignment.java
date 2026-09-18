@@ -24,8 +24,7 @@ public final class DisassemblyScaleAlignment {
         final ServerSubLevel subLevel = containing(assembler);
         if (subLevel == null) return true;
 
-        if (ScaleState.isSettled(subLevel.getUniqueId())
-                && ScaleState.getStage(subLevel) == CompressionStage.NORMAL) {
+        if (ScaleState.isAt(subLevel, CompressionStage.NORMAL.scale())) {
             return true;
         }
 

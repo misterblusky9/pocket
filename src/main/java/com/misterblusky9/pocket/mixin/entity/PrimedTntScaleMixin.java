@@ -142,6 +142,6 @@ public abstract class PrimedTntScaleMixin implements PrimedTntScaleAccess {
     @Unique
     private static double pocket$sanitize(final double scale) {
         if (!Double.isFinite(scale) || scale <= 0.0D) return 1.0D;
-        return Math.max(PocketSized.MIN_SCALE, Math.min(1.0D, scale));
+        return PocketSized.clampScale(scale);
     }
 }

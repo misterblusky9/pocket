@@ -1,10 +1,12 @@
 package com.misterblusky9.pocket.item;
 
+import com.misterblusky9.pocket.Overclocking;
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.client.CompressionGunTargetingScreen;
 import com.misterblusky9.pocket.client.CreativeShrinkRayRenderer;
 import com.misterblusky9.pocket.client.MoonScaleClient;
-import com.misterblusky9.pocket.entity.PehkuiScaleBridge;
+import com.misterblusky9.pocket.compression.EntityCompressionSessions;
+import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.misterblusky9.pocket.moon.MoonCompressionSessions;
 import com.misterblusky9.pocket.moon.MoonScale;
 import com.misterblusky9.pocket.moon.MoonTargeting;
@@ -12,6 +14,9 @@ import com.misterblusky9.pocket.pocket.PocketMetrics;
 import com.misterblusky9.pocket.network.ShrinkRayBeamColourPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleController;
+import com.misterblusky9.pocket.scale.ScaleLadder;
+import com.misterblusky9.pocket.scale.ScaleLimits;
+import com.misterblusky9.pocket.scale.ScalePhysicsMode;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.simibubi.create.AllDataComponents;
 import com.simibubi.create.CreateClient;
@@ -33,6 +38,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
@@ -45,9 +51,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.function.Consumer;
 
 public final class CreativeShrinkRayItem extends ZapperItem implements PriorityInteractionItem {
+    private static final ThreadLocal<Boolean> FIRED = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    private static final String SCALE_KEY = "PocketScale";
     private static final String STAGE_KEY = "PocketStage";
     private static final String TARGETING_MODE_KEY = "PocketTargetingMode";
-    private static final double RANGE = 192.0D;
+    public static final double RANGE = 192.0D;
 
     public CreativeShrinkRayItem(final Properties properties) {
         super(properties);
@@ -59,17 +68,52 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
         consumer.accept(SimpleCustomRenderer.create(this, new CreativeShrinkRayRenderer()));
     }
 
-    public static CompressionStage selectedStage(final ItemStack stack) {
-        final CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
-        if (custom == null) return CompressionStage.NORMAL;
-        final CompoundTag tag = custom.copyTag();
-        return CompressionStage.fromDepth(tag.getInt(STAGE_KEY));
+    public static CompressionStage selectedStage(final ItemStack stack, final Player player) {
+        return CompressionStage.nearest(selectedScale(stack, player));
     }
 
     public static void setSelectedStage(final ItemStack stack, final CompressionStage stage) {
+        setSelectedScale(stack, stage == null ? PocketSized.FULL_SCALE : stage.scale());
+    }
+
+    public static double[] ladder(final Player player) {
+        return Overclocking.ladder(player, ScaleLadder.CREATIVE);
+    }
+
+    public static ScaleLimits limits(final Player player) {
+        return Overclocking.limits(player, ScaleLimits.CREATIVE);
+    }
+
+    public static boolean permits(final Player player, final double scale) {
+        final ScaleLimits limits = limits(player);
+        return PocketSized.isValidScale(scale)
+                && scale >= limits.min() - PocketSized.EPSILON
+                && scale <= limits.max() + PocketSized.EPSILON;
+    }
+
+    public static double selectedScale(final ItemStack stack, final Player player) {
+        final double scale = selectedScale(stack);
+        return limits(player).clamp(scale);
+    }
+
+    public static double selectedScale(final ItemStack stack) {
+        final CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        if (custom == null) return PocketSized.FULL_SCALE;
+        final CompoundTag tag = custom.copyTag();
+        if (tag.contains(SCALE_KEY, net.minecraft.nbt.Tag.TAG_ANY_NUMERIC)
+                && PocketSized.isValidScale(tag.getDouble(SCALE_KEY))) {
+            return CompressionStage.snap(tag.getDouble(SCALE_KEY));
+        }
+        return CompressionStage.fromDepth(tag.getInt(STAGE_KEY)).scale();
+    }
+
+    public static void setSelectedScale(final ItemStack stack, final double scale) {
+        if (!PocketSized.isValidScale(scale)) return;
+        final double clamped = CompressionStage.snap(scale);
         final CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
         final CompoundTag tag = custom == null ? new CompoundTag() : custom.copyTag();
-        tag.putInt(STAGE_KEY, stage == null ? 0 : stage.depth());
+        tag.putDouble(SCALE_KEY, clamped);
+        tag.putInt(STAGE_KEY, CompressionStage.nearest(clamped).depth());
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
     }
 
@@ -77,25 +121,16 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
         final CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
         if (custom == null) return CompressionGunTargetingMode.SUBLEVEL;
 
-        final CompressionGunTargetingMode mode = CompressionGunTargetingMode.fromId(
-                custom.copyTag().getInt(TARGETING_MODE_KEY)
-        );
-        if (mode == CompressionGunTargetingMode.SELF && !PehkuiScaleBridge.ownsScaling()) {
-            return CompressionGunTargetingMode.SUBLEVEL;
-        }
-        return mode;
+        return CompressionGunTargetingMode.fromId(custom.copyTag().getInt(TARGETING_MODE_KEY));
     }
 
     public static void setTargetingMode(
             final ItemStack stack,
             final CompressionGunTargetingMode requested
     ) {
-        CompressionGunTargetingMode mode = requested == null
+        final CompressionGunTargetingMode mode = requested == null
                 ? CompressionGunTargetingMode.SUBLEVEL
                 : requested;
-        if (mode == CompressionGunTargetingMode.SELF && !PehkuiScaleBridge.ownsScaling()) {
-            mode = CompressionGunTargetingMode.SUBLEVEL;
-        }
 
         final CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
         final CompoundTag tag = custom == null ? new CompoundTag() : custom.copyTag();
@@ -110,21 +145,49 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
             final InteractionHand hand
     ) {
         final ItemStack stack = player.getItemInHand(hand);
-        final CompressionGunTargetingMode targeting = targetingMode(stack);
 
-        if (!player.isShiftKeyDown() && targeting == CompressionGunTargetingMode.SELF) {
-            if (!level.isClientSide && player instanceof final ServerPlayer serverPlayer) {
-                if (!PehkuiScaleBridge.isOperational()) {
-                    player.displayClientMessage(Component.literal("Pehkui integration unavailable"), true);
-                } else {
-                    com.misterblusky9.pocket.compression.SelfCompressionSessions.instant(
-                            serverPlayer, selectedStage(stack));
+        if (!player.isShiftKeyDown()) {
+            final EntityCompressionTargeting.Target entityTarget =
+                    EntityCompressionTargeting.find(player, RANGE);
+            if (entityTarget != null) {
+                if (ShootableGadgetItemMethods.shouldSwap(player, stack, hand, this::isZapper)) {
+                    return new InteractionResultHolder<>(InteractionResult.FAIL, stack);
                 }
-            }
-            return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
-        }
 
-        if (!player.isShiftKeyDown() && targeting != CompressionGunTargetingMode.SELF) {
+                if (level.isClientSide) {
+                    CreateClient.ZAPPER_RENDER_HANDLER.dontAnimateItem(hand);
+                    return new InteractionResultHolder<>(InteractionResult.SUCCESS, stack);
+                }
+
+                if (player instanceof final ServerPlayer serverPlayer) {
+                    final double targetScale = selectedScale(stack, player);
+                    final double currentScale = EntityCompressionTargeting.scale(entityTarget.entity());
+                    final int beamColour = ScaleController.sameScale(currentScale, targetScale)
+                            ? ShrinkRayBeamColourPayload.INERT_COLOUR
+                            : targetScale > currentScale
+                                    ? ShrinkRayBeamColourPayload.GROW_COLOUR
+                                    : ShrinkRayBeamColourPayload.SHRINK_COLOUR;
+
+                    EntityCompressionSessions.creative(
+                            serverPlayer, entityTarget.entity(), targetScale);
+                    ShootableGadgetItemMethods.applyCooldown(
+                            player, stack, hand, this::isZapper, getCooldownDelay(stack));
+
+                    final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
+                            player,
+                            hand == InteractionHand.MAIN_HAND,
+                            new Vec3(0.35D, -0.1D, 1.0D)
+                    );
+                    ShrinkRayBeamColourPayload.send(serverPlayer, entityTarget.hitPos(), beamColour);
+                    ShootableGadgetItemMethods.sendPackets(
+                            player,
+                            local -> new ZapperBeamPacket(barrel, hand, local, entityTarget.hitPos())
+                    );
+                }
+
+                return new InteractionResultHolder<>(InteractionResult.SUCCESS, stack);
+            }
+
             final float moonScale = level.isClientSide
                     ? MoonScaleClient.get()
                     : player instanceof final ServerPlayer serverPlayer
@@ -133,6 +196,12 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
 
             final MoonTargeting.Hit moonHit = MoonTargeting.hit(
                     player, moonScale, 1.0F, RANGE);
+            if (moonHit == null
+                    && player instanceof final ServerPlayer shooter
+                    && selectedStage(stack, player).isDeeperThan(MoonScale.stage(shooter.serverLevel().getServer()))
+                    && MoonTargeting.aimedAtNonFullMoon(player, moonScale, RANGE)) {
+                player.displayClientMessage(MoonTargeting.NOT_FULL_MESSAGE, true);
+            }
             if (moonHit != null) {
                 if (ShootableGadgetItemMethods.shouldSwap(player, stack, hand, this::isZapper)) {
                     return new InteractionResultHolder<>(InteractionResult.FAIL, stack);
@@ -144,11 +213,20 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
                 }
 
                 if (player instanceof final ServerPlayer serverPlayer) {
-                    final CompressionStage moonTarget = selectedStage(stack);
+                    final CompressionStage moonTarget = selectedStage(stack, player);
                     final CompressionStage moonCurrent =
                             MoonScale.stage(serverPlayer.serverLevel().getServer());
+                    final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
+                            player,
+                            hand == InteractionHand.MAIN_HAND,
+                            new Vec3(0.35D, -0.1D, 1.0D)
+                    );
+                    final int beamColour = moonCurrent == moonTarget
+                            ? ShrinkRayBeamColourPayload.INERT_COLOUR
+                            : moonTarget.depth() < moonCurrent.depth()
+                                    ? ShrinkRayBeamColourPayload.GROW_COLOUR
+                                    : ShrinkRayBeamColourPayload.SHRINK_COLOUR;
 
-                    MoonCompressionSessions.instant(serverPlayer, moonTarget, moonHit);
                     ShootableGadgetItemMethods.applyCooldown(
                             player,
                             stack,
@@ -156,19 +234,8 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
                             this::isZapper,
                             getCooldownDelay(stack)
                     );
-                    final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
-                            player,
-                            hand == InteractionHand.MAIN_HAND,
-                            new Vec3(0.35D, -0.1D, 1.0D)
-                    );
-                    ShrinkRayBeamColourPayload.send(
-                            serverPlayer,
-                            moonHit.worldPoint(),
-                            moonCurrent == moonTarget
-                                    ? ShrinkRayBeamColourPayload.INERT_COLOUR
-                                    : moonTarget.depth() < moonCurrent.depth()
-                                            ? ShrinkRayBeamColourPayload.GROW_COLOUR
-                                            : ShrinkRayBeamColourPayload.SHRINK_COLOUR);
+                    MoonCompressionSessions.instant(serverPlayer, moonTarget, moonHit);
+                    ShrinkRayBeamColourPayload.send(serverPlayer, moonHit.worldPoint(), beamColour);
                     ShootableGadgetItemMethods.sendPackets(
                             player,
                             local -> new ZapperBeamPacket(barrel, hand, local, moonHit.worldPoint())
@@ -179,7 +246,32 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
             }
         }
 
-        return super.use(level, player, hand);
+        if (level.isClientSide) return super.use(level, player, hand);
+
+        FIRED.set(Boolean.FALSE);
+        final InteractionResultHolder<ItemStack> result = super.use(level, player, hand);
+        if (!FIRED.get() && result.getResult() == InteractionResult.SUCCESS) {
+            beamOnly(level, player, hand);
+        }
+        return result;
+    }
+
+    private void beamOnly(final Level level, final Player player, final InteractionHand hand) {
+        final Vec3 eye = player.getEyePosition();
+        final Vec3 end = level.clip(new ClipContext(
+                eye,
+                eye.add(player.getLookAngle().scale(RANGE)),
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                player)).getLocation();
+        final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
+                player,
+                hand == InteractionHand.MAIN_HAND,
+                new Vec3(0.35D, -0.1D, 1.0D)
+        );
+
+        ShootableGadgetItemMethods.sendPackets(
+                player, local -> new ZapperBeamPacket(barrel, hand, local, end));
     }
 
     @Override
@@ -233,23 +325,12 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
             final BlockHitResult raytrace,
             final CompoundTag data
     ) {
+        FIRED.set(Boolean.TRUE);
+
         if (level.isClientSide) return true;
 
-        final CompressionStage target = selectedStage(stack);
+        final double target = selectedScale(stack, player);
         final CompressionGunTargetingMode targeting = targetingMode(stack);
-        if (targeting == CompressionGunTargetingMode.SELF) {
-            if (!(player instanceof final ServerPlayer serverPlayer)) return false;
-            if (!PehkuiScaleBridge.isOperational()) {
-                player.displayClientMessage(Component.literal("Pehkui integration unavailable"), true);
-                return false;
-            }
-            if (com.misterblusky9.pocket.compression.SelfCompressionSessions
-                    .currentStage(serverPlayer) == target) {
-                return false;
-            }
-            com.misterblusky9.pocket.compression.SelfCompressionSessions.instant(serverPlayer, target);
-            return true;
-        }
 
         SubLevel subLevel = Sable.HELPER.getContaining(level, raytrace.getLocation());
         if (subLevel == null) subLevel = Sable.HELPER.getContaining(level, raytrace.getBlockPos());
@@ -266,41 +347,71 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
         final net.minecraft.core.BlockPos contact =
                 lockedOn ? centreOf(serverSubLevel) : raytrace.getBlockPos();
 
-        final CompressionStage currentStage = ScaleState.getStage(serverSubLevel);
-        final boolean inert = ScaleState.isSettled(serverSubLevel.getUniqueId())
-                && currentStage == target;
+        final double currentScale = ScaleState.getServerScale(serverSubLevel);
+        final boolean inert = ScaleState.isAt(serverSubLevel, target);
+        final int beamColour = inert
+                ? ShrinkRayBeamColourPayload.INERT_COLOUR
+                : target > currentScale
+                        ? ShrinkRayBeamColourPayload.GROW_COLOUR
+                        : ShrinkRayBeamColourPayload.SHRINK_COLOUR;
 
-        if (player instanceof final ServerPlayer beamHolder) {
-            ShrinkRayBeamColourPayload.send(beamHolder, raytrace.getLocation(), inert
-                    ? ShrinkRayBeamColourPayload.INERT_COLOUR
-                    : target.depth() < currentStage.depth()
-                            ? ShrinkRayBeamColourPayload.GROW_COLOUR
-                            : ShrinkRayBeamColourPayload.SHRINK_COLOUR);
-        }
-
-        if (inert) return true;
-
-        if (target.isCompressed()) {
+        if (!inert && target < PocketSized.FULL_SCALE - PocketSized.EPSILON) {
             final int blocks = PocketMetrics.measureForCompression(serverSubLevel, level.getGameTime()).blocks();
             if (blocks > PocketSized.MAX_COMPRESSED_BLOCKS) {
-                player.displayClientMessage(Component.literal("Pocket Sized hard limit: " + PocketSized.MAX_COMPRESSED_BLOCKS + " blocks"), true);
+                player.displayClientMessage(Component.translatable("pocket.message.hard_limit", PocketSized.MAX_COMPRESSED_BLOCKS), true);
                 return false;
             }
         }
 
         if (player instanceof final ServerPlayer serverPlayer) {
-            com.misterblusky9.pocket.compression.CompressionSessions.instant(
-                    serverPlayer, serverSubLevel, contact, target,
-                    targeting == CompressionGunTargetingMode.CONNECTED_SUBLEVELS
+            final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
+                    player,
+                    heldHand(player, stack) == InteractionHand.MAIN_HAND,
+                    new Vec3(0.35D, -0.1D, 1.0D)
             );
-            return true;
+            final boolean connected = targeting == CompressionGunTargetingMode.CONNECTED_SUBLEVELS;
+            final ScaleLimits scaleLimits = limits(player);
+
+            ShootableGadgetItemMethods.applyCooldown(
+                    player,
+                    stack,
+                    heldHand(player, stack),
+                    this::isZapper,
+                    getCooldownDelay(stack)
+            );
+            final Vec3 beamPoint = worldPointOf(serverSubLevel, raytrace.getLocation());
+            if (!inert) {
+                com.misterblusky9.pocket.compression.CompressionSessions.instant(
+                        serverPlayer, serverSubLevel, contact, target, connected, scaleLimits
+                );
+            }
+            ShrinkRayBeamColourPayload.send(serverPlayer, beamPoint, beamColour);
+            ShootableGadgetItemMethods.sendPackets(
+                    player,
+                    local -> new ZapperBeamPacket(barrel, heldHand(player, stack), local, beamPoint)
+            );
+            return false;
         }
 
-        ScaleController.forceStage(
-                serverSubLevel, target, level.getGameTime(), null,
-                targeting == CompressionGunTargetingMode.CONNECTED_SUBLEVELS
-        );
-        return true;
+        if (!inert) {
+            ScaleController.forceScale(
+                    serverSubLevel, target, level.getGameTime(), null,
+                    targeting == CompressionGunTargetingMode.CONNECTED_SUBLEVELS,
+                    ScalePhysicsMode.TRACKING,
+                    limits(player)
+            );
+        }
+        return false;
+    }
+
+    private static Vec3 worldPointOf(final ServerSubLevel subLevel, final Vec3 plotPoint) {
+        final org.joml.Vector3d world = subLevel.logicalPose().transformPosition(
+                new org.joml.Vector3d(plotPoint.x, plotPoint.y, plotPoint.z));
+        return new Vec3(world.x, world.y, world.z);
+    }
+
+    private static InteractionHand heldHand(final Player player, final ItemStack stack) {
+        return player.getMainHandItem() == stack ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
     }
 
     private static net.minecraft.core.BlockPos centreOf(final ServerSubLevel subLevel) {

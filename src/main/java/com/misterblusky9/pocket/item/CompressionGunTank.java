@@ -52,9 +52,13 @@ public final class CompressionGunTank {
     public static void registerCapabilities(final RegisterCapabilitiesEvent event) {
         event.registerItem(
                 Capabilities.FluidHandler.ITEM,
-                (stack, context) -> new Handler(stack),
+                (stack, context) -> new Handler(stack, CAPACITY),
                 ModItems.COMPRESSION_GUN.get(),
                 ModItems.PEARLESCENT_COMPRESSION_GUN.get());
+        event.registerItem(
+                Capabilities.FluidHandler.ITEM,
+                (stack, context) -> new Handler(stack, SelfResizeDeviceItem.CAPACITY),
+                ModItems.SELF_RESIZE_DEVICE.get());
     }
 
     public static Fluid levitite() {
@@ -77,7 +81,11 @@ public final class CompressionGunTank {
     }
 
     public static ItemStack filled(final ItemStack stack) {
-        stack.set(CONTENTS.get(), SimpleFluidContent.copyOf(levititeStack(CAPACITY)));
+        return filled(stack, CAPACITY);
+    }
+
+    public static ItemStack filled(final ItemStack stack, final int capacity) {
+        stack.set(CONTENTS.get(), SimpleFluidContent.copyOf(levititeStack(capacity)));
         return stack;
     }
 
@@ -99,9 +107,11 @@ public final class CompressionGunTank {
 
     public static boolean hasPower(final Player player, final ItemStack stack) {
         if (hasAirPressure(player)) return true;
-        return amount(stack) > 0
-                && stack.isDamageableItem()
-                && stack.getMaxDamage() - stack.getDamageValue() > 1;
+        return amount(stack) > 0 && hasDurability(stack);
+    }
+
+    public static boolean hasDurability(final ItemStack stack) {
+        return stack.isDamageableItem() && stack.getMaxDamage() - stack.getDamageValue() > 1;
     }
 
     public static boolean canFire(final Player player, final ItemStack stack) {
@@ -134,13 +144,31 @@ public final class CompressionGunTank {
         return true;
     }
 
+    public static boolean runEngineOnce(
+            final ServerPlayer player,
+            final ItemStack stack,
+            final InteractionHand hand
+    ) {
+        if (player.isCreative()) return true;
+
+        final List<ItemStack> tanks = BacktankUtil.getAllWithAir(player);
+        if (!tanks.isEmpty()) {
+            BacktankUtil.consumeAir(player, tanks.get(0), BACKTANK_AIR_PER_DRAW);
+            return true;
+        }
+
+        if (!hasDurability(stack)) return false;
+        stack.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
+        return true;
+    }
+
     public static void stopEngine(final Player player) {
         if (player != null) DURABILITY_DEBT.remove(player.getUUID());
     }
 
     private static final class Handler extends FluidHandlerItemStack {
-        private Handler(final ItemStack container) {
-            super(CONTENTS, container, CAPACITY);
+        private Handler(final ItemStack container, final int capacity) {
+            super(CONTENTS, container, capacity);
         }
 
         @Override

@@ -4,7 +4,7 @@ import com.llamalad7.mixinextras.sugar.Local;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.block.PortableSubspaceCompressorBlockEntity;
 import com.misterblusky9.pocket.client.CompressionFieldRenderer;
-import com.misterblusky9.pocket.scale.CompressionStage;
+import com.misterblusky9.pocket.client.ScaleReadout;
 import com.misterblusky9.pocket.scale.ScaleState;
 import com.simibubi.create.content.equipment.goggles.GoggleOverlayRenderer;
 import com.simibubi.create.content.equipment.goggles.GogglesItem;
@@ -61,7 +61,7 @@ public abstract class GoggleOverlaySubLevelMixin {
         if (!tooltip.isEmpty()) tooltip.add(CommonComponents.EMPTY);
 
         CreateLang.builder().text(" Pocket Sized").style(ChatFormatting.GOLD).forGoggles(tooltip);
-        CreateLang.builder().text("Current scale: " + CompressionStage.nearest(ScaleState.getScale(sub)).label())
+        CreateLang.builder().text("Current scale: " + ScaleReadout.of(sub))
                 .style(ChatFormatting.AQUA).forGoggles(tooltip, 1);
     }
 
@@ -94,7 +94,7 @@ public abstract class GoggleOverlaySubLevelMixin {
                     .style(ChatFormatting.GRAY).forGoggles(tooltip, 1);
         }
 
-        CreateLang.builder().text("Current scale: " + CompressionStage.nearest(ScaleState.getScale(sub)).label())
+        CreateLang.builder().text("Current scale: " + ScaleReadout.of(sub))
                 .style(ChatFormatting.DARK_GRAY).forGoggles(tooltip, 1);
     }
 }

@@ -158,7 +158,7 @@ public final class PlotShapeCache {
 
     private static double scaleOf(final SubLevel subLevel) {
         final double scale = ScaleState.getScale(subLevel);
-        return scale > 0.0D && scale <= 1.0D ? scale : 1.0D;
+        return scale > 0.0D && scale <= com.misterblusky9.pocket.PocketSized.MAX_SCALE ? scale : 1.0D;
     }
 
     public static int revision(final UUID id) {

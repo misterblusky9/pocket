@@ -25,6 +25,7 @@ public final class CompressionGunControls {
         if (delta == 0.0D) return;
 
         event.setCanceled(true);
+        if (CompressionGunItem.modeLocked(player, hand)) return;
 
         final ItemStack stack = player.getItemInHand(hand);
         final boolean growing = !CompressionGunItem.isGrowing(stack);
@@ -53,13 +54,13 @@ public final class CompressionGunControls {
     public static void showModes(final LocalPlayer player, final boolean growing) {
         final var line = Component.empty();
         if (growing) {
-            line.append(Component.literal("Shrink").withStyle(ChatFormatting.DARK_GRAY));
+            line.append(Component.translatable("pocket.hud.shrink").withStyle(ChatFormatting.DARK_GRAY));
             line.append(Component.literal("  ").withStyle(ChatFormatting.DARK_GRAY));
-            line.append(Component.literal("Grow").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+            line.append(Component.translatable("pocket.hud.grow").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
         } else {
-            line.append(Component.literal("Shrink").withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD));
+            line.append(Component.translatable("pocket.hud.shrink").withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD));
             line.append(Component.literal("  ").withStyle(ChatFormatting.DARK_GRAY));
-            line.append(Component.literal("Grow").withStyle(ChatFormatting.DARK_GRAY));
+            line.append(Component.translatable("pocket.hud.grow").withStyle(ChatFormatting.DARK_GRAY));
         }
         player.displayClientMessage(line, true);
     }

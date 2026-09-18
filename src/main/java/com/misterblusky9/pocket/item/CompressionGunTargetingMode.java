@@ -2,8 +2,7 @@ package com.misterblusky9.pocket.item;
 
 public enum CompressionGunTargetingMode {
     SUBLEVEL(0, "Sublevel"),
-    CONNECTED_SUBLEVELS(1, "Connected Sublevels"),
-    SELF(2, "Self (Pehkui)");
+    CONNECTED_SUBLEVELS(1, "Connected Sublevels");
 
     private final int id;
     private final String label;
