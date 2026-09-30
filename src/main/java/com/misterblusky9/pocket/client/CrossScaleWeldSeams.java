@@ -5,7 +5,6 @@ import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldContact;
 import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.item.ModItems;
-import com.misterblusky9.pocket.scale.ScaleState;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.util.SimColors;
@@ -72,7 +71,7 @@ public final class CrossScaleWeldSeams {
                     WeldContact.identity(record.smallFacing()),
                     cache.outline(),
                     color,
-                    lineWidth(small));
+                    LINE_WIDTH);
         }
     }
 
@@ -112,10 +111,7 @@ public final class CrossScaleWeldSeams {
         return cache;
     }
 
-    public static float lineWidth(final SubLevel small) {
-        final double scale = small == null ? 1.0D : ScaleState.getScale(small);
-        return (float) (PocketSized.clampScale(scale) / 16.0D);
-    }
+    public static final float LINE_WIDTH = 1.0F / 16.0F;
 
     private static UUID hoveredWeld(final Minecraft minecraft, final Level level) {
         final long now = level.getGameTime();

@@ -159,8 +159,10 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
                 : state.fill + (targetFill - state.fill) * Math.min(1.0F, FILL_EASE * delta);
 
         final Player holderPlayer = holder.player();
-        final boolean spooling = holderPlayer != null && isSpooling(holder);
-        final float ticksUsing = spooling
+        final boolean fueled = CompressionGunTank.amount(stack) > 0;
+        final boolean triggered = holderPlayer != null && isSpooling(holder);
+        final boolean spooling = triggered && fueled;
+        final float ticksUsing = triggered
                 ? holderPlayer.getTicksUsingItem() + AnimationTickHolder.getPartialTicks()
                 : 0.0F;
         state.source = CompressionGunSweep.advanceSource(state.source, spooling, ticksUsing, delta);
@@ -171,7 +173,11 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         final float direction = com.misterblusky9.pocket.item.CompressionGunItem.isGrowing(stack)
                 ? 1.0F : -1.0F;
 
-        if (isDriving(holder)) {
+        // Dry: the cog kicks but never winds up.
+        final boolean kickOnly = !fueled
+                && ticksUsing >= com.misterblusky9.pocket.item.CompressionGunItem.SPIN_KICK_TICKS;
+
+        if (isDriving(holder) && !kickOnly) {
             final float curve = MAX_SPIN_SPEED * com.misterblusky9.pocket.item.CompressionGunItem.spinFraction(ticksUsing);
             final float coasting = state.speed * direction > 0.0F ? Math.abs(state.speed) : 0.0F;
             state.speed = direction * Math.max(curve, coasting);

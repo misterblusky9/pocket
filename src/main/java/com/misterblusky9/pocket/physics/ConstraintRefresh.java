@@ -185,7 +185,10 @@ public final class ConstraintRefresh {
         if (generic != null) {
             ((GenericConstraintState.Access) tracked.handle()).pocket$trackGeneric(bodyA, bodyB, generic);
             generic.bake(pivotOf(bodyA), scaleOf(bodyA), pivotOf(bodyB), scaleOf(bodyB));
-            generic.replayLimits((GenericConstraintHandle) tracked.handle());
+
+            final GenericConstraintHandle handle = (GenericConstraintHandle) tracked.handle();
+            generic.replayLimits(handle, scaleOf(bodyA), scaleOf(bodyB));
+            generic.replayLockedAxes(handle);
         }
         owned.pocket$replayMotors();
         owned.pocket$replayContacts();
