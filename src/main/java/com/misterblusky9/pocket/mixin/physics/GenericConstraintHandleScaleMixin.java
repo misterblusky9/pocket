@@ -11,9 +11,6 @@ import org.joml.Quaterniondc;
 import org.joml.Vector3dc;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(targets = "dev.ryanhcode.sable.physics.impl.rapier.constraint.generic.RapierGenericConstraintHandle", remap = false)
 public abstract class GenericConstraintHandleScaleMixin implements GenericConstraintState.Access {
@@ -68,10 +65,30 @@ public abstract class GenericConstraintHandleScaleMixin implements GenericConstr
                 ScaleFrame.scaleOf(body));
     }
 
-    @Inject(method = "setLimit", at = @At("RETURN"), remap = false, require = 1)
-    private void pocket$captureLimit(
-            final ConstraintJointAxis axis, final double min, final double max, final CallbackInfo ci
+    @WrapMethod(method = "setLimit", remap = false)
+    private void pocket$setLimit(
+            final ConstraintJointAxis axis, final double min, final double max, final Operation<Void> original
     ) {
-        if (this.pocket$state != null) this.pocket$state.captureLimit(axis, min, max);
+        final GenericConstraintState state = this.pocket$state;
+
+        // A replay already carries metric values; scaling them again would compound.
+        if (state != null && state.isReplayingLimits()) {
+            original.call(axis, min, max);
+            return;
+        }
+
+        final double scale1 = ScaleFrame.scaleOf(this.pocket$body1);
+        final double scale2 = ScaleFrame.scaleOf(this.pocket$body2);
+        original.call(axis,
+                GenericConstraintState.toMetricLimit(axis, min, scale1, scale2),
+                GenericConstraintState.toMetricLimit(axis, max, scale1, scale2));
+
+        if (state != null) state.captureLimit(axis, min, max);
+    }
+
+    @WrapMethod(method = "lockAxes", remap = false)
+    private void pocket$lockAxes(final ConstraintJointAxis[] axes, final Operation<Void> original) {
+        original.call((Object) axes);
+        if (this.pocket$state != null) this.pocket$state.captureLockedAxes(axes);
     }
 }

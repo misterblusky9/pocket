@@ -14,10 +14,15 @@ import java.io.IOException;
 public final class PocketShaders {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static ShaderInstance compressionField;
+    private static ShaderInstance moonSurface;
     private PocketShaders() {}
 
     public static ShaderInstance compressionField() {
         return compressionField;
+    }
+
+    public static ShaderInstance moonSurface() {
+        return moonSurface;
     }
 
     public static void register(final RegisterShadersEvent event) {
@@ -29,6 +34,14 @@ public final class PocketShaders {
                             DefaultVertexFormat.POSITION_TEX_COLOR
                     ),
                     shader -> compressionField = shader
+            );
+            event.registerShader(
+                    new ShaderInstance(
+                            event.getResourceProvider(),
+                            ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "moon_surface"),
+                            DefaultVertexFormat.POSITION_TEX_COLOR
+                    ),
+                    shader -> moonSurface = shader
             );
         } catch (final IOException exception) {
             LOGGER.error("Could not load shaders", exception);

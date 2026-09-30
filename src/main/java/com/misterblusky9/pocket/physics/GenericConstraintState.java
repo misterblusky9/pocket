@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.physics;
 
+import com.misterblusky9.pocket.PocketSized;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.api.physics.constraint.ConstraintJointAxis;
 import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintConfiguration;
@@ -9,6 +10,7 @@ import org.joml.Quaterniondc;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 
+import java.util.EnumSet;
 import java.util.Set;
 
 public final class GenericConstraintState {
@@ -26,6 +28,8 @@ public final class GenericConstraintState {
     private final GenericConstraintConfiguration configuration;
     private Limit[] limits;
     private boolean replayingLimits;
+    private Set<ConstraintJointAxis> lockedAxes;
+    private boolean replayingLockedAxes;
 
     public GenericConstraintState(
             final GenericConstraintConfiguration configuration,
@@ -70,22 +74,83 @@ public final class GenericConstraintState {
         return this.frame1.wouldMove(pivot1, scale1) || this.frame2.wouldMove(pivot2, scale2);
     }
 
+    public static boolean isLinear(final ConstraintJointAxis axis) {
+        return axis == ConstraintJointAxis.LINEAR_X
+                || axis == ConstraintJointAxis.LINEAR_Y
+                || axis == ConstraintJointAxis.LINEAR_Z;
+    }
+
+    // A linear limit is relative joint travel, not a coordinate owned by either end. It only has a
+    // nominal reading when both ends share a scale; a mismatched pair has no single nominal frame,
+    // so it stays in metric units rather than inheriting an endpoint's scale.
+    public static double limitScale(
+            final ConstraintJointAxis axis, final double scale1, final double scale2
+    ) {
+        if (!isLinear(axis)) return 1.0D;
+        final double s1 = sane(scale1);
+        final double s2 = sane(scale2);
+        return Math.abs(s1 - s2) > PocketSized.EPSILON ? 1.0D : s1;
+    }
+
+    public static double toMetricLimit(
+            final ConstraintJointAxis axis, final double value, final double scale1, final double scale2
+    ) {
+        final double scale = limitScale(axis, scale1, scale2);
+        return scale == 1.0D ? value : value * scale;
+    }
+
+    private static double sane(final double scale) {
+        return Double.isFinite(scale) && scale > 0.0D ? scale : 1.0D;
+    }
+
+    public boolean isReplayingLimits() {
+        return this.replayingLimits;
+    }
+
     public void captureLimit(final ConstraintJointAxis axis, final double min, final double max) {
         if (this.replayingLimits) return;
         if (this.limits == null) this.limits = new Limit[AXES.length];
         this.limits[axis.ordinal()] = new Limit(min, max);
     }
 
-    public void replayLimits(final GenericConstraintHandle handle) {
+    public void replayLimits(
+            final GenericConstraintHandle handle, final double scale1, final double scale2
+    ) {
         if (this.limits == null || !handle.isValid()) return;
         this.replayingLimits = true;
         try {
             for (int i = 0; i < this.limits.length; i++) {
                 final Limit limit = this.limits[i];
-                if (limit != null) handle.setLimit(AXES[i], limit.min(), limit.max());
+                if (limit == null) continue;
+                final ConstraintJointAxis axis = AXES[i];
+                handle.setLimit(axis,
+                        toMetricLimit(axis, limit.min(), scale1, scale2),
+                        toMetricLimit(axis, limit.max(), scale1, scale2));
             }
         } finally {
             this.replayingLimits = false;
+        }
+    }
+
+    // lockAxes replaces the whole lock mask, so the newest call is the whole truth.
+    public void captureLockedAxes(final ConstraintJointAxis... axes) {
+        if (this.replayingLockedAxes) return;
+        final EnumSet<ConstraintJointAxis> locked = EnumSet.noneOf(ConstraintJointAxis.class);
+        if (axes != null) {
+            for (final ConstraintJointAxis axis : axes) {
+                if (axis != null) locked.add(axis);
+            }
+        }
+        this.lockedAxes = locked;
+    }
+
+    public void replayLockedAxes(final GenericConstraintHandle handle) {
+        if (this.lockedAxes == null || !handle.isValid()) return;
+        this.replayingLockedAxes = true;
+        try {
+            handle.lockAxes(this.lockedAxes.toArray(new ConstraintJointAxis[0]));
+        } finally {
+            this.replayingLockedAxes = false;
         }
     }
 

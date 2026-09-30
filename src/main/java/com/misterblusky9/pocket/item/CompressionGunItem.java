@@ -146,15 +146,20 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         final boolean growing = isGrowing(stack);
         final CompressionGunTargetingMode targeting = targetingMode(stack);
 
+        if (CompressionGunTank.amount(stack) <= 0) {
+            player.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
+            beam(player, false, growing);
+            return;
+        }
+
         if (!CompressionGunTank.runEngine(player, stack, player.getUsedItemHand(), elapsed)) {
             player.displayClientMessage(Component.translatable("pocket.message.no_air_pressure"), true);
             shutDown(player);
             return;
         }
 
-        final boolean fueled = CompressionGunTank.amount(stack) > 0;
         if (elapsed < CHARGE_TICKS) {
-            beam(player, fueled, growing);
+            beam(player, true, growing);
             return;
         }
 
@@ -166,11 +171,6 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         if (MoonCompressionSessions.renew(player, moonGoal)) return;
         if (CompressionSessions.renew(player, goal)) return;
 
-        if (!fueled) {
-            player.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
-            beam(player, false, growing);
-            return;
-        }
         beam(player, true, growing);
 
         final EntityCompressionTargeting.Target entityTarget =
@@ -259,7 +259,7 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         CompressionBeamPayload.send(player, firing, growing);
     }
 
-    private static final float SPIN_KICK_TICKS = 3.0F;
+    public static final float SPIN_KICK_TICKS = 3.0F;
     private static final float SPIN_KICK_SPEED = 0.24F;
 
     public static float spinFraction(final float ticksUsing) {

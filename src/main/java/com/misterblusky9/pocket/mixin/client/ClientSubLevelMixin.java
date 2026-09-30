@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.mixin.client;
 
+import com.misterblusky9.pocket.PocketSized;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import dev.ryanhcode.sable.companion.math.BoundingBox3dc;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
@@ -134,14 +135,48 @@ public abstract class ClientSubLevelMixin {
                 ? self.logicalPose()
                 : interpolator.buffer.getLast().pose();
 
-        ((SubLevelSnapshotInterpolatorAccessor) interpolator)
-                .pocket$getRunningSnapshot()
-                .set(target);
+        final double scale = ScaleState.getClientScale(self);
+        final boolean validScale = PocketSized.isValidScale(scale);
+
+        final Pose3d runningSnapshot =
+                ((SubLevelSnapshotInterpolatorAccessor) interpolator)
+                        .pocket$getRunningSnapshot();
+
+        runningSnapshot.set(target);
+        if (validScale) {
+            runningSnapshot.scale().set(scale, scale, scale);
+        }
 
         self.logicalPose().set(target);
+        if (validScale) {
+            self.logicalPose().scale().set(scale, scale, scale);
+        }
+
         interpolator.buffer.clear();
         self.updateLastPose();
         self.forceUpdateBounds();
+    }
+
+    @Inject(
+            method = "tick",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Ldev/ryanhcode/sable/network/client/SubLevelSnapshotInterpolator;tick(D)V",
+                    shift = At.Shift.AFTER
+            ),
+            remap = false
+    )
+    private void pocket$preserveScaleThroughSableInterpolation(final CallbackInfo ci) {
+        final ClientSubLevel self = (ClientSubLevel) (Object) this;
+        if (!ScaleState.hasClientSnapshot(self.getUniqueId())) return;
+
+        final double scale = ScaleState.getClientScale(self);
+        if (!PocketSized.isValidScale(scale)) return;
+
+        ((SubLevelSnapshotInterpolatorAccessor) self.getInterpolator())
+                .pocket$getRunningSnapshot()
+                .scale()
+                .set(scale, scale, scale);
     }
 
     @Inject(method = "tick", at = @At("RETURN"), remap = false)
