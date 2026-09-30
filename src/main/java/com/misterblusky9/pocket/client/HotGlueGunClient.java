@@ -155,7 +155,6 @@ public final class HotGlueGunClient {
                 WeldContact.identity(firstFacing),
                 origin.faces(),
                 SimColors.SUCCESS_LIME);
-        final float originLineWidth = CrossScaleWeldSeams.lineWidth(first);
         WeldContactPatch.show(
                 "pocket_weld_origin_outline",
                 firstPos,
@@ -164,7 +163,7 @@ public final class HotGlueGunClient {
                 WeldContact.identity(firstFacing),
                 origin.outline(),
                 SimColors.SUCCESS_LIME,
-                originLineWidth);
+                CrossScaleWeldSeams.LINE_WIDTH);
         if (!(minecraft.hitResult instanceof final BlockHitResult hit)
                 || hit.getType() == HitResult.Type.MISS) return;
 
@@ -200,8 +199,11 @@ public final class HotGlueGunClient {
 
     private static void renderPreview(final Minecraft minecraft, final CrossScaleWelds.Weld weld) {
         final int color = weld.check().allowed() ? SimColors.SUCCESS_LIME : SimColors.NUH_UH_RED;
-        final float lineWidth = (float) (PocketSized.clampScale(weld.smallScale()) / 16.0D);
         final boolean sourceIsSmall = weld.startedSmall(firstPos);
+        // Target-frame units.
+        final double targetScale = sourceIsSmall ? weld.bigScale() : weld.smallScale();
+        final float lineWidth = (float) (CrossScaleWeldSeams.LINE_WIDTH
+                * PocketSized.clampScale(weld.smallScale()) / PocketSized.clampScale(targetScale));
         final Quaterniond orientation = CrossScaleWelds.weldOrientation(weld, rotationTurns);
         final double cell = sourceIsSmall ? weld.bigSpan() : 1.0D / weld.bigSpan();
         final WeldContact.Projection projection = WeldContact.projection(
