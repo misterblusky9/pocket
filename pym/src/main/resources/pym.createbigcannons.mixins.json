@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.createbigcannons.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CannonSurfaceNormalMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

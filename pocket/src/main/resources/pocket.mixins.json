@@ -1,0 +1,41 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pocket.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "create.ControlledContraptionEntityControllerInvoker",
+    "create.SwitchBearingContraptionInteractionMixin",
+    "create.SwitchPistonIdentityMixin",
+    "create.SwitchContraptionOrphanMixin",
+    "create.PotatoCannonImmediatePocketMixin",
+    "create.PotatoCannonSettingsMixin",
+    "create.PackagerUnwrapGuardMixin",
+    "create.PackageEntityDropMixin",
+    "create.HauntedCompressionGunMixin",
+    "create.ZapperSelectShrinkRayMixin",
+    "create.FanHauntingTriggerMixin",
+    "AdvancementTabSpacingMixin",
+    "create.ControlledContraptionEntityControllerPosAccessor",
+    "sable.SubLevelAssemblyWeldMoveMixin"
+  ],
+  "client": [
+    "create.ContraptionInteractionPriorityMixin",
+    "client.GoggleCompressorStatusMixin",
+    "client.CreativeTabContainsScaleToolMixin",
+    "client.MinecraftShrinkRayPickMixin",
+    "client.ShrinkRayEntityOutlineMixin",
+    "client.ShrinkRayEntityOutlineColourMixin",
+    "create.PackageEntityCraftRenderMixin",
+    "create.PackageVisualModelMixin",
+    "create.ContraptionHandlerClientScaleMixin",
+    "create.SwitchBearingContraptionRaycastMixin",
+    "client.MoonScaleMixin",
+    "create.HelmBearingContraptionInteractionClientMixin",
+    "create.ZapperLaserBeamColourMixin",
+    "create.ZapperBeamColourMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

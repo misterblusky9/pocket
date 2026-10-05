@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.pehkui.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "PehkuiSmallPlayerAnimationMixin",
+    "ShrunkEntityRenderDistanceMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

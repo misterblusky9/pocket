@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.offroad.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "WheelMountForceContextMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

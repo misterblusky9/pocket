@@ -1,0 +1,27 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.simulated.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "PhysicsAssemblerDisassemblyScaleMixin",
+    "SimAssemblyGlueLookupMixin",
+    "PlaceMergingGluePacketScaleMixin",
+    "RopeScaleBoundaryMixin",
+    "SubLevelInclusiveGlueLookupMixin"
+  ],
+  "client": [
+    "RopeStrandScaleMixin",
+    "MergingGlueScaleClientMixin",
+    "ClientRopeItemScaleBoundaryMixin",
+    "HoneyGlueClientLookupMixin",
+    "PhysicsStaffPickupTargetMixin",
+    "PhysicsStaffHoldDistanceScaleMixin",
+    "PhysicsStaffScrollStepScaleMixin",
+    "DiagramScaleOverlayMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}
