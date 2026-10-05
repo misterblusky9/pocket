@@ -45,7 +45,9 @@ public enum CompressionStage {
     }
 
     public static CompressionStage nearest(final double scale) {
-        final double target = Double.isNaN(scale) ? ScaleBounds.FULL : ScaleBounds.clampValid(scale);
+        final double target = Double.isNaN(scale)
+                ? ScaleBounds.FULL
+                : Math.max(SIXTEENTH.scale, Math.min(NORMAL.scale, scale));
         CompressionStage best = NORMAL;
         double bestError = Double.MAX_VALUE;
         for (final CompressionStage stage : values()) {
