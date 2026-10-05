@@ -67,7 +67,7 @@ neoForge {
 dependencies {
     implementation "maven.modrinth:T9PomCSv:NGuyFOeE"
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
-
+    testRuntimeOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
     compileOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
 
     // Optional mods with compat modules. Pym loads each module only when its mod is installed.
