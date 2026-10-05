@@ -1,0 +1,229 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev'
+    id 'idea'
+}
+
+version = mod_version
+group = mod_group_id
+
+sourceSets.main.resources {
+    srcDir('src/generated/resources')
+    exclude("**/*.bbmodel")
+    exclude("src/generated/**/.cache")
+}
+
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+evaluationDependsOn(':pym')
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client1 {
+            client()
+            devLogin = true
+            gameDirectory = rootProject.file("runs/client1")
+
+            programArguments = [
+                    "--username", "MisterBluSky"
+            ]
+
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        client2 {
+            client()
+            gameDirectory = rootProject.file("runs/client2")
+
+            programArguments = [
+                    "--username", "Player2"
+            ]
+
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            gameDirectory = rootProject.file("runs/server")
+
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            sourceSet = sourceSets.gametest
+            gameDirectory = rootProject.file("runs/pocket-gametest")
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            programArguments.addAll(
+                    '--mod', project.mod_id,
+                    '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath()
+            )
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+
+            systemProperty 'pocket.traceScale',
+                    providers.gradleProperty('pocketTrace').getOrElse('true')
+
+            systemProperty 'pocket.tracePhysics',
+                    providers.gradleProperty('pocketTracePhysics').getOrElse('false')
+
+            systemProperty 'pocket.jointPropagation',
+                    providers.gradleProperty('pocketJoints').getOrElse('true')
+
+            jvmArguments.addAll '-Xmx8G'
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+            sourceSet(sourceSets.gametest)
+        }
+        "${pym_mod_id}" {
+            sourceSet(project(':pym').sourceSets.main)
+        }
+    }
+
+    addModdingDependenciesTo sourceSets.test
+    addModdingDependenciesTo sourceSets.gametest
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+    gametestImplementation.extendsFrom implementation
+    gametestCompileOnly.extendsFrom compileOnly
+    aeronauticsBundle
+}
+
+tasks.register('extractSimulated', Copy) {
+    from({ zipTree(configurations.aeronauticsBundle.singleFile) }) {
+        include 'META-INF/jarjar/dev.simulated_team.simulated.*.jar'
+    }
+    into layout.buildDirectory.dir('simulated')
+    eachFile { it.path = it.name }
+    includeEmptyDirs = false
+}
+
+dependencies {
+    implementation project(':pym')
+    // ModDevGradle only applies version ranges to external modules. On a subproject a
+    // version { } block falls through to this project and replaces its version, so the
+    // supported Pym range lives in neoforge.mods.toml instead.
+    jarJar(project(':pym'))
+
+    implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") {
+        transitive = false
+    }
+    implementation "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
+    compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}"
+    runtimeOnly "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+    implementation "com.tterrag.registrate:Registrate:${registrate_version}"
+
+    implementation "maven.modrinth:oWaK0Q19:w7zlLnea"
+    aeronauticsBundle "maven.modrinth:oWaK0Q19:w7zlLnea"
+    compileOnly fileTree(dir: layout.buildDirectory.dir('simulated'), include: '*.jar')
+            .builtBy('extractSimulated')
+
+    implementation "maven.modrinth:T9PomCSv:NGuyFOeE"
+
+    compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
+
+    implementation "maven.modrinth:t5W7Jfwy:nKHizsl6"
+
+    localRuntime "maven.modrinth:spark:v5qtqRQi"
+
+    testImplementation "org.joml:joml:${joml_version}"
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version       : minecraft_version,
+            minecraft_version_range : minecraft_version_range,
+            neo_version             : neo_version,
+            loader_version_range    : loader_version_range,
+            mod_id                  : mod_id,
+            mod_name                : mod_name,
+            mod_license             : mod_license,
+            mod_version             : mod_version,
+            pym_mod_version         : pym_mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/repo"
+        }
+    }
+}
+
+def contractTest(String name, String description, String mainClass) {
+    tasks.register(name, JavaExec) {
+        group = 'verification'
+        it.description = description
+        dependsOn testClasses
+        classpath = sourceSets.test.runtimeClasspath
+        it.mainClass = mainClass
+    }
+    tasks.named('check') { dependsOn tasks.named(name) }
+}
+
+contractTest('scaleContractTest',
+        'Runs the compression-stage ladder, tier and tool-limit checks.',
+        'com.misterblusky9.pocket.scale.ScaleContractTest')
+contractTest('weldSnapTest',
+        'Runs the cross-scale weld divisor, footprint and snapping checks.',
+        'com.misterblusky9.pocket.compat.WeldSnapTest')
+contractTest('pymBoundaryTest',
+        'Checks that Pocket consumes Pym only through its public API and never regrows the scaling engine.',
+        'com.misterblusky9.pocket.PymBoundaryTest')
+tasks.named('pymBoundaryTest', JavaExec) {
+    workingDir = project.projectDir
+    inputs.dir('src/main/java')
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

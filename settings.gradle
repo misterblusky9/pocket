@@ -5,3 +5,6 @@ pluginManagement {
 }
 
 rootProject.name = 'Create-Pocket-Sized'
+
+include 'pym'
+include 'pocket'

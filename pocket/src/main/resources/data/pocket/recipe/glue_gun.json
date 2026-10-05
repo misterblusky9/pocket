@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    { "item": "minecraft:white_dye" },
+    { "item": "minecraft:slime_ball" }
+  ],
+  "result": {
+    "id": "pocket:glue_gun",
+    "count": 1
+  }
+}

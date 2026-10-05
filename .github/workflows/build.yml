@@ -43,7 +43,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: pocket-${{ github.sha }}
-          path: build/libs/pocket-*.jar
+          path: |
+            pocket/build/libs/pocket-*.jar
+            pym/build/libs/pym-*.jar
           if-no-files-found: error
           retention-days: 30
           archive: false

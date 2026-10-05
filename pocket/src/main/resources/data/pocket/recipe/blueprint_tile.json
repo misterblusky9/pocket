@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    { "item": "create:crafting_blueprint" },
+    { "item": "minecraft:smooth_stone" }
+  ],
+  "result": {
+    "id": "pocket:blueprint_tile",
+    "count": 8
+  }
+}
