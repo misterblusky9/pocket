@@ -9,7 +9,7 @@
     "SimAssemblyGlueLookupMixin",
     "PlaceMergingGluePacketScaleMixin",
     "RopeScaleBoundaryMixin",
-    "SubLevelInclusiveGlueLookupMixin"
+    "SwivelBearingFaceAnchorMixin"
   ],
   "client": [
     "RopeStrandScaleMixin",
@@ -19,6 +19,12 @@
     "PhysicsStaffPickupTargetMixin",
     "PhysicsStaffHoldDistanceScaleMixin",
     "PhysicsStaffScrollStepScaleMixin",
+    "PhysicsBeamLineAccessor",
+    "PhysicsStaffBeamEmitterMixin",
+    "PhysicsBeamOwnerScaleMixin",
+    "PhysicsBeamEndSegmentMixin",
+    "PhysicsStaffFocusScaleMixin",
+    "PhysicsStaffLockIconScaleMixin",
     "DiagramScaleOverlayMixin"
   ],
   "injectors": {

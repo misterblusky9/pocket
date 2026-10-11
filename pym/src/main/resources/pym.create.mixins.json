@@ -17,6 +17,8 @@
     "TrackMarkerScaleMixin",
     "CreateContraptionDebugHitboxScaleMixin",
     "OutlineFaceCullMixin",
+    "LineOutlineScaleMixin",
+    "OutlineParamsEmitterMixin",
     "FlywheelSubLevelScaleMixin"
   ],
   "injectors": {

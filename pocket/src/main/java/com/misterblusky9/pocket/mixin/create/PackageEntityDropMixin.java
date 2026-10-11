@@ -3,12 +3,9 @@ package com.misterblusky9.pocket.mixin.create;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.simibubi.create.content.logistics.box.PackageEntity;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.Containers;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.UUID;
 import org.spongepowered.asm.mixin.Mixin;
@@ -34,19 +31,12 @@ public abstract class PackageEntityDropMixin {
         }
 
         ci.cancel();
-        final ItemStack recovery = PocketCaseItem.recoveryFor(level, box);
-        if (!recovery.isEmpty()) recovery.setCount(1);
-
         final UUID recoveryToken = PocketCaseItem.token(box);
-        final boolean restored = PocketCaseItem.isFilled(recovery) && PocketCaseItem.deployFromBrokenPackage(
-                level, box, new Vec3(self.getX(), self.getY(), self.getZ()));
+        if (PocketCaseItem.breakOpen(level, self)) return;
+        if (!PocketCaseItem.dropRecovery(level, self)) return;
 
-        box.remove(DataComponents.CUSTOM_DATA);
-        if (!restored && !recovery.isEmpty()) {
-            Containers.dropItemStack(level, self.getX(), self.getY(), self.getZ(), recovery);
-            PocketTrace.logger().warn(
-                    "[PocketTransfer] broken package restore failed token={} recoveryDropped=true backendValid=false",
-                    recoveryToken);
-        }
+        PocketTrace.logger().warn(
+                "[PocketTransfer] broken package restore failed token={} recoveryDropped=true backendValid=false",
+                recoveryToken);
     }
 }

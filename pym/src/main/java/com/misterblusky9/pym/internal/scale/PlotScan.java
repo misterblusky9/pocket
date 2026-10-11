@@ -30,7 +30,7 @@ public final class PlotScan {
     private static final Map<UUID, Cached> CACHE = new ConcurrentHashMap<>();
 
     private static volatile Set<Block> configured = Set.of();
-    private static volatile int shrunkBlockLimit = 1_048_576;
+    private static volatile int shrunkBlockLimit = Integer.MAX_VALUE;
 
     public static PlotContents of(final ServerSubLevel subLevel) {
         if (subLevel == null || subLevel.isRemoved() || subLevel.getUniqueId() == null) return PlotContents.EMPTY;

@@ -6,6 +6,8 @@ import dev.ryanhcode.sable.companion.math.BoundingBox3dc;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.SimulatedClient;
 import dev.simulated_team.simulated.content.physics_staff.PhysicsStaffClientHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,29 +30,41 @@ public final class PhysicsStaffScale {
         pickupTarget = null;
     }
 
-    public static double dragScale() {
+    public static double scrollFrame() {
+        final double player = playerScale();
         final SubLevel target = dragTarget();
         if (target == null) {
-            return 1.0D;
+            return player;
         }
 
         final double scale = coarsestScale(target);
-        return scale > 0.0D && scale < 1.0D ? scale : 1.0D;
+        return scale > 0.0D ? Math.min(scale, player) : player;
     }
 
-    public static double minHoldDistance(final double vanillaMin) {
+    public static double minHoldDistance(final double vanillaMin, final double max) {
+        final double player = playerScale();
         final SubLevel target = dragTarget();
         if (target == null) {
-            return vanillaMin;
+            return Math.min(max, vanillaMin * player);
         }
 
         final double largest = extent(target);
         if (!(largest > 0.0D)) {
-            return vanillaMin;
+            return Math.min(max, vanillaMin * player);
         }
 
         final double radius = largest * PYM$HALF_DIAGONAL;
-        return Math.max(PYM$ABSOLUTE_MIN_HOLD, Math.min(vanillaMin, radius + PYM$HOLD_CLEARANCE));
+        return Math.min(max, Math.max(PYM$ABSOLUTE_MIN_HOLD * player, radius + PYM$HOLD_CLEARANCE * player));
+    }
+
+    private static double playerScale() {
+        final LocalPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            return 1.0D;
+        }
+
+        final double scale = Pym.entities().scaleOf(player);
+        return scale > 0.0D && Double.isFinite(scale) ? scale : 1.0D;
     }
 
     private static SubLevel dragTarget() {

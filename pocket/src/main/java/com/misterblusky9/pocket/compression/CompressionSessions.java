@@ -4,6 +4,7 @@ import com.misterblusky9.pym.api.PlotContents;
 import com.misterblusky9.pocket.network.CompressionSyncPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleLadder;
+import com.misterblusky9.pocket.scale.ResizeActor;
 import com.misterblusky9.pocket.scale.ResizeFeedback;
 import com.misterblusky9.pocket.scale.ScaleLimits;
 import com.misterblusky9.pym.api.Pym;
@@ -149,7 +150,8 @@ public final class CompressionSessions {
         }
 
         if (Pym.resize().suspendDrivers(subLevel, now)) CompressionSyncPayload.sendRelease(subLevel);
-        final ResizeResult result = request(subLevel, requested, limits, propagateJoints).submit();
+        final ResizeResult result = ResizeActor.as(player,
+                () -> request(subLevel, requested, limits, propagateJoints).submit());
         if (!ResizeFeedback.report(player, result)) return;
 
         final Session session = new Session(
@@ -351,7 +353,8 @@ public final class CompressionSessions {
         final long now = subLevel.getLevel().getGameTime();
         if (!withinLimits(holder, subLevel, next, now, session.limits, session.propagateJoints)) return false;
 
-        final ResizeResult result = request(subLevel, next, session.limits, session.propagateJoints).submit();
+        final ResizeResult result = ResizeActor.as(holder,
+                () -> request(subLevel, next, session.limits, session.propagateJoints).submit());
         if (!ResizeFeedback.report(holder, result)) return false;
         beam.stepped();
         return true;

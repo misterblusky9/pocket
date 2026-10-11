@@ -8,6 +8,10 @@ import com.misterblusky9.pym.api.Pym;
 
 import com.misterblusky9.pocket.compression.BeamSession;
 import com.misterblusky9.pocket.compression.CompressionSessions;
+import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
+import com.misterblusky9.pocket.compression.PersonalLock;
+import com.misterblusky9.pocket.compression.PersonalScale;
+import com.misterblusky9.pocket.network.EntityCompressionGlowPayload;
 import com.misterblusky9.pocket.network.CompressionSyncPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pocket.scale.ScaleCommandSource;
@@ -27,11 +31,16 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -50,6 +59,8 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
     private static final double TRANSITION_SPEED_FACTOR = 0.35D;
     private static final int AIM_GRACE_TICKS = 10;
     private static final double BEAM_RADIUS = 0.5D;
+    private static final int GLOW_REFRESH_TICKS = 5;
+    private static final int GLOW_TIMEOUT_TICKS = 15;
 
     private static final Map<UUID, Set<StaticSubspaceCompressorBlockEntity>> DRIVERS =
             new ConcurrentHashMap<>();
@@ -72,9 +83,12 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
 
     private UUID targetId;
     private ServerSubLevel target;
+    private LivingEntity targetEntity;
+    private int entityResizeAge;
+    private boolean entityGrowing;
     private BlockPos hitLocalPos;
     private double commandedScale = NO_COMMAND;
-    private CompressionStage inFlightStage;
+    private double inFlightScale = NO_COMMAND;
 
     public StaticSubspaceCompressorBlockEntity(
             final BlockEntityType<?> type,
@@ -188,7 +202,7 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
             return;
         }
 
-        if (this.target == null || this.target.isRemoved()) {
+        if (!hasTarget()) {
             if (!acquireOrContinue(level)) return;
         } else if (stillAimingAtTarget(level)) {
             this.aimMissTicks = 0;
@@ -197,8 +211,13 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
             return;
         }
 
-        if (this.target == null || this.target.isRemoved()) {
+        if (!hasTarget()) {
             clearTarget(true);
+            return;
+        }
+
+        if (this.targetEntity != null) {
+            driveEntity(level);
             return;
         }
 
@@ -210,14 +229,22 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
             this.stepAge = Integer.MAX_VALUE / 2;
             this.completedSteps = 0;
             this.pulseSent = false;
-            this.inFlightStage = null;
+            this.inFlightScale = NO_COMMAND;
             this.commandedScale = Pym.scale().settled(this.target);
         }
 
         driveShrink(level);
     }
 
+    private boolean hasTarget() {
+        if (this.targetEntity != null) return !this.targetEntity.isRemoved() && this.targetEntity.isAlive();
+        return this.target != null && !this.target.isRemoved();
+    }
+
     private boolean acquireOrContinue(final ServerLevel level) {
+        final LivingEntity entity = aimedEntity();
+        if (entity != null) return acquireEntity(entity);
+
         final Target hit = findTarget(level);
         if (hit == null) {
             clearTarget(true);
@@ -259,7 +286,48 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         return true;
     }
 
+    private boolean acquireEntity(final LivingEntity entity) {
+        clearTarget(true);
+        if (protects(entity)) return false;
+
+        final double current = EntityCompressionTargeting.scale(entity);
+        final double goal = goalFor(entity, current);
+        if (ScaleBounds.same(current, goal)) return false;
+
+        this.targetEntity = entity;
+        this.targetId = entity.getUUID();
+        this.fieldActive = true;
+        this.aimMissTicks = 0;
+        this.sealed = true;
+        this.stepAge = Integer.MAX_VALUE / 2;
+        this.completedSteps = 0;
+        this.inFlightScale = NO_COMMAND;
+        this.commandedScale = current;
+        this.entityGrowing = goal > current;
+        DRIVERS.computeIfAbsent(this.targetId, id -> ConcurrentHashMap.newKeySet()).add(this);
+
+        EntityCompressionGlowPayload.send(entity, this.entityGrowing, GLOW_TIMEOUT_TICKS);
+        return true;
+    }
+
+    private LivingEntity aimedEntity() {
+        if (this.laser == null || !Pym.entities().available()) return null;
+        if (!(this.laser.getClosestHitResult() instanceof final EntityHitResult hit)) return null;
+        return hit.getEntity() instanceof final LivingEntity living
+                && !(living instanceof ArmorStand)
+                && living.isAlive()
+                && !living.isSpectator()
+                ? living
+                : null;
+    }
+
     private boolean stillAimingAtTarget(final ServerLevel level) {
+        if (this.targetId == null) return false;
+
+        final LivingEntity entity = aimedEntity();
+        if (entity != null) return this.targetId.equals(entity.getUUID());
+        if (this.targetEntity != null) return false;
+
         final Target hit = findTarget(level);
         return hit != null
                 && this.targetId != null
@@ -273,19 +341,19 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         }
 
         if (!Pym.scale().isSettled(this.targetId)) {
-            if (this.inFlightStage != null) this.commandedScale = this.inFlightStage.scale();
+            if (ScaleBounds.isValid(this.inFlightScale)) this.commandedScale = this.inFlightScale;
             Pym.resize().drive(this.target, this);
             return;
         }
 
         final double current = Pym.scale().settled(this.target);
 
-        if (this.inFlightStage != null) {
-            if (ScaleBounds.same(current, this.inFlightStage.scale())) {
+        if (ScaleBounds.isValid(this.inFlightScale)) {
+            if (ScaleBounds.same(current, this.inFlightScale)) {
                 this.completedSteps++;
                 this.stepAge = 0;
             }
-            this.inFlightStage = null;
+            this.inFlightScale = NO_COMMAND;
             this.pulseSent = false;
         }
 
@@ -314,13 +382,71 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         }
 
         if (this.stepAge >= delay) {
-            final CompressionStage next = CompressionStage.exact(nextScale);
-            this.inFlightStage = next;
-            this.commandedScale = next.scale();
+            this.inFlightScale = nextScale;
+            this.commandedScale = nextScale;
             this.pulseSent = false;
         }
 
         Pym.resize().drive(this.target, this);
+    }
+
+    private void driveEntity(final ServerLevel level) {
+        final LivingEntity entity = this.targetEntity;
+        if (protects(entity)) {
+            clearTarget(true);
+            return;
+        }
+
+        if (level.getGameTime() % GLOW_REFRESH_TICKS == 0) {
+            EntityCompressionGlowPayload.send(entity, this.entityGrowing, GLOW_TIMEOUT_TICKS);
+        }
+
+        if (ScaleBounds.isValid(this.inFlightScale)) {
+            if (++this.entityResizeAge < entityResizeTicks()) return;
+            this.commandedScale = this.inFlightScale;
+            this.inFlightScale = NO_COMMAND;
+            this.completedSteps++;
+            this.stepAge = 0;
+        }
+
+        final double current = this.commandedScale;
+        final double goal = goalFor(entity, current);
+        if (ScaleBounds.same(current, goal)) {
+            clearTarget(true);
+            return;
+        }
+
+        if (isOpposed(current)) {
+            this.stepAge = 0;
+            return;
+        }
+
+        this.stepAge++;
+        final double nextScale = ScaleLadder.stepToward(current, goal);
+        final int delay = BeamSession.Pace.STATIC_COMPRESSOR.delay(
+                this.completedSteps, ScaleBounds.same(nextScale, goal));
+        if (this.stepAge < delay) return;
+
+        if (!Pym.entities().setScale(
+                entity, nextScale / EntityCompressionTargeting.containerScale(entity), entityResizeTicks())) {
+            clearTarget(true);
+            return;
+        }
+        this.inFlightScale = nextScale;
+        this.entityResizeAge = 0;
+        if (entity instanceof final ServerPlayer player) PersonalScale.remember(player, nextScale);
+    }
+
+    private double goalFor(final LivingEntity entity, final double current) {
+        return PersonalScale.goalFor(entity, current, targetStage().scale());
+    }
+
+    private boolean protects(final LivingEntity entity) {
+        return entity instanceof final Player player && PersonalLock.protects(player);
+    }
+
+    private int entityResizeTicks() {
+        return Math.max(1, (int) Math.round(transitionTicks()));
     }
 
     private boolean isOpposed(final double current) {
@@ -442,7 +568,7 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
 
     private void clearTarget(final boolean releaseVisuals) {
         if (this.targetId != null) {
-            Pym.resize().release(this.targetId);
+            if (this.targetEntity == null) Pym.resize().release(this.targetId);
             DRIVERS.computeIfPresent(this.targetId, (id, drivers) -> {
                 drivers.remove(this);
                 return drivers.isEmpty() ? null : drivers;
@@ -450,7 +576,9 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         }
 
         if (releaseVisuals && this.fieldActive) {
-            if (this.target != null && !this.target.isRemoved()) {
+            if (this.targetEntity != null) {
+                if (this.level instanceof final ServerLevel level) EntityCompressionGlowPayload.clear(level, this.targetId);
+            } else if (this.target != null && !this.target.isRemoved()) {
                 CompressionSyncPayload.sendRelease(this.target);
             } else if (this.level instanceof final ServerLevel level && this.targetId != null) {
                 CompressionSyncPayload.sendRelease(level, this.targetId);
@@ -458,10 +586,13 @@ public final class StaticSubspaceCompressorBlockEntity extends KineticBlockEntit
         }
 
         this.target = null;
+        this.targetEntity = null;
+        this.entityResizeAge = 0;
+        this.entityGrowing = false;
         this.targetId = null;
         this.hitLocalPos = null;
         this.commandedScale = NO_COMMAND;
-        this.inFlightStage = null;
+        this.inFlightScale = NO_COMMAND;
         this.acquisitionAge = 0;
         this.acquisitionTicks = 0;
         this.stepAge = 0;

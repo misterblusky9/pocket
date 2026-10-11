@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.block;
 
 import com.misterblusky9.pocket.PocketSized;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
@@ -79,10 +80,25 @@ public final class ModBlocks {
                     () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.STONE))
             );
 
-    public static final DeferredHolder<Block, Block> DIAGRAM_TILE =
+    static {
+        BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "diagram_tile"), BLUEPRINT_TILE.getId());
+    }
+
+    public static final DeferredHolder<Block, CopycatFacadeBlock> COPYCAT_FACADE =
             BLOCKS.register(
-                    "diagram_tile",
-                    () -> new Block(BlockBehaviour.Properties.ofFullCopy(Blocks.STONE))
+                    "copycat_facade",
+                    () -> new CopycatFacadeBlock(
+                            BlockBehaviour.Properties.ofFullCopy(Blocks.GOLD_BLOCK)
+                                    .noOcclusion()
+                                    .mapColor(MapColor.NONE)
+                                    .isValidSpawn((state, level, pos, type) -> false)
+                    )
+            );
+
+    public static final DeferredHolder<Block, SubspaceHarnessBlock> SUBSPACE_HARNESS =
+            BLOCKS.register(
+                    "subspace_harness",
+                    () -> new SubspaceHarnessBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.COPPER_BLOCK))
             );
 
     private ModBlocks() {}

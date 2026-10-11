@@ -26,7 +26,7 @@ public final class ShrinkRayPick {
         if (player == null) return false;
         final ItemStack held = player.getMainHandItem();
         if (!(held.getItem() instanceof final ScaleSelectingItem tool)
-                || !tool.permitsSelection(player, scale)) return false;
+                || !tool.permitsSelection(held, player, scale)) return false;
 
         if (ScaleBounds.same(CreativeShrinkRayItem.selectedScale(held), scale)) return true;
         tool.select(held, scale);

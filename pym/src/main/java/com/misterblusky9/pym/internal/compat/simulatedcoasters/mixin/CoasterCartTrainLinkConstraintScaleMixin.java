@@ -6,12 +6,14 @@ import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterLinkScale;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.track.cart.CoasterCartTrainLinkConstraint", remap = false)
 public abstract class CoasterCartTrainLinkConstraintScaleMixin {
+    @Unique
     private static final String PYM$UPDATE =
             "updateConstraint("
                     + "Ldev/ryanhcode/sable/sublevel/system/SubLevelPhysicsSystem;"
@@ -19,18 +21,21 @@ public abstract class CoasterCartTrainLinkConstraintScaleMixin {
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;)V";
 
+    @Unique
     private static final String PYM$LINK_CARTS =
             "linkCarts("
                     + "Lnet/minecraft/server/level/ServerLevel;"
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;)Z";
 
+    @Unique
     private static final String PYM$TENSION =
             "isUnderExtremeTension("
                     + "Ldev/silvergold/simulatedcoasters/track/cart/CoasterCartTrainLinkConstraint$ActiveLink;"
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;D)Z";
 
+    @Unique
     private static final String PYM$CENTER_DISTANCE =
             "Ldev/silvergold/simulatedcoasters/track/cart/CoasterCartTrainLinkConstraint$ActiveLink;centerDistance:D";
 

@@ -11,6 +11,21 @@ import java.util.EnumMap;
 import java.util.Map;
 
 public final class DeviceRanges {
+    public enum PvpScalingMode {
+        ON,
+        OFF,
+        PERSONAL_ON,
+        PERSONAL_OFF;
+
+        public boolean personal() {
+            return this == PERSONAL_ON || this == PERSONAL_OFF;
+        }
+
+        public boolean defaultAllowed() {
+            return this == ON || this == PERSONAL_ON;
+        }
+    }
+
     public enum Device {
         CREATIVE_SHRINK_RAY("creativeShrinkRay", "Creative Shrinkray", new ScaleBounds(1.0D / 32.0D, ScaleBounds.SAFE.max())),
         COMPRESSION_GUN("compressionGun", "Compression guns", new ScaleBounds(1.0D / 32.0D, ScaleBounds.SAFE.max())),
@@ -34,6 +49,9 @@ public final class DeviceRanges {
     public static final ModConfigSpec SPEC;
     private static final Map<Device, ModConfigSpec.DoubleValue> MIN = new EnumMap<>(Device.class);
     private static final Map<Device, ModConfigSpec.DoubleValue> MAX = new EnumMap<>(Device.class);
+    private static final ModConfigSpec.EnumValue<PvpScalingMode> PVP_SCALING_MODE;
+    private static final ModConfigSpec.BooleanValue ALLOW_PVP_SCALING_TOGGLE;
+    private static final ModConfigSpec.BooleanValue RESIZE_ENTITIES_ON_CRAFTS;
 
     static {
         final ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -51,11 +69,39 @@ public final class DeviceRanges {
             builder.pop();
         }
         builder.pop();
+
+        builder.comment(
+                "Controls whether players may resize other players.",
+                "ON: always allowed; OFF: always blocked; PERSONAL_ON/OFF: PSC owners choose, using that default.")
+                .push("pvpScaling");
+        PVP_SCALING_MODE = builder.defineEnum("mode", PvpScalingMode.PERSONAL_ON);
+        ALLOW_PVP_SCALING_TOGGLE = builder.comment(
+                "Whether personal-mode players may change their PVP Scaling preference from the PSC menu.")
+                .define("allowPlayersToToggleInPsc", true);
+        builder.pop();
+
+        RESIZE_ENTITIES_ON_CRAFTS = builder.comment(
+                "Whether entities standing on contraptions resize with them.",
+                "Powered compressors include standing players automatically; handheld tools require Ctrl.",
+                "Riders in Create seats always follow.")
+                .define("resizeEntitiesOnCrafts", true);
         SPEC = builder.build();
     }
 
     public static void register(final IEventBus modBus, final ModContainer container) {
         container.registerConfig(ModConfig.Type.SERVER, SPEC);
+    }
+
+    public static PvpScalingMode pvpScalingMode() {
+        return SPEC.isLoaded() ? PVP_SCALING_MODE.get() : PvpScalingMode.PERSONAL_ON;
+    }
+
+    public static boolean allowPlayersToTogglePvpScaling() {
+        return !SPEC.isLoaded() || ALLOW_PVP_SCALING_TOGGLE.get();
+    }
+
+    public static boolean resizeEntitiesOnCrafts() {
+        return !SPEC.isLoaded() || RESIZE_ENTITIES_ON_CRAFTS.get();
     }
 
     public static ScaleBounds of(final Device device) {

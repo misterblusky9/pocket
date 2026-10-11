@@ -10,49 +10,52 @@ import net.minecraft.world.item.Items;
 public enum PocketContainer {
     CARDBOARD_BOX(
             "empty_box", "item/container/cardboard_box",
-            12.0D, 0.5D,
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
             1.5D, 12.0D, -1.0D,
             false
     ),
 
     DISPLAY_BOTTLE(
             "display_bottle", "item/display_bottle",
-            12.0D, 0.5D,
-            0.5D, 12.0D, 0.5D,
+            1.25D, 15.25D, 2.25D, 13.25D, 0.5D,
+            1.251D, 11.0D, 0.5D,
             true
     ),
 
     BRASS_DISPLAY_CASE(
             "brass_display_case", "item/brass_display_case",
-            12.0D, 0.5D,
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
             1.25D, 13.0D, 0.5D,
             true
     ),
 
     BRASS_DISPLAY_PLATE(
             "brass_display_plate", "item/brass_display_plate",
-            12.0D, 0.5D,
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
             1.25D, 13.0D, -1.0D,
             false
     ),
 
     ANDESITE_DISPLAY_CASE(
             "andesite_display_case", "item/andesite_display_case",
-            12.0D, 0.5D,
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
             1.25D, 13.0D, 0.5D,
             true
     ),
 
     ANDESITE_DISPLAY_PLATE(
             "andesite_display_plate", "item/andesite_display_plate",
-            12.0D, 0.5D,
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
             1.25D, 13.0D, -1.0D,
             false
     );
 
     private final String registryPath;
     private final String modelPath;
-    private final double interiorWidthVoxels;
+    private final double interiorMinXVoxels;
+    private final double interiorMaxXVoxels;
+    private final double interiorMinZVoxels;
+    private final double interiorMaxZVoxels;
     private final double sideMarginVoxels;
     private final double floorVoxels;
     private final double ceilingVoxels;
@@ -62,7 +65,10 @@ public enum PocketContainer {
     PocketContainer(
             final String registryPath,
             final String modelPath,
-            final double interiorWidthVoxels,
+            final double interiorMinXVoxels,
+            final double interiorMaxXVoxels,
+            final double interiorMinZVoxels,
+            final double interiorMaxZVoxels,
             final double sideMarginVoxels,
             final double floorVoxels,
             final double ceilingVoxels,
@@ -71,7 +77,10 @@ public enum PocketContainer {
     ) {
         this.registryPath = registryPath;
         this.modelPath = modelPath;
-        this.interiorWidthVoxels = interiorWidthVoxels;
+        this.interiorMinXVoxels = interiorMinXVoxels;
+        this.interiorMaxXVoxels = interiorMaxXVoxels;
+        this.interiorMinZVoxels = interiorMinZVoxels;
+        this.interiorMaxZVoxels = interiorMaxZVoxels;
         this.sideMarginVoxels = sideMarginVoxels;
         this.floorVoxels = floorVoxels;
         this.ceilingVoxels = ceilingVoxels;
@@ -92,8 +101,20 @@ public enum PocketContainer {
         return ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, this.modelPath);
     }
 
-    public double clearWidth() {
-        return (this.interiorWidthVoxels - 2.0D * this.sideMarginVoxels) / 16.0D;
+    public double clearWidthX() {
+        return (this.interiorMaxXVoxels - this.interiorMinXVoxels - 2.0D * this.sideMarginVoxels) / 16.0D;
+    }
+
+    public double clearWidthZ() {
+        return (this.interiorMaxZVoxels - this.interiorMinZVoxels - 2.0D * this.sideMarginVoxels) / 16.0D;
+    }
+
+    public double centreX() {
+        return ((this.interiorMinXVoxels + this.interiorMaxXVoxels) * 0.5D - 8.0D) / 16.0D;
+    }
+
+    public double centreZ() {
+        return ((this.interiorMinZVoxels + this.interiorMaxZVoxels) * 0.5D - 8.0D) / 16.0D;
     }
 
     public double clearHeight() {

@@ -3,6 +3,7 @@ package com.misterblusky9.pocket.network;
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.item.ScaleToolModifier;
+import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pocket.item.ScaleSelectingItem;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -11,7 +12,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class PocketNetwork {
     public static void register(final RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("18");
+        final PayloadRegistrar registrar = event.registrar("19");
         registrar.playToClient(
                 CompressionSyncPayload.TYPE,
                 CompressionSyncPayload.STREAM_CODEC,
@@ -27,10 +28,18 @@ public final class PocketNetwork {
                 )
         );
         registrar.playToClient(
+                EntityCompressionGlowPayload.TYPE,
+                EntityCompressionGlowPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        com.misterblusky9.pocket.client.ShrinkRayHoverOutline.compressionGlow(
+                                payload.entityId(), payload.growing(), payload.ticks())
+                )
+        );
+        registrar.playToClient(
                 ShrinkRayBeamColourPayload.TYPE,
                 ShrinkRayBeamColourPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(
-                        () -> com.misterblusky9.pocket.client.PocketBeamColours.push(payload.colour(), payload.target())
+                        () -> com.misterblusky9.pocket.client.PocketBeamColours.push(payload.colour(), payload.target(), payload.shooter())
                 )
         );
         registrar.playToServer(
@@ -62,6 +71,15 @@ public final class PocketNetwork {
                 })
         );
         registrar.playToServer(
+                HotGluePunchPayload.TYPE,
+                HotGluePunchPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof final ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
                 CannonExpansionPayload.TYPE,
                 CannonExpansionPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
@@ -78,7 +96,7 @@ public final class PocketNetwork {
                 (payload, context) -> context.enqueueWork(() -> {
                     final ItemStack stack = context.player().getItemInHand(payload.hand());
                     if (stack.getItem() instanceof final ScaleSelectingItem tool
-                            && tool.permitsSelection(context.player(), payload.scale())) {
+                            && tool.permitsSelection(stack, context.player(), payload.scale())) {
                         tool.select(stack, payload.scale());
                     }
                 })
@@ -102,18 +120,38 @@ public final class PocketNetwork {
                 (payload, context) -> context.enqueueWork(() -> {
                     final ItemStack stack = context.player().getItemInHand(payload.hand());
                     if (!(stack.getItem() instanceof final CreativeShrinkRayItem ray)) return;
-                    if (!ray.permitsSelection(context.player(), payload.scale())) return;
+                    final CreativeShrinkRayItem.TargetingMode mode =
+                            CreativeShrinkRayItem.TargetingMode.byId(payload.targetingMode());
+                    final double scale = payload.scale();
+                    if (!ScaleBounds.isValid(scale)
+                            || !CreativeShrinkRayItem.limits(mode, context.player()).contains(scale)) return;
 
-                    ray.select(stack, payload.scale());
-                    CreativeShrinkRayItem.setTargetingMode(
-                            stack, CreativeShrinkRayItem.TargetingMode.byId(payload.targetingMode()));
+                    CreativeShrinkRayItem.setTargetingMode(stack, mode, context.player());
+                    ray.select(stack, scale);
                 })
         );
         registrar.playToServer(
                 ScaleToolModifierPayload.TYPE,
                 ScaleToolModifierPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(
-                        () -> ScaleToolModifier.set(context.player(), payload.targetOnly())
+                        () -> ScaleToolModifier.set(context.player(), payload.targetOnly(), payload.follow())
+                )
+        );
+        registrar.playToServer(
+                FacadeAlignmentPayload.TYPE,
+                FacadeAlignmentPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof final ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToClient(
+                FacadeAlignmentSyncPayload.TYPE,
+                FacadeAlignmentSyncPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.CopycatFacadeFrames.acceptAlignment(
+                                payload.craft(), payload.offset())
                 )
         );
     }

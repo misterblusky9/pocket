@@ -173,7 +173,6 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         final float direction = com.misterblusky9.pocket.item.CompressionGunItem.isGrowing(stack)
                 ? 1.0F : -1.0F;
 
-        // Dry: the cog kicks but never winds up.
         final boolean kickOnly = !fueled
                 && ticksUsing >= com.misterblusky9.pocket.item.CompressionGunItem.SPIN_KICK_TICKS;
 
@@ -253,7 +252,6 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         return isSpooling(holder) ? CompressionGunStateModel.State.ACTIVE : CompressionGunStateModel.State.IDLE;
     }
 
-    // Local player: exact hand slot. Other players: using a compression gun at all.
     private static boolean isSpooling(final Holder holder) {
         if (holder.player() instanceof LocalPlayer) return isDriving(holder);
         final Player player = holder.player();

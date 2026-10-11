@@ -67,7 +67,6 @@
   "pocket.switch.control_mode.analog": "Аналоговий",
   "block.pocket.switch_piston": "Перемикач-поршень",
   "block.pocket.blueprint_tile": "Плитка креслення",
-  "block.pocket.diagram_tile": "Плитка діаграми",
   "pocket.message.levitite_depleted": "Левітитовий сплав вичерпано",
   "pocket.message.no_air_pressure": "Немає тиску повітря",
   "pocket.message.hard_limit": "Жорстке обмеження Pocket Sized: %s блоків",

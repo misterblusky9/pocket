@@ -13,6 +13,12 @@ final class PehkuiEntityScalingBackend implements PehkuiEntityScaling.Backend {
     }
 
     @Override
+    public double renderScale(final Entity entity, final float partialTick) {
+        final float value = ScaleTypes.BASE.getScaleData(entity).getScale(partialTick);
+        return valid(value) ? value : 1.0D;
+    }
+
+    @Override
     public void setScale(final Entity entity, final double requested, final int ticks) {
         final ScaleData base = ScaleTypes.BASE.getScaleData(entity);
         final float scale = representable(requested);
@@ -21,6 +27,7 @@ final class PehkuiEntityScalingBackend implements PehkuiEntityScaling.Backend {
             base.setTargetScale(scale);
         } else {
             base.setScaleTickDelay(ticks);
+            base.setTargetScale(base.getBaseScale());
             base.setTargetScale(scale);
         }
     }
@@ -29,6 +36,14 @@ final class PehkuiEntityScalingBackend implements PehkuiEntityScaling.Backend {
     public boolean changing(final Entity entity) {
         final ScaleData base = ScaleTypes.BASE.getScaleData(entity);
         return base.getBaseScale() != base.getTargetScale() || base.getPrevBaseScale() != base.getBaseScale();
+    }
+
+    @Override
+    public void settle(final Entity entity) {
+        final ScaleData base = ScaleTypes.BASE.getScaleData(entity);
+        if (base.getBaseScale() == base.getTargetScale() && base.getPrevBaseScale() != base.getBaseScale()) {
+            base.tick();
+        }
     }
 
     @Override

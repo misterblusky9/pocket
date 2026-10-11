@@ -13,6 +13,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Constant;
@@ -26,6 +27,7 @@ import java.util.List;
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.track.cart.CoasterCartTrackSnap", remap = false)
 public abstract class CoasterCartTrackSnapScaleMixin {
+    @Unique
     private static final String PYM$IDEAL =
             "idealRepresentativeSnapCenterWorld("
                     + "Lnet/minecraft/server/level/ServerLevel;"
@@ -33,10 +35,12 @@ public abstract class CoasterCartTrackSnapScaleMixin {
                     + "Lnet/minecraft/world/phys/Vec3;";
 
 
+    @Unique
     private static final String PYM$PRE_TICK =
             "onPrePhysicsTick("
                     + "Ldev/ryanhcode/sable/neoforge/event/ForgeSablePrePhysicsTickEvent;)V";
 
+    @Unique
     private static final String PYM$APPLY =
             "applySnap("
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
@@ -46,6 +50,7 @@ public abstract class CoasterCartTrackSnapScaleMixin {
                     + "Lnet/minecraft/world/phys/Vec3;"
                     + "Lnet/minecraft/world/phys/Vec3;Z)V";
 
+    @Unique
     private static final String PYM$OPEN_END =
             "shouldDisengageAtOpenEndHit("
                     + "Lnet/minecraft/world/level/Level;"

@@ -52,7 +52,7 @@ public final class CrossScaleWeldSeams {
 
         CELLS.keySet().removeIf(id -> welds.stream().noneMatch(w -> w.weldId().equals(id)));
 
-        final UUID doomed = holdingKnife(player) ? hoveredWeld(minecraft, level) : null;
+        final UUID doomed = holdingKnife(player) || punchCuts(player) ? hoveredWeld(minecraft, level) : null;
 
         for (final WeldRecord record : welds) {
             final SubLevel small = container.getSubLevel(record.smallSubLevel());
@@ -74,7 +74,7 @@ public final class CrossScaleWeldSeams {
                     WeldContact.identity(record.smallFacing()),
                     cache.outline(),
                     color,
-                    LINE_WIDTH);
+                    WeldContactPatch.lineWidth(small, big));
         }
     }
 
@@ -119,7 +119,6 @@ public final class CrossScaleWeldSeams {
         return cache;
     }
 
-    public static final float LINE_WIDTH = 1.0F / 16.0F;
 
     private static UUID hoveredWeld(final Minecraft minecraft, final Level level) {
         final long now = level.getGameTime();
@@ -143,6 +142,10 @@ public final class CrossScaleWeldSeams {
 
     private static boolean holdingKnife(final LocalPlayer player) {
         return isKnife(player.getMainHandItem()) || isKnife(player.getOffhandItem());
+    }
+
+    private static boolean punchCuts(final LocalPlayer player) {
+        return player.getMainHandItem().is(ModItems.GLUE_GUN.get()) && !HotGlueGunClient.placing();
     }
 
     private static boolean isKnife(final ItemStack stack) {

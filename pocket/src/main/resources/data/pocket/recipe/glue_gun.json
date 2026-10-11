@@ -2,8 +2,11 @@
   "type": "minecraft:crafting_shapeless",
   "category": "equipment",
   "ingredients": [
-    { "item": "minecraft:white_dye" },
-    { "item": "minecraft:slime_ball" }
+    { "item": "minecraft:magma_cream" },
+    [
+      { "item": "create:super_glue" },
+      { "item": "simulated:honey_glue" }
+    ]
   ],
   "result": {
     "id": "pocket:glue_gun",

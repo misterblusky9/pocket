@@ -15,12 +15,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(value = BlockEntityRenderDispatcher.class, priority = 900)
 public abstract class ComputerCraftMonitorRenderDistanceMixin {
+    @Unique
     private static final String COMPUTERCRAFT = "computercraft";
+    @Unique
     private static final String MONITOR_NORMAL = "monitor_normal";
+    @Unique
     private static final String MONITOR_ADVANCED = "monitor_advanced";
 
     @ModifyExpressionValue(

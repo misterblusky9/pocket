@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class ScaleToolModifier {
     private static final Set<UUID> TARGET_ONLY = ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> FOLLOW = ConcurrentHashMap.newKeySet();
 
     public static boolean targetOnly(final Player player) {
         return player != null && TARGET_ONLY.contains(player.getUUID());
@@ -18,12 +19,21 @@ public final class ScaleToolModifier {
         return !targetOnly(player);
     }
 
-    public static void set(final Player player, final boolean targetOnly) {
+    public static boolean follows(final Player player) {
+        return player != null && FOLLOW.contains(player.getUUID());
+    }
+
+    public static void set(final Player player, final boolean targetOnly, final boolean follow) {
         if (player == null) return;
-        if (targetOnly) {
-            TARGET_ONLY.add(player.getUUID());
+        mark(TARGET_ONLY, player, targetOnly);
+        mark(FOLLOW, player, follow);
+    }
+
+    private static void mark(final Set<UUID> set, final Player player, final boolean on) {
+        if (on) {
+            set.add(player.getUUID());
         } else {
-            TARGET_ONLY.remove(player.getUUID());
+            set.remove(player.getUUID());
         }
     }
 
@@ -38,6 +48,7 @@ public final class ScaleToolModifier {
 
     public static void onLoggedOut(final PlayerEvent.PlayerLoggedOutEvent event) {
         TARGET_ONLY.remove(event.getEntity().getUUID());
+        FOLLOW.remove(event.getEntity().getUUID());
     }
 
     private ScaleToolModifier() {}

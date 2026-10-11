@@ -3,7 +3,10 @@ package com.misterblusky9.pym.internal.compat.pehkui;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import net.minecraft.world.entity.Entity;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 
 public final class PehkuiEntityScaling {
     private static final String BACKEND =
@@ -18,6 +21,7 @@ public final class PehkuiEntityScaling {
 
         try {
             backend = (Backend) Class.forName(BACKEND).getDeclaredConstructor().newInstance();
+            NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, PehkuiEntityScaling::onJoin);
         } catch (final ReflectiveOperationException | RuntimeException | LinkageError exception) {
             PymTrace.warn("Pehkui integration unavailable: {}", exception.toString());
         }
@@ -42,6 +46,17 @@ public final class PehkuiEntityScaling {
         }
     }
 
+    public static double renderScale(final Entity entity, final float partialTick) {
+        final Backend current = backend;
+        if (current == null || entity == null) return 1.0D;
+        try {
+            return current.renderScale(entity, partialTick);
+        } catch (final RuntimeException | LinkageError exception) {
+            fail(current, exception);
+            return 1.0D;
+        }
+    }
+
     public static boolean setScale(final Entity entity, final double scale, final int ticks) {
         final Backend current = backend;
         if (current == null || entity == null || !ScaleBounds.isValid(scale)) return false;
@@ -51,6 +66,17 @@ public final class PehkuiEntityScaling {
         } catch (final RuntimeException | LinkageError exception) {
             fail(current, exception);
             return false;
+        }
+    }
+
+    private static void onJoin(final EntityJoinLevelEvent event) {
+        if (event.getLevel().isClientSide()) return;
+        final Backend current = backend;
+        if (current == null) return;
+        try {
+            current.settle(event.getEntity());
+        } catch (final RuntimeException | LinkageError exception) {
+            fail(current, exception);
         }
     }
 
@@ -78,8 +104,10 @@ public final class PehkuiEntityScaling {
 
     interface Backend {
         double scale(Entity entity, boolean target);
+        double renderScale(Entity entity, float partialTick);
         void setScale(Entity entity, double scale, int ticks);
         boolean changing(Entity entity);
+        void settle(Entity entity);
         void disable();
     }
 

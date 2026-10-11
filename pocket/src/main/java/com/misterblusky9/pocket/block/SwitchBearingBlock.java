@@ -142,6 +142,10 @@ public final class SwitchBearingBlock extends DirectionalKineticBlock
                 return ItemInteractionResult.SUCCESS;
             }
             withBlockEntityDo(level, pos, be -> {
+                if (be.clickedThroughContraption(player, hitResult.getLocation())) {
+                    be.onContraptionInteraction(player, hand);
+                    return;
+                }
                 if (be.isRunning()) {
                     be.disassemble();
                     return;

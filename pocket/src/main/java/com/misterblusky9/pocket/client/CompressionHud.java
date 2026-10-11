@@ -41,16 +41,24 @@ public final class CompressionHud {
         final Minecraft minecraft = Minecraft.getInstance();
         final LocalPlayer player = minecraft.player;
         if (player == null || minecraft.options.hideGui || minecraft.screen != null) return;
-        final double range = rangeFor(player);
-        final boolean selfResize = !holding(player, SelfResizeDeviceItem.class).isEmpty();
-        if (Double.isNaN(range) && !selfResize) return;
-
-        final float partialTick = minecraft.getTimer().getGameTimeDeltaPartialTick(false);
+        if (holdingFilledPocket(player)) return;
 
         final GuiGraphics graphics = event.getGuiGraphics();
         final Font font = minecraft.font;
         final int centreX = graphics.guiWidth() / 2;
         final int y = graphics.guiHeight() - HOTBAR_CLEARANCE;
+
+        final CaseSealAim sealAim = CaseSealAim.of(player);
+        if (sealAim != null) {
+            drawCentred(graphics, font, sealAim.label(), centreX, y, SCALE_COLOUR);
+            return;
+        }
+
+        final double range = rangeFor(player);
+        final boolean selfResize = !holding(player, SelfResizeDeviceItem.class).isEmpty();
+        if (Double.isNaN(range) && !selfResize) return;
+
+        final float partialTick = minecraft.getTimer().getGameTimeDeltaPartialTick(false);
 
         if (Double.isNaN(range)) {
             drawCentred(graphics, font, HudScaleText.of(ScaleReadout.value(player), Pym.entities().scaleOf(player)), centreX, y, SCALE_COLOUR);
@@ -146,8 +154,12 @@ public final class CompressionHud {
     }
 
     private static boolean holdingCase(final LocalPlayer player) {
-        return !holding(player, EmptyBoxItem.class).isEmpty()
-                || !holding(player, PocketCaseItem.class).isEmpty();
+        return !holding(player, EmptyBoxItem.class).isEmpty();
+    }
+
+    private static boolean holdingFilledPocket(final LocalPlayer player) {
+        final ItemStack caseStack = holding(player, PocketCaseItem.class);
+        return !caseStack.isEmpty() && PocketCaseItem.isFilled(caseStack);
     }
 
     private static ItemStack holding(final LocalPlayer player, final Class<?> type) {

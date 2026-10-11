@@ -10,6 +10,7 @@ import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.service.SimConfigService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -39,23 +40,26 @@ public final class CrossScaleWelds {
     private static final double SEAM_TOLERANCE = 0.35D;
 
     public enum Refusal {
-        NONE(null),
-        OUT_OF_RANGE("Too far apart"),
-        OUT_OF_PLOT("Too far apart at this scale"),
-        SCALE_CHANGING("Still scaling"),
-        ALREADY_CONNECTED("Already connected"),
-        SAME_SUBLEVEL("Cannot weld to itself"),
-        WORLD_ALREADY_CONNECTED("Already welded to the world"),
-        CANNOT_WELD("Cannot weld");
+        NONE(null, false),
+        OUT_OF_RANGE("create.package_port.too_far", true),
+        OUT_OF_PLOT("create.package_port.too_far", true),
+        SCALE_CHANGING("Still scaling", false),
+        ALREADY_CONNECTED("Already connected", false),
+        SAME_SUBLEVEL("Cannot weld to itself", false),
+        WORLD_ALREADY_CONNECTED("Already welded to the world", false),
+        CANNOT_WELD("Cannot weld", false);
 
         private final String message;
+        private final boolean translatable;
 
-        Refusal(final String message) {
+        Refusal(final String message, final boolean translatable) {
             this.message = message;
+            this.translatable = translatable;
         }
 
-        public String message() {
-            return this.message;
+        public Component component() {
+            if (this.message == null) return null;
+            return this.translatable ? Component.translatable(this.message) : Component.literal(this.message);
         }
 
         public boolean allowed() {

@@ -29,6 +29,20 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+abstract class LatestSaveQuickPlay implements ValueSource<List<String>, Params> {
+    interface Params extends ValueSourceParameters {
+        DirectoryProperty getSaves()
+    }
+
+    @Override
+    List<String> obtain() {
+        final File latest = parameters.saves.get().asFile.listFiles()
+                ?.findAll { new File(it, "level.dat").isFile() }
+                ?.max { new File(it, "level.dat").lastModified() }
+        return latest == null ? [] : ["--quickPlaySingleplayer", latest.name]
+    }
+}
+
 neoForge {
     version = project.neo_version
 
@@ -46,6 +60,9 @@ neoForge {
             programArguments = [
                     "--username", "MisterBluSky"
             ]
+            programArguments.addAll(providers.of(LatestSaveQuickPlay) {
+                it.parameters.saves = rootProject.layout.projectDirectory.dir("runs/client1/saves")
+            })
 
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
@@ -134,9 +151,6 @@ tasks.register('extractSimulated', Copy) {
 
 dependencies {
     implementation project(':pym')
-    // ModDevGradle only applies version ranges to external modules. On a subproject a
-    // version { } block falls through to this project and replaces its version, so the
-    // supported Pym range lives in neoforge.mods.toml instead.
     jarJar(project(':pym'))
 
     implementation("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") {

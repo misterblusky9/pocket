@@ -36,12 +36,6 @@ public final class PocketWheelPreview {
     private static final float MIN_RADIUS = 0.05F;
     private static final float MAX_RADIUS = 8.0F;
 
-    /*
-     * Shell coordinates are unsigned whole blocks. Wheels are different: their centre can sit
-     * half a block outside the shell and coarse previews need fractional centres. Keep the same
-     * four-int payload, but mark wheel-centre positions and store each axis in half-block units.
-     * The 10-bit fields cover -0.5 through 511 blocks, comfortably beyond the preview grid.
-     */
     private static final int CENTRE_FORMAT_BIT = 1 << 30;
     private static final int CENTRE_BITS = 10;
     private static final int CENTRE_MASK = (1 << CENTRE_BITS) - 1;
@@ -153,8 +147,6 @@ public final class PocketWheelPreview {
                 y = unpackCentreAxis(packed, CENTRE_BITS);
                 z = unpackCentreAxis(packed, CENTRE_BITS * 2);
             } else {
-                // Compatibility with the first wheel-preview payload: whole block coordinate,
-                // interpreted as that block's centre. Negative edge positions were not representable.
                 x = ShellVoxels.unpackX(packed) + 0.5F;
                 y = ShellVoxels.unpackY(packed) + 0.5F;
                 z = ShellVoxels.unpackZ(packed) + 0.5F;

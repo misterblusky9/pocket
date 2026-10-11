@@ -15,6 +15,9 @@ public abstract class ZapperLaserBeamColourMixin implements PocketLaserBeamColou
     @Unique
     private int pocket$colour = ShrinkRayBeamColourPayload.INERT_COLOUR;
 
+    @Unique
+    private int pocket$shooter = -1;
+
     @Override
     public int pocket$colour() {
         return this.pocket$colour;
@@ -23,6 +26,16 @@ public abstract class ZapperLaserBeamColourMixin implements PocketLaserBeamColou
     @Override
     public void pocket$colour(final int colour) {
         this.pocket$colour = colour;
+    }
+
+    @Override
+    public int pocket$shooter() {
+        return this.pocket$shooter;
+    }
+
+    @Override
+    public void pocket$shooter(final int shooter) {
+        this.pocket$shooter = shooter;
     }
 
     @Override

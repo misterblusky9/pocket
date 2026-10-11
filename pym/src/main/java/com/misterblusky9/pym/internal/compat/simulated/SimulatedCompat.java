@@ -8,6 +8,7 @@ public final class SimulatedCompat {
     public static void init() {
         PymExtensions.register((subLevel, from, to) ->
                 SimulatedRopeScaleBoundary.blocksTransition(subLevel, to) ? ROPE_BLOCKS_SCALING : null);
+        PymExtensions.ownership(SwivelBearingHeads::of);
     }
 
     private SimulatedCompat() {}

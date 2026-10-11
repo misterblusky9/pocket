@@ -13,6 +13,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -20,6 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.client.track.CoasterWrenchCurveAnchorOutlineClient", remap = false)
 public abstract class CoasterAnchorSelectionScaleMixin {
+    @Unique
     private static final int[][] PYM$EDGES = {
             {0, 1}, {0, 2}, {0, 4},
             {1, 3}, {1, 5},

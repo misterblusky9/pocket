@@ -1,6 +1,8 @@
 package com.misterblusky9.pocket.block;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
+import com.simibubi.create.content.equipment.armor.BacktankBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -61,6 +63,24 @@ public final class ModBlockEntities {
                     () -> BlockEntityType.Builder.of(
                             SwitchPistonBlockEntity::new,
                             ModBlocks.SWITCH_PISTON.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CopycatBlockEntity>>
+            COPYCAT_FACADE = BLOCK_ENTITIES.register(
+                    "copycat_facade",
+                    () -> BlockEntityType.Builder.of(
+                            (pos, state) -> new CopycatBlockEntity(ModBlockEntities.COPYCAT_FACADE.get(), pos, state),
+                            ModBlocks.COPYCAT_FACADE.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<BacktankBlockEntity>>
+            SUBSPACE_HARNESS = BLOCK_ENTITIES.register(
+                    "subspace_harness",
+                    () -> BlockEntityType.Builder.of(
+                            (pos, state) -> new BacktankBlockEntity(ModBlockEntities.SUBSPACE_HARNESS.get(), pos, state),
+                            ModBlocks.SUBSPACE_HARNESS.get()
                     ).build(null)
             );
 

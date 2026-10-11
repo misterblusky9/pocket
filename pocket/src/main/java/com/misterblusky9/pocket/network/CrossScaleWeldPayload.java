@@ -24,6 +24,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
@@ -129,6 +130,7 @@ public record CrossScaleWeldPayload(
         WeldRuntime.markNew(level, record.weldId());
         CrossScaleWeldSync.broadcast(level);
 
+        glue.hurtAndBreak(1, player, LivingEntity.getSlotForHand(this.hand));
         player.awardStat(Stats.ITEM_USED.get(glue.getItem()));
     }
 
@@ -158,7 +160,7 @@ public record CrossScaleWeldPayload(
     }
 
     private static void message(final ServerPlayer player, final CrossScaleWelds.Refusal refusal) {
-        if (refusal.message() == null) return;
-        player.displayClientMessage(Component.literal(refusal.message()), true);
+        final Component message = refusal.component();
+        if (message != null) player.displayClientMessage(message, true);
     }
 }

@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.block;
 
+import com.misterblusky9.pocket.create.ContraptionSightline;
 import com.misterblusky9.pocket.create.SwitchPistonContraption;
 import com.misterblusky9.pocket.debug.SwitchPistonDebug;
 import com.simibubi.create.AllSoundEvents;
@@ -29,6 +30,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
@@ -206,6 +208,10 @@ public class SwitchPistonBlockEntity extends MechanicalPistonBlockEntity
         setPower(0, false);
     }
 
+    public boolean clickedThroughContraption(final Player player, final Vec3 hit) {
+        return running && ContraptionSightline.blocks(movedContraption, player, hit);
+    }
+
     public void toggleAssembly() {
         waitingForSpeedChange = false;
         if (running) {
@@ -241,22 +247,19 @@ public class SwitchPistonBlockEntity extends MechanicalPistonBlockEntity
 
         final BlockPos anchor =
                 contraption.anchor.relative(direction, contraption.getInitialExtensionProgress());
-        if (powered && ContraptionCollider.isCollidingWithWorld(level, contraption,
-                anchor.relative(movementDirection), movementDirection)) {
-            return;
-        }
-
         extensionLength = contraption.getExtensionLength();
 
+        boolean stalled = false;
         if (powered) {
             final float resultingOffset =
                     contraption.getInitialExtensionProgress() + Math.signum(getMovementSpeed()) * .5f;
-            if (resultingOffset <= 0 || resultingOffset >= extensionLength) {
-                return;
-            }
+            stalled = resultingOffset <= 0 || resultingOffset >= extensionLength
+                    || ContraptionCollider.isCollidingWithWorld(level, contraption,
+                    anchor.relative(movementDirection), movementDirection);
         }
 
         running = true;
+        waitingForSpeedChange = stalled;
         offset = contraption.getInitialExtensionProgress();
         sendData();
         clientOffsetDiff = 0;

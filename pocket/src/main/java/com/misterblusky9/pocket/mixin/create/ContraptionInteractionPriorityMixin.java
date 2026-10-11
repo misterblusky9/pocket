@@ -10,8 +10,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-// Create claims contraption right-clicks off the raw input event, before the vanilla
-// interaction pipeline runs, so held-tool priority has to be re-stated here.
 @Mixin(value = ContraptionHandlerClient.class, remap = false)
 public abstract class ContraptionInteractionPriorityMixin {
     @Inject(

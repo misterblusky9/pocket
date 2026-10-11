@@ -7,7 +7,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-public record ScaleToolModifierPayload(boolean targetOnly) implements CustomPacketPayload {
+public record ScaleToolModifierPayload(boolean targetOnly, boolean follow) implements CustomPacketPayload {
     public static final Type<ScaleToolModifierPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "scale_tool_modifier")
     );
@@ -15,6 +15,7 @@ public record ScaleToolModifierPayload(boolean targetOnly) implements CustomPack
     public static final StreamCodec<RegistryFriendlyByteBuf, ScaleToolModifierPayload> STREAM_CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.BOOL, ScaleToolModifierPayload::targetOnly,
+                    ByteBufCodecs.BOOL, ScaleToolModifierPayload::follow,
                     ScaleToolModifierPayload::new
             );
 

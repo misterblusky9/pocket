@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-// runs ahead of Sable's canPlace gate, which models every block as 1x1x1 world units
 @Mixin(value = BlockPlaceContext.class, priority = 500)
 public abstract class PlacementMarginMixin {
     @Shadow protected boolean replaceClicked;

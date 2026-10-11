@@ -2,6 +2,9 @@ package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.compat.simulated.WeldContact;
 import com.misterblusky9.pocket.compat.simulated.WeldGeometry;
+import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.ScaleBounds;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.createmod.catnip.outliner.Outliner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -17,6 +20,16 @@ import java.util.Set;
 
 public final class WeldContactPatch {
     public static final double SEAM_OOZE = 0.04D;
+    public static final float LINE_WIDTH = 1.0F / 16.0F;
+
+    public static float lineWidth(final SubLevel drawnOn, final SubLevel other) {
+        final double own = scaleOf(drawnOn);
+        return (float) (LINE_WIDTH * Math.min(own, scaleOf(other)) / own);
+    }
+
+    private static double scaleOf(final SubLevel subLevel) {
+        return subLevel == null ? ScaleBounds.FULL : ScaleBounds.clampValid(Pym.scale().of(subLevel));
+    }
 
     public record Edge(double u0, double v0, double u1, double v1) {}
     public static List<Edge> silhouette(final Set<Long> cells, final double ooze) {

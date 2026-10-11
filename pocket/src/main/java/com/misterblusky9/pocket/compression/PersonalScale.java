@@ -8,6 +8,8 @@ import com.misterblusky9.pocket.scale.CompressionStage;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 
 public final class PersonalScale {
     private static final int PERSONAL_RESIZE_TICKS = (int) Pym.resize().defaultTransitionTicks();
@@ -34,6 +36,20 @@ public final class PersonalScale {
             return CompressionStage.snap(data.getDouble(SCALE_KEY));
         }
         return CompressionStage.fromDepth(data.getInt(STAGE_KEY)).scale();
+    }
+
+    public static double goalFor(final Entity entity, final double current, final double goal) {
+        if (!(entity instanceof Player)) return goal;
+        final ScaleBounds bounds = DeviceRanges.of(DeviceRanges.Device.PERSONAL_COMPRESSOR);
+        return Math.max(Math.min(current, bounds.min()), Math.min(Math.max(current, bounds.max()), goal));
+    }
+
+    public static void remember(final ServerPlayer player, final double scale) {
+        if (player == null || !ScaleBounds.isValid(scale)) return;
+        final double snapped = CompressionStage.snap(scale);
+        final CompoundTag data = player.getPersistentData();
+        data.putDouble(SCALE_KEY, snapped);
+        data.putInt(STAGE_KEY, CompressionStage.nearest(snapped).depth());
     }
 
     private static void applyScale(final ServerPlayer player, final double scale) {

@@ -38,9 +38,10 @@ public final class WeldContact {
     public static Projection projectionFor(final WeldRecord record, final boolean sourceIsSmall) {
         final Quaterniond orientation = new Quaterniond(record.orientation());
         final Quaterniond toTarget = sourceIsSmall ? orientation.invert() : orientation;
+        final double smallSpan = record.spanFor(true);
         final double bigSpan = record.spanFor(false);
-        final double cell = sourceIsSmall ? bigSpan : (bigSpan <= 0.0D ? 1.0D : 1.0D / bigSpan);
-        return projection(record.facingFor(sourceIsSmall), toTarget, cell);
+        final double smallToBig = smallSpan <= 0.0D || bigSpan <= 0.0D ? 1.0D : bigSpan / smallSpan;
+        return projection(record.facingFor(sourceIsSmall), toTarget, sourceIsSmall ? smallToBig : 1.0D / smallToBig);
     }
 
     public static Projection identity(final Direction facing) {
@@ -54,11 +55,6 @@ public final class WeldContact {
             final Direction sourceFacing
     ) {
         return faceCells(level, source, sourcePos, sourceFacing, RADIUS);
-    }
-
-    public static int reachOnTarget(final double cell) {
-        if (!Double.isFinite(cell) || cell <= 0.0D) return RADIUS;
-        return Math.max(1, Math.min(RADIUS, (int) Math.ceil(RADIUS / Math.max(1.0D, cell))));
     }
 
     public static Set<Long> faceCells(

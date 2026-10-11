@@ -7,6 +7,7 @@ import com.simibubi.create.content.contraptions.ControlledContraptionEntity;
 import com.simibubi.create.content.contraptions.IDisplayAssemblyExceptions;
 import com.simibubi.create.content.contraptions.bearing.BearingContraption;
 import com.simibubi.create.content.contraptions.bearing.IBearingBlockEntity;
+import com.misterblusky9.pocket.create.ContraptionSightline;
 import com.misterblusky9.pocket.create.SwitchBearingContraption;
 import com.misterblusky9.pocket.debug.SwitchBearingDebug;
 import com.simibubi.create.content.kinetics.base.GeneratingKineticBlockEntity;
@@ -31,6 +32,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
@@ -254,6 +256,10 @@ public class SwitchBearingBlockEntity extends GeneratingKineticBlockEntity
         angle = 0;
         sendData();
         updateGeneratedRotation();
+    }
+
+    public boolean clickedThroughContraption(final Player player, final Vec3 hit) {
+        return running && ContraptionSightline.blocks(movedContraption, player, hit);
     }
 
     public void disassemble() {

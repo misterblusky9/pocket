@@ -15,6 +15,7 @@ import com.misterblusky9.pocket.network.PocketNetwork;
 import com.misterblusky9.pocket.pocket.CannonDeploymentQueue;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelEvents;
 import com.misterblusky9.pocket.scale.PocketPymIntegration;
+import com.misterblusky9.pym.api.Pym;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -26,6 +27,10 @@ public final class PocketSized {
     public static final String MOD_NAME = "Create: Pocket Sized";
 
     public PocketSized(final IEventBus modBus, final ModContainer modContainer) {
+        if (!Pym.entities().pehkuiAvailable()) {
+            throw new IllegalStateException("Create: Pocket Sized requires Pym with a working Pehkui backend");
+        }
+
         DeviceRanges.register(modBus, modContainer);
         modBus.addListener(PocketContraptionTypes::register);
 
@@ -51,6 +56,8 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onEntityInteractSpecific);
         NeoForge.EVENT_BUS.addListener(PocketedSubLevelEvents::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(CannonDeploymentQueue::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.FacadeAlignment::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.FacadeAlignment::onServerStopped);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.CompressionSessions::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.EntityCompressionSessions::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.item.ScaleToolModifier::onLoggedOut);

@@ -15,7 +15,6 @@ collision and world interaction, so a resized sublevel keeps behaving like part 
 [[mixins]]
 config="pym.mixins.json"
 
-# Compat modules. Each one only applies when its mod is installed.
 [[mixins]]
 config="pym.create.mixins.json"
 
