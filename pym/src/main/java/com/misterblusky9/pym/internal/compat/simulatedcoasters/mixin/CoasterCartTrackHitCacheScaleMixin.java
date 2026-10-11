@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Constant;
@@ -21,6 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(targets = "dev.silvergold.simulatedcoasters.track.cart.CoasterCartTrackHitCache", remap = false)
 public abstract class CoasterCartTrackHitCacheScaleMixin {
 
+    @Unique
     private static final String PYM$NEAREST =
             "nearestGraphHit("
                     + "Lnet/minecraft/server/level/ServerLevel;"
@@ -29,6 +31,7 @@ public abstract class CoasterCartTrackHitCacheScaleMixin {
                     + "Lnet/minecraft/world/phys/Vec3;D[Z)"
                     + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;";
 
+    @Unique
     private static final String PYM$ENGAGED =
             "engagedTickFrame("
                     + "Lnet/minecraft/server/level/ServerLevel;"

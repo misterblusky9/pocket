@@ -38,14 +38,22 @@ jobs:
       - name: Build and test
         run: ./gradlew build --stacktrace
 
-      - name: Upload JAR
+      - name: Upload Pocket JAR
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
           name: pocket-${{ github.sha }}
-          path: |
-            pocket/build/libs/pocket-*.jar
-            pym/build/libs/pym-*.jar
+          path: pocket/build/libs/pocket-*.jar
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+      - name: Upload Pym JAR
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pym-${{ github.sha }}
+          path: pym/build/libs/pym-*.jar
           if-no-files-found: error
           retention-days: 30
           archive: false

@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.compression;
 
 import com.misterblusky9.pocket.scale.ScaleLadder;
+import com.misterblusky9.pocket.network.EntityCompressionGlowPayload;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 import net.minecraft.network.chat.Component;
@@ -18,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class EntityCompressionSessions {
     private static final int RESIZE_TICKS = (int) Pym.resize().defaultTransitionTicks();
+    private static final int GLOW_REFRESH_TICKS = 5;
+    private static final int GLOW_TIMEOUT_TICKS = 15;
 
     private static final Map<UUID, Session> SESSIONS = new ConcurrentHashMap<>();
 
@@ -31,7 +34,9 @@ public final class EntityCompressionSessions {
 
         final Session session = new Session(target.getUUID(), holder.getUUID(), null, goal, current);
         if (!session.resizeTo(target, goal)) return false;
-        SESSIONS.put(target.getUUID(), session);
+        final Session previous = SESSIONS.put(target.getUUID(), session);
+        if (previous != null) EntityCompressionGlowPayload.clear(target);
+        EntityCompressionGlowPayload.send(target, goal > current, GLOW_TIMEOUT_TICKS);
         return true;
     }
 
@@ -42,7 +47,8 @@ public final class EntityCompressionSessions {
         if (aimed == null) return false;
 
         final Session session = SESSIONS.get(aimed.entity().getUUID());
-        if (session == null || session.beam == null || !session.beam.heldBy(holder) || !ScaleBounds.same(session.goal, goal)) {
+        if (session == null || session.beam == null || !session.beam.heldBy(holder)
+                || !ScaleBounds.same(session.goal, PersonalScale.goalFor(aimed.entity(), session.settled, goal))) {
             return false;
         }
         session.beam.hold(holder.level().getGameTime());
@@ -52,14 +58,15 @@ public final class EntityCompressionSessions {
     public static boolean holdCannon(
             final ServerPlayer holder,
             final Entity target,
-            final double goal,
+            final double requested,
             final InteractionHand hand
     ) {
-        if (!valid(holder, target, goal)) return false;
+        if (!valid(holder, target, requested)) return false;
 
         final long now = holder.level().getGameTime();
         final Session existing = SESSIONS.get(target.getUUID());
-        if (existing != null && existing.beam != null && existing.beam.heldBy(holder) && ScaleBounds.same(existing.goal, goal)) {
+        if (existing != null && existing.beam != null && existing.beam.heldBy(holder)
+                && ScaleBounds.same(existing.goal, PersonalScale.goalFor(target, existing.settled, requested))) {
             existing.beam.hold(now);
             return true;
         }
@@ -67,17 +74,25 @@ public final class EntityCompressionSessions {
         releaseCannon(holder);
 
         final double current = EntityCompressionTargeting.scale(target);
+        final double goal = PersonalScale.goalFor(target, current, requested);
         if (ScaleBounds.same(current, goal)) return false;
 
         final float levitite = holder.isCreative() ? 0.0F : CompressionSessions.LEVITITE_PER_TICK;
         final BeamSession beam = new BeamSession(holder.getUUID(), hand, 0, levitite, now);
-        SESSIONS.put(target.getUUID(), new Session(target.getUUID(), holder.getUUID(), beam, goal, current));
+        final Session previous = SESSIONS.put(target.getUUID(),
+                new Session(target.getUUID(), holder.getUUID(), beam, goal, current));
+        if (previous != null) EntityCompressionGlowPayload.clear(target);
+        EntityCompressionGlowPayload.send(target, goal > current, GLOW_TIMEOUT_TICKS);
         return true;
     }
 
     public static void releaseCannon(final ServerPlayer holder) {
         if (holder == null) return;
-        SESSIONS.values().removeIf(session -> session.beam != null && session.beam.heldBy(holder));
+        SESSIONS.values().removeIf(session -> {
+            if (session.beam == null || !session.beam.heldBy(holder)) return false;
+            EntityCompressionGlowPayload.clear(holder.serverLevel(), session.targetId);
+            return true;
+        });
     }
 
     public static void onServerTick(final ServerTickEvent.Post event) {
@@ -89,7 +104,15 @@ public final class EntityCompressionSessions {
             final Entity target = findEntity(event, session.targetId);
             final ServerPlayer holder = event.getServer().getPlayerList().getPlayer(session.holderId);
             if (target == null || !target.isAlive() || holder == null || !tick(session, target, holder)) {
+                final ServerLevel level = target != null && target.level() instanceof ServerLevel serverLevel
+                        ? serverLevel : holder == null ? null : holder.serverLevel();
+                EntityCompressionGlowPayload.clear(level, session.targetId);
                 iterator.remove();
+                continue;
+            }
+            if (holder.level().getGameTime() % GLOW_REFRESH_TICKS == 0) {
+                EntityCompressionGlowPayload.send(
+                        target, session.growing, GLOW_TIMEOUT_TICKS);
             }
         }
     }
@@ -99,6 +122,7 @@ public final class EntityCompressionSessions {
         final BeamSession beam = session.beam;
         if (beam != null) {
             if (beam.expired(holder.level().getGameTime())) return false;
+            if (!session.resizing() && ScaleBounds.same(session.settled, session.goal)) return true;
             if (!beam.drain(holder)) {
                 holder.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
                 return false;
@@ -108,9 +132,9 @@ public final class EntityCompressionSessions {
         session.tickResize();
         if (beam == null) return session.resizing();
 
+        if (!session.resizing() && ScaleBounds.same(session.settled, session.goal)) return true;
         final double next = ScaleLadder.stepToward(session.settled, session.goal);
         final BeamSession.Tick tick = beam.advance(BeamSession.Pace.HELD_BEAM, ScaleBounds.same(next, session.goal));
-        if (!session.resizing() && ScaleBounds.same(session.settled, session.goal)) return false;
         if (session.resizing() || !tick.step()) return true;
 
         if (!session.resizeTo(target, next)) return false;
@@ -129,8 +153,7 @@ public final class EntityCompressionSessions {
     }
 
     private static boolean locked(final Entity target, final ServerPlayer holder) {
-        if (holder.isCreative() && holder.hasPermissions(2)) return false;
-        return target instanceof final Player player && PersonalLock.protects(player);
+        return target instanceof final Player player && PersonalLock.blocks(holder, player);
     }
 
     private static Entity findEntity(final ServerTickEvent.Post event, final UUID entityId) {
@@ -146,6 +169,7 @@ public final class EntityCompressionSessions {
         private final UUID holderId;
         private final BeamSession beam;
         private final double goal;
+        private final boolean growing;
 
         private double settled;
         private double resizingTo = Double.NaN;
@@ -156,6 +180,7 @@ public final class EntityCompressionSessions {
             this.holderId = holderId;
             this.beam = beam;
             this.goal = goal;
+            this.growing = goal > settled;
             this.settled = settled;
         }
 

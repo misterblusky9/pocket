@@ -28,9 +28,13 @@
     "interaction.PlacementDiagnosticMixin",
     "collision.SubLevelEntityCollisionMixin",
     "collision.PlayerSubLevelEdgeScaleMixin",
+    "collision.SubLevelEdgeProbeBoundsMixin",
     "entity.EntityDimensionsScaleMixin",
     "entity.EntityResizeFootingMixin",
     "entity.LivingEntityDimensionsScaleMixin",
+    "entity.PlayerPoseFitScaleMixin",
+    "entity.SableInsideBlockOptimizationMixin",
+    "entity.SubLevelFluidScanBoundsMixin",
     "sable.SubLevelTrackingScaleSyncMixin",
     "sable.RiderEyeScaleMixin",
     "sable.SubLevelAssemblyRemovedBodyGuardMixin",
@@ -56,7 +60,8 @@
     "client.SubLevelEntityRenderScaleMixin",
     "client.SubLevelSnapshotInterpolatorAccessor",
     "client.SableDebugColliderOverlayScaleMixin",
-    "client.SubLevelBlockEntityLodMixin"
+    "client.SubLevelBlockEntityLodMixin",
+    "client.SubLevelShadowScanBoundsMixin"
   ],
   "injectors": {
     "defaultRequire": 1

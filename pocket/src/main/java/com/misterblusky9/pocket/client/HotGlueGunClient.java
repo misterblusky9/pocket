@@ -6,8 +6,10 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldContact;
 import com.misterblusky9.pocket.compat.simulated.WeldGeometry;
+import com.misterblusky9.pocket.item.HeldInteractionPriority;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.network.CrossScaleWeldPayload;
+import com.misterblusky9.pocket.network.HotGluePunchPayload;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.content.items.merging_glue.MergingGlueItemHandler;
@@ -26,12 +28,14 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -45,14 +49,28 @@ public final class HotGlueGunClient {
     private static int rotationTurns;
     private static PreviewShape originShape;
     private static PreviewShape previewShape;
+    private static PreviewShape previewSource;
+    private static PreviewKey previewKey;
+    private static boolean swallowPunch;
 
     private record PreviewShape(
             UUID subLevel,
             BlockPos pos,
             Direction facing,
-            double cell,
+            Set<Long> cells,
             List<WeldContactPatch.Edge> faces,
             List<WeldContactPatch.Edge> outline
+    ) {}
+
+    private record PreviewKey(
+            UUID source,
+            UUID target,
+            BlockPos targetPos,
+            Direction targetFacing,
+            Vector3d anchor,
+            Vector3d axisU,
+            Vector3d axisV,
+            double cell
     ) {}
 
     @SubscribeEvent
@@ -64,6 +82,8 @@ public final class HotGlueGunClient {
 
         if (player.isShiftKeyDown() && firstPos != null) {
             discardSelection();
+            event.setCancellationResult(InteractionResult.CONSUME);
+            event.setCanceled(true);
             return;
         }
 
@@ -72,6 +92,9 @@ public final class HotGlueGunClient {
                 || event.getLevel().getBlockState(hit.getBlockPos()).isAir()) {
             return;
         }
+        if (knifeCuts(player, event.getHand(), hit)) return;
+        if (firstPos == null && !player.isShiftKeyDown()
+                && event.getLevel().getBlockState(hit.getBlockPos()).is(HeldInteractionPriority.TAKES_HELD_ITEMS)) return;
 
         if ((firstPos == null || firstHand != event.getHand())
                 && Sable.HELPER.getContaining(event.getLevel(), hit.getBlockPos()) == null) {
@@ -79,24 +102,24 @@ public final class HotGlueGunClient {
         }
 
         event.setUseBlock(net.neoforged.neoforge.common.util.TriState.FALSE);
-        event.setCancellationResult(InteractionResult.SUCCESS);
+        event.setCancellationResult(InteractionResult.CONSUME);
         event.setCanceled(true);
 
         if (firstPos == null || firstHand != event.getHand()) {
             begin(hit, event.getHand());
-            player.swing(event.getHand());
             return;
         }
 
         final CrossScaleWelds.Weld weld = resolve(event.getLevel(), hit);
         if (weld == null) {
-            player.displayClientMessage(Component.literal(CrossScaleWelds.Refusal.CANNOT_WELD.message()), true);
+            player.displayClientMessage(CrossScaleWelds.Refusal.CANNOT_WELD.component(), true);
             return;
         }
 
         final CrossScaleWelds.Refusal refusal = weld.check();
         if (!refusal.allowed()) {
-            if (refusal.message() != null) player.displayClientMessage(Component.literal(refusal.message()), true);
+            final Component message = refusal.component();
+            if (message != null) player.displayClientMessage(message, true);
             return;
         }
 
@@ -112,13 +135,44 @@ public final class HotGlueGunClient {
                 bigHit.z,
                 placementMode(weld).ordinal(),
                 rotationTurns));
+        HotGlueGunRenderHandler.INSTANCE.shoot(event.getHand(), player.position());
 
-        player.swing(event.getHand());
         clear();
+    }
+
+    @SubscribeEvent(receiveCanceled = true)
+    public static void onLeftClickBlock(final PlayerInteractEvent.LeftClickBlock event) {
+        if (!event.getLevel().isClientSide()
+                || event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START
+                || !event.getItemStack().is(ModItems.GLUE_GUN.get())) return;
+
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (event.getEntity() != minecraft.player || placing() || swallowPunch) return;
+
+        if (!(minecraft.hitResult instanceof final BlockHitResult hit)
+                || hit.getType() == HitResult.Type.MISS
+                || !hit.getBlockPos().equals(event.getPos())
+                || CrossScaleWelds.weldNear(event.getLevel(), hit.getLocation()) == null) return;
+
+        final Vec3 fraction = hitFraction(hit);
+        PacketDistributor.sendToServer(new HotGluePunchPayload(hit.getBlockPos(), fraction.x, fraction.y, fraction.z));
+    }
+
+    @SubscribeEvent
+    public static void onAttackInput(final InputEvent.InteractionKeyMappingTriggered event) {
+        if (!event.isAttack()) return;
+        if (placing()) {
+            discardSelection();
+            swallowPunch = true;
+        }
+        if (!swallowPunch) return;
+        event.setSwingHand(false);
+        event.setCanceled(true);
     }
 
     @SubscribeEvent
     public static void onFrame(final RenderFrameEvent.Pre event) {
+        if (swallowPunch && !Minecraft.getInstance().options.keyAttack.isDown()) swallowPunch = false;
         if (firstPos == null) {
             while (PocketKeys.WELD_ROTATE.consumeClick()) {}
             return;
@@ -165,9 +219,10 @@ public final class HotGlueGunClient {
                 WeldContact.identity(firstFacing),
                 origin.outline(),
                 SimColors.SUCCESS_LIME,
-                CrossScaleWeldSeams.LINE_WIDTH);
+                WeldContactPatch.LINE_WIDTH);
         if (!(minecraft.hitResult instanceof final BlockHitResult hit)
                 || hit.getType() == HitResult.Type.MISS) return;
+        if (knifeCuts(player, firstHand, hit)) return;
 
         final CrossScaleWelds.Weld weld = resolve(minecraft.level, hit);
         if (weld == null) return;
@@ -175,6 +230,14 @@ public final class HotGlueGunClient {
                 || java.util.Objects.equals(weld.small().getUniqueId(), weld.big().getUniqueId()))) return;
 
         renderPreview(minecraft, weld);
+    }
+
+    private static boolean knifeCuts(final LocalPlayer player, final InteractionHand gunHand, final BlockHitResult hit) {
+        final InteractionHand other = gunHand == InteractionHand.MAIN_HAND
+                ? InteractionHand.OFF_HAND
+                : InteractionHand.MAIN_HAND;
+        return player.getItemInHand(other).is(ModItems.POCKET_KNIFE.get())
+                && CrossScaleWelds.weldNear(player.level(), hit.getLocation()) != null;
     }
 
     private static void begin(final BlockHitResult hit, final InteractionHand hand) {
@@ -185,6 +248,8 @@ public final class HotGlueGunClient {
         rotationTurns = 0;
         originShape = null;
         previewShape = null;
+        previewSource = null;
+        previewKey = null;
     }
 
     private static CrossScaleWelds.Weld resolve(final net.minecraft.world.level.Level level, final BlockHitResult hit) {
@@ -202,21 +267,19 @@ public final class HotGlueGunClient {
     private static void renderPreview(final Minecraft minecraft, final CrossScaleWelds.Weld weld) {
         final int color = weld.check().allowed() ? SimColors.SUCCESS_LIME : SimColors.NUH_UH_RED;
         final boolean sourceIsSmall = weld.startedSmall(firstPos);
-        // Target-frame units.
-        final double targetScale = sourceIsSmall ? weld.bigScale() : weld.smallScale();
-        final float lineWidth = (float) (CrossScaleWeldSeams.LINE_WIDTH
-                * ScaleBounds.clampValid(weld.smallScale()) / ScaleBounds.clampValid(targetScale));
         final Quaterniond orientation = CrossScaleWelds.weldOrientation(weld, rotationTurns);
-        final double cell = sourceIsSmall ? weld.bigSpan() : 1.0D / weld.bigSpan();
+        final double cell = sourceIsSmall
+                ? ScaleBounds.clampValid(weld.smallScale()) / ScaleBounds.clampValid(weld.bigScale())
+                : ScaleBounds.clampValid(weld.bigScale()) / ScaleBounds.clampValid(weld.smallScale());
         final WeldContact.Projection projection = WeldContact.projection(
                 sourceIsSmall ? weld.smallFacing() : weld.bigFacing(),
                 sourceIsSmall ? new Quaterniond(orientation).invert() : new Quaterniond(orientation),
                 cell);
 
         final SubLevel source = sourceIsSmall ? weld.small() : weld.big();
+        final SubLevel target = sourceIsSmall ? weld.big() : weld.small();
         final BlockPos sourcePos = sourceIsSmall ? weld.smallPos() : weld.bigPos();
         final Direction sourceFacing = sourceIsSmall ? weld.smallFacing() : weld.bigFacing();
-        final PreviewShape shape = shape(minecraft, source, sourcePos, sourceFacing, cell);
 
         final Vector3d sourceAnchor = sourceIsSmall ? weld.smallAnchor() : weld.bigAnchor();
         final BlockPos targetPos = sourceIsSmall ? weld.bigPos() : weld.smallPos();
@@ -237,6 +300,8 @@ public final class HotGlueGunClient {
                 WeldGeometry.facePlane(targetPos, targetFacing),
                 WeldContact.axisOf(targetAnchor, targetU) + offset[0],
                 WeldContact.axisOf(targetAnchor, targetV) + offset[1]);
+        final PreviewShape shape = previewShape(
+                originShape(minecraft, source), target, targetPos, targetFacing, previewAnchor, projection);
         WeldContactPatch.showFaces(
                 "pocket_weld_preview_fill",
                 targetPos,
@@ -253,7 +318,7 @@ public final class HotGlueGunClient {
                 projection,
                 shape.outline(),
                 color,
-                lineWidth);
+                WeldContactPatch.lineWidth(target, source));
     }
 
     private static PreviewShape originShape(final Minecraft minecraft, final SubLevel source) {
@@ -266,43 +331,62 @@ public final class HotGlueGunClient {
 
         final Set<Long> traced = WeldContact.faceCells(
                 minecraft.level, source, firstPos, firstFacing, WeldContact.RADIUS);
-        final Set<Long> cells = traced.isEmpty() ? Set.of(WeldContact.originCell()) : traced;
-        originShape = new PreviewShape(
-                subLevelId(source),
-                firstPos,
-                firstFacing,
-                1.0D,
-                WeldContactPatch.rectangles(cells),
-                WeldContactPatch.silhouette(cells, 0.0D));
+        originShape = shapeOf(subLevelId(source), firstPos, firstFacing,
+                traced.isEmpty() ? Set.of(WeldContact.originCell()) : traced);
         return originShape;
     }
 
-    private static PreviewShape shape(
-            final Minecraft minecraft,
-            final SubLevel source,
-            final BlockPos pos,
-            final Direction facing,
-            final double cell
+    private static PreviewShape previewShape(
+            final PreviewShape traced,
+            final SubLevel target,
+            final BlockPos targetPos,
+            final Direction targetFacing,
+            final Vector3d anchor,
+            final WeldContact.Projection projection
     ) {
-        if (previewShape != null
-                && java.util.Objects.equals(previewShape.subLevel(), subLevelId(source))
-                && previewShape.pos().equals(pos)
-                && previewShape.facing() == facing
-                && Math.abs(previewShape.cell() - cell) < 1.0E-9D) {
-            return previewShape;
+        if (target == null) return traced;
+
+        final PreviewKey key = new PreviewKey(traced.subLevel(), subLevelId(target), targetPos, targetFacing,
+                new Vector3d(anchor), new Vector3d(projection.axisU()), new Vector3d(projection.axisV()),
+                projection.cell());
+        if (previewSource == traced && key.equals(previewKey)) return previewShape;
+
+        final Direction.Axis targetU = WeldContact.uAxis(targetFacing);
+        final Direction.Axis targetV = WeldContact.vAxis(targetFacing);
+        final double anchorU = WeldContact.axisOf(anchor, targetU);
+        final double anchorV = WeldContact.axisOf(anchor, targetV);
+        final double plane = WeldGeometry.facePlane(targetPos, targetFacing);
+        final Set<Long> inside = new HashSet<>();
+        for (final long cell : traced.cells()) {
+            final double[] centre = WeldContact.project(
+                    WeldContact.unpackU(cell), WeldContact.unpackV(cell), projection, targetU, targetV);
+            final Vector3d point = WeldGeometry.inPlane(
+                    targetFacing, plane, anchorU + centre[0], anchorV + centre[1]);
+            if (target.getPlot().contains(point.x, point.z)) inside.add(cell);
         }
 
-        final Set<Long> traced = WeldContact.faceCells(
-                minecraft.level, source, pos, facing, WeldContact.reachOnTarget(cell));
-        final Set<Long> cells = traced.isEmpty() ? Set.of(WeldContact.originCell()) : traced;
-        previewShape = new PreviewShape(
-                subLevelId(source),
+        previewSource = traced;
+        previewKey = key;
+        previewShape = inside.size() == traced.cells().size()
+                ? traced
+                : shapeOf(traced.subLevel(), traced.pos(), traced.facing(),
+                        inside.isEmpty() ? Set.of(WeldContact.originCell()) : inside);
+        return previewShape;
+    }
+
+    private static PreviewShape shapeOf(
+            final UUID subLevel,
+            final BlockPos pos,
+            final Direction facing,
+            final Set<Long> cells
+    ) {
+        return new PreviewShape(
+                subLevel,
                 pos,
                 facing,
-                cell,
+                cells,
                 WeldContactPatch.rectangles(cells),
                 WeldContactPatch.silhouette(cells, 0.0D));
-        return previewShape;
     }
 
     private static UUID subLevelId(final SubLevel subLevel) {
@@ -338,6 +422,10 @@ public final class HotGlueGunClient {
         if (event.getLevel().isClientSide()) clear();
     }
 
+    public static boolean placing() {
+        return firstPos != null;
+    }
+
     public static void clear() {
         firstPos = null;
         firstFacing = null;
@@ -346,6 +434,8 @@ public final class HotGlueGunClient {
         rotationTurns = 0;
         originShape = null;
         previewShape = null;
+        previewSource = null;
+        previewKey = null;
     }
 
     private HotGlueGunClient() {}

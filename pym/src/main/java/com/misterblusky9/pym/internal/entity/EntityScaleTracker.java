@@ -124,9 +124,20 @@ public final class EntityScaleTracker {
     }
 
     public static double renderScale(final Entity entity, final float partialTick) {
+        return switch (backend(entity)) {
+            case PEHKUI -> PehkuiEntityScaling.renderScale(entity, partialTick);
+            case NATIVE_STATIC -> nativeState(entity, true).render(partialTick);
+            case UNAVAILABLE -> 1.0D;
+        };
+    }
+
+    public static double nativeRenderScale(final Entity entity, final float partialTick) {
         if (backend(entity) != Backend.NATIVE_STATIC) return 1.0D;
-        final NativeState state = nativeState(entity, true);
-        return state.render(partialTick);
+        return nativeState(entity, true).render(partialTick);
+    }
+
+    public static double nativePivotHeight(final Entity entity) {
+        return entity.isPassenger() ? entity.getEyeHeight() : 0.0D;
     }
 
     public static EntityDimensions applyScale(final EntityDimensions base, final double scale) {

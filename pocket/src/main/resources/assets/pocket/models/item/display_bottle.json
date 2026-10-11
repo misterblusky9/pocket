@@ -1,5 +1,17 @@
 {
-  "credit": "Wrapper for the display bottle. Keep this file; export Blockbench geometry to item/export/display_bottle.json instead.",
-  "parent": "pocket:item/export/display_bottle",
-  "render_type": "minecraft:translucent"
+	"credit": "Wrapper for the display bottle. Keep this file; export Blockbench geometry to item/export/display_bottle.json instead.",
+	"parent": "create:item/package_transforms",
+	"loader": "neoforge:composite",
+	"render_type": "minecraft:translucent",
+	"textures": {
+		"particle": "pocket:item/display_bottle"
+	},
+	"children": {
+		"bottle": {
+			"parent": "pocket:item/export/display_bottle"
+		},
+		"planks": {
+			"parent": "pocket:item/display_bottle/planks"
+		}
+	}
 }

@@ -35,6 +35,8 @@ public final class PocketSizedClient {
     public PocketSizedClient(final IEventBus modBus) {
         SwitchBearingPartials.init();
         HelmBearingPartials.init();
+        CopycatFacadePartials.init();
+        SubspaceHarnessClient.init();
         HelmBearingHandler.register();
         modBus.addListener(PocketPackageModels::register);
         modBus.addListener(PocketItemTooltips::register);
@@ -51,7 +53,11 @@ public final class PocketSizedClient {
         modBus.addListener(SwitchPistonRenderer::registerVisual);
         modBus.addListener(SubspaceRecyclerRenderer::register);
         modBus.addListener(SubspaceRecyclerRenderer::registerVisual);
+        modBus.addListener(SubspaceHarnessClient::register);
+        modBus.addListener(SubspaceHarnessClient::registerVisual);
         modBus.addListener(PocketKeys::register);
+        modBus.addListener(CopycatFacadeModel::swap);
+        modBus.addListener(CopycatFacadeModel::registerColours);
         NeoForge.EVENT_BUS.addListener(CompressionFieldRenderer::render);
         NeoForge.EVENT_BUS.addListener(CompressionBeamRenderer::render);
         DebugOverlay.showCollidersWhile(() -> {
@@ -61,15 +67,19 @@ public final class PocketSizedClient {
         });
         NeoForge.EVENT_BUS.addListener(SwitchBearingOutlineRenderer::render);
         NeoForge.EVENT_BUS.addListener(WeldFaceRenderer::render);
+        NeoForge.EVENT_BUS.addListener(CopycatFacadeFrames::tick);
         CompressionGunRenderHandler.INSTANCE.registerListeners(NeoForge.EVENT_BUS);
+        HotGlueGunRenderHandler.INSTANCE.registerListeners(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(
                 (net.neoforged.neoforge.client.event.ClientTickEvent.Post event) -> {
                     CompressionBeamRenderer.tick();
                     CompressionGunRenderHandler.INSTANCE.tick();
+                    HotGlueGunRenderHandler.INSTANCE.tick();
                     ShrinkRayHoverOutline.tick();
                 }
         );
         NeoForge.EVENT_BUS.addListener(ScaleSelectionInput::onInteraction);
+        NeoForge.EVENT_BUS.addListener(FacadeAlignmentInput::onInteraction);
         NeoForge.EVENT_BUS.addListener(CompressionGunControls::onScroll);
         NeoForge.EVENT_BUS.addListener(ScaleToolModifierClient::onClientTick);
 

@@ -3,6 +3,7 @@ package com.misterblusky9.pocket.item;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.pocket.DeploymentClearance;
+import com.misterblusky9.pocket.pocket.NetherEvaporation;
 import com.misterblusky9.pym.api.PlotContents;
 import com.misterblusky9.pocket.pocket.PocketRenderSnapshot;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelSavedData;
@@ -12,11 +13,13 @@ import com.misterblusky9.pym.api.ResizeResult;
 import com.misterblusky9.pocket.client.PocketedSubLevelItemRenderer;
 import com.simibubi.create.AllDataComponents;
 import com.simibubi.create.foundation.item.render.SimpleCustomRenderer;
+import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelData;
 import dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer;
 import dev.ryanhcode.sable.util.SableNBTUtils;
@@ -36,6 +39,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Containers;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -44,6 +48,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import com.simibubi.create.AllEntityTypes;
+import com.simibubi.create.content.logistics.box.PackageEntity;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import com.simibubi.create.content.logistics.box.PackageStyles;
 import net.minecraft.world.item.Item;
@@ -65,6 +71,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
@@ -87,11 +94,14 @@ public class PocketCaseItem extends PackageItem {
     private static final String ORPHANED_KEY = "pocket_orphaned";
     private static final String ORPHANED_REASON_KEY = "pocket_orphaned_reason";
     private static final String NAME_KEY = "sublevel_name";
+    private static final String LEGACY_UNNAMED = "Pocketed Contraption";
     private static final String BLOCKS_KEY = "pocket_blocks";
     private static final String BLOCK_ENTITIES_KEY = "pocket_block_entities";
     private static final String MASS_KEY = "pocket_mass";
     private static final String SCALE_KEY = "pocket_scale";
+    private static final String FACADE_OFFSET_KEY = "pocket_facade_offset";
     private static final String PACKED_BY_KEY = "packed_by";
+    private static final String CASE_TURNS_KEY = "pocket_case_quarter_turns";
 
     private static final String CONTAINER_KEY = "pocket_container";
     private static final String INTEGRITY_KEY = "pocket_integrity";
@@ -155,6 +165,10 @@ public class PocketCaseItem extends PackageItem {
     }
 
     public static boolean isCannonPayload(final ItemStack stack) {
+        return isUnique(stack);
+    }
+
+    public static boolean isUnique(final ItemStack stack) {
         return stack.getItem() instanceof PocketCaseItem && isFilled(stack);
     }
 
@@ -275,6 +289,96 @@ public class PocketCaseItem extends PackageItem {
         return com.misterblusky9.pocket.scale.CompressionStage.snap(scale);
     }
 
+    public static void setFacadeOffset(final ItemStack stack, final int[] offset) {
+        final CompoundTag tag = customTag(stack);
+        if (tag == null || offset == null || offset.length != 3) return;
+        tag.putIntArray(FACADE_OFFSET_KEY, offset);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+    }
+
+    public static int[] facadeOffset(final ItemStack stack) {
+        final CompoundTag tag = customTag(stack);
+        if (tag == null || !tag.contains(FACADE_OFFSET_KEY, Tag.TAG_INT_ARRAY)) return null;
+        final int[] offset = tag.getIntArray(FACADE_OFFSET_KEY);
+        return offset.length == 3 ? offset : null;
+    }
+
+    public static int modelQuarterTurns(final ItemStack stack) {
+        return Math.floorMod(stack.getOrDefault(ModDataComponents.MODEL_QUARTER_TURNS.get(), 0), 4);
+    }
+
+    public static boolean isSealed(final ItemStack stack) {
+        return stack.has(ModDataComponents.SEAL.get());
+    }
+
+    @Nullable
+    public static PocketSeal seal(final ItemStack stack) {
+        final CaseSeal seal = caseSeal(stack);
+        return seal == null ? null : seal.glue();
+    }
+
+    @Nullable
+    public static CaseSeal caseSeal(final ItemStack stack) {
+        return stack.get(ModDataComponents.SEAL.get());
+    }
+
+    public static boolean isSealable(final ItemStack stack) {
+        return stack.getItem() instanceof PocketCaseItem && isFilled(stack)
+                && PocketContainer.of(stack) != PocketContainer.CARDBOARD_BOX;
+    }
+
+    public static void setSeal(final ItemStack stack, @Nullable final CaseSeal seal) {
+        if (seal == null) {
+            stack.remove(ModDataComponents.SEAL.get());
+        } else {
+            stack.set(ModDataComponents.SEAL.get(), seal);
+        }
+    }
+
+    @Nullable
+    public static String sublevelName(final ItemStack stack) {
+        final CompoundTag tag = customTag(stack);
+        if (tag == null || !tag.hasUUID(TOKEN_KEY)) return null;
+        final String name = tag.getString(NAME_KEY);
+        return name.isBlank() || name.equals(LEGACY_UNNAMED) ? null : name;
+    }
+
+    @Override
+    public Component getName(final ItemStack stack) {
+        final String name = sublevelName(stack);
+        return name == null ? super.getName(stack) : Component.literal(name).withStyle(ChatFormatting.ITALIC);
+    }
+
+    public static void rotateModelQuarterTurn(final ItemStack stack) {
+        setModelQuarterTurns(stack, modelQuarterTurns(stack) + 1);
+    }
+
+    private static void setModelQuarterTurns(final ItemStack stack, final int quarterTurns) {
+        final int turns = quarterTurns & 3;
+        if (turns == 0) {
+            stack.remove(ModDataComponents.MODEL_QUARTER_TURNS.get());
+        } else {
+            stack.set(ModDataComponents.MODEL_QUARTER_TURNS.get(), turns);
+        }
+    }
+
+    private static void rememberCaseTurns(final ServerSubLevel subLevel, final int quarterTurns) {
+        final CompoundTag userData = subLevel.getUserDataTag() == null ? new CompoundTag() : subLevel.getUserDataTag();
+        if ((quarterTurns & 3) == 0) {
+            userData.remove(CASE_TURNS_KEY);
+        } else {
+            userData.putInt(CASE_TURNS_KEY, quarterTurns & 3);
+        }
+        subLevel.setUserDataTag(userData);
+    }
+
+    public static void recallCaseTurns(final ServerSubLevel subLevel, final ItemStack stack) {
+        final CompoundTag userData = subLevel.getUserDataTag();
+        if (userData != null && userData.contains(CASE_TURNS_KEY, Tag.TAG_INT)) {
+            setModelQuarterTurns(stack, userData.getInt(CASE_TURNS_KEY));
+        }
+    }
+
     public static void setPackedBy(final ItemStack stack, final String playerName) {
         final CompoundTag tag = customTag(stack);
         if (tag == null || playerName == null || playerName.isBlank()) return;
@@ -322,10 +426,6 @@ public class PocketCaseItem extends PackageItem {
         if (!(level instanceof final ServerLevel currentLevel)) return;
 
         final UUID payloadToken = token(stack);
-        if (entity instanceof final Player holder && isClone(holder, stack, payloadToken)) {
-            replaceHeld(holder, stack, new ItemStack(containerItem(stack), stack.getCount()));
-            return;
-        }
         final ResourceLocation sourceId = ResourceLocation.tryParse(sourceDimension(stack));
         final ServerLevel sourceLevel = sourceId == null ? null : currentLevel.getServer().getLevel(
                 ResourceKey.create(Registries.DIMENSION, sourceId));
@@ -345,16 +445,6 @@ public class PocketCaseItem extends PackageItem {
 
         markOrphaned(stack, entity, slotId,
                 "payload " + payloadToken + " is not in " + sourceId + "'s pocketed-sublevel storage");
-    }
-
-    private static boolean isClone(final Player player, final ItemStack stack, final UUID payloadToken) {
-        final Inventory inventory = player.getInventory();
-        for (int i = 0; i < inventory.getContainerSize(); i++) {
-            final ItemStack other = inventory.getItem(i);
-            if (other == stack) return false;
-            if (other.getItem() instanceof PocketCaseItem && payloadToken.equals(token(other))) return true;
-        }
-        return false;
     }
 
     private static boolean replaceHeld(final Player player, final ItemStack stack, final ItemStack replacement) {
@@ -484,6 +574,7 @@ public class PocketCaseItem extends PackageItem {
         if (!isFilled(stack)) return super.useOn(context);
 
         if (!player.isShiftKeyDown()) return super.useOn(context);
+        if (isSealed(stack)) return placeAsPackage(context);
 
         if (!(context.getLevel() instanceof final ServerLevel serverLevel)) return InteractionResult.SUCCESS;
 
@@ -491,6 +582,30 @@ public class PocketCaseItem extends PackageItem {
                 serverLevel, player, context.getHand(), stack,
                 context.getClickLocation(), context.getClickedFace()
         ) ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+    }
+
+    private InteractionResult placeAsPackage(final UseOnContext context) {
+        Vec3 point = context.getClickLocation();
+        final float height = this.style.height() / 16.0F;
+        final float radius = this.style.width() / 2.0F / 16.0F;
+        if (context.getClickedFace() == Direction.DOWN) {
+            point = point.subtract(0.0D, height + 0.25F, 0.0D);
+        } else if (context.getClickedFace().getAxis().isHorizontal()) {
+            point = point.add(Vec3.atLowerCornerOf(context.getClickedFace().getNormal()).scale(radius));
+        }
+
+        final Level level = context.getLevel();
+        final AABB footprint = com.misterblusky9.pocket.scale.PlayerSpawnScale.placementBox(
+                context, new AABB(point, point).inflate(radius, 0.0D, radius).expandTowards(0.0D, height, 0.0D));
+        if (!level.getEntities(AllEntityTypes.PACKAGE.get(), footprint, entity -> true).isEmpty()) {
+            return InteractionResult.PASS;
+        }
+
+        final PackageEntity placed = new PackageEntity(level, point.x, point.y, point.z);
+        placed.setBox(context.getItemInHand().copy());
+        level.addFreshEntity(placed);
+        context.getItemInHand().shrink(1);
+        return InteractionResult.SUCCESS;
     }
 
     private static void rotatePreferredYaw(final ItemStack stack, final double delta) {
@@ -529,8 +644,19 @@ public class PocketCaseItem extends PackageItem {
         PocketTrace.debug(
                 "[PocketTransfer] route=hand begin token={} target={} player={} hand={}",
                 payloadToken, level.dimension().location(), player.getScoreboardName(), hand);
+        Vec3 worldClick = click;
+        Direction worldFace = face;
+        final SubLevel surface = Sable.HELPER.getContaining(level, click);
+        if (surface != null) {
+            final var surfacePose = surface.logicalPose();
+            worldClick = surfacePose.transformPosition(click);
+            final Vector3d normal = surfacePose.orientation().transform(new Vector3d(
+                    face.getStepX(), face.getStepY(), face.getStepZ()));
+            worldFace = Direction.getNearest(normal.x, normal.y, normal.z);
+        }
+
         final ServerSubLevel restored = restoreAt(
-                level, stack, click, face, player, true, false
+                level, stack, worldClick, worldFace, player, true, false
         );
         if (restored == null) {
             PocketTrace.logger().warn(
@@ -554,10 +680,31 @@ public class PocketCaseItem extends PackageItem {
         return true;
     }
 
+    public static boolean breakOpen(final ServerLevel level, final PackageEntity pocketed) {
+        final ItemStack box = pocketed.getBox();
+        if (box == null || !(box.getItem() instanceof PocketCaseItem) || !isFilled(box) || isSealed(box)) return false;
+        if (payloadState(level, box) != PayloadState.AVAILABLE) return false;
+
+        final double yaw = -Math.toRadians(pocketed.getYRot() + 90.0D + 90.0D * modelQuarterTurns(box));
+        if (!deployFromBrokenPackage(level, box, pocketed.position(), yaw)) return false;
+        box.remove(DataComponents.CUSTOM_DATA);
+        return true;
+    }
+
+    public static boolean dropRecovery(final ServerLevel level, final PackageEntity pocketed) {
+        final ItemStack box = pocketed.getBox();
+        final ItemStack recovery = recoveryFor(level, box);
+        box.remove(DataComponents.CUSTOM_DATA);
+        if (recovery.isEmpty()) return false;
+        Containers.dropItemStack(level, pocketed.getX(), pocketed.getY(), pocketed.getZ(), recovery.copyWithCount(1));
+        return true;
+    }
+
     public static boolean deployFromBrokenPackage(
             final ServerLevel level,
             final ItemStack stack,
-            final Vec3 position
+            final Vec3 position,
+            final double yaw
     ) {
         if (!isFilled(stack)) return false;
         final UUID payloadToken = token(stack);
@@ -565,7 +712,7 @@ public class PocketCaseItem extends PackageItem {
                 "[PocketTransfer] route=broken_package begin token={} target={} position={}",
                 payloadToken, level.dimension().location(), position);
         final boolean restored = restoreAt(
-                level, stack, position, Direction.UP, null, false, false, true) != null;
+                level, stack, position, Direction.UP, null, false, false, true, null, yaw) != null;
         PocketTrace.debug(
                 "[PocketTransfer] route=broken_package end token={} target={} restored={} backendValid={}",
                 payloadToken, level.dimension().location(), restored, restored);
@@ -699,8 +846,25 @@ public class PocketCaseItem extends PackageItem {
             final boolean nudgeClear,
             final Vec3 aimDirection
     ) {
+        return restoreAt(serverLevel, stack, click, face, feedbackPlayer,
+                checkPlacement, freshIdentity, nudgeClear, aimDirection, null);
+    }
+
+    private static ServerSubLevel restoreAt(
+            final ServerLevel serverLevel,
+            final ItemStack stack,
+            final Vec3 click,
+            final Direction face,
+            final Player feedbackPlayer,
+            final boolean checkPlacement,
+            final boolean freshIdentity,
+            final boolean nudgeClear,
+            final Vec3 aimDirection,
+            final Double fixedYaw
+    ) {
         final UUID token = token(stack);
         if (token == null) return fail(feedbackPlayer, "This pocketed item is empty.");
+        if (isSealed(stack)) return null;
 
         final PayloadBackend backend = resolvePayloadBackend(
                 serverLevel, token, sourceDimension(stack), feedbackPlayer);
@@ -748,6 +912,13 @@ public class PocketCaseItem extends PackageItem {
             fullTag.putUUID("uuid", replacement);
         }
 
+        final boolean drainsBeforeLoad = serverLevel.dimensionType().ultraWarm()
+                && fullTag.contains(INTEGRITY_KEY, Tag.TAG_COMPOUND);
+        final NetherEvaporation.Drained drained = drainsBeforeLoad
+                ? NetherEvaporation.drainPayload(serverLevel, fullTag)
+                : null;
+        if (drained != null && drained.changed() > 0) remeasureDrainedPayload(fullTag);
+
         final SubLevelData original = SubLevelSerializer.fromData(fullTag);
         if (original == null) return fail(feedbackPlayer, "The stored sublevel payload is invalid.");
 
@@ -761,6 +932,8 @@ public class PocketCaseItem extends PackageItem {
                 ? snapshot.uprightYaw() : 0.0D;
         if (aimDirection != null) {
             pose.orientation().set(noseAlignment(storedFront, aimDirection));
+        } else if (fixedYaw != null) {
+            pose.orientation().set(new Quaterniond().rotationY(fixedYaw));
         } else {
             final double placementYaw = feedbackPlayer != null
                     ? facingYawFor(feedbackPlayer, storedFront)
@@ -880,7 +1053,9 @@ public class PocketCaseItem extends PackageItem {
             return fail(feedbackPlayer, "The restored sublevel could not be initialized safely.");
         }
 
-        com.misterblusky9.pocket.pocket.PocketedEntities.restore(serverLevel, fullTag);
+        com.misterblusky9.pocket.scale.PlayerSpawnScale.restoring(
+                () -> com.misterblusky9.pocket.pocket.PocketedEntities.restore(serverLevel, restored, fullTag));
+        rememberCaseTurns(restored, modelQuarterTurns(stack));
 
         backend.storage().remove(token);
         backend.storage().markDeployed(token);
@@ -889,6 +1064,18 @@ public class PocketCaseItem extends PackageItem {
                         + "legacyReservation={} backendValid=true",
                 token, backend.sourceLevel().dimension().location(), serverLevel.dimension().location(),
                 backend.legacyReservation());
+
+        try {
+            if (drained == null) {
+                NetherEvaporation.apply(serverLevel, restored);
+            } else if (drained.changed() > 0) {
+                NetherEvaporation.playEffects(serverLevel, restored, drained);
+            }
+        } catch (final RuntimeException exception) {
+            PocketTrace.logger().error(
+                    "[PocketTransfer] nether evaporation failed token={} target={} - craft deployed unchanged",
+                    token, serverLevel.dimension().location(), exception);
+        }
         return restored;
     }
 
@@ -1320,6 +1507,103 @@ public class PocketCaseItem extends PackageItem {
         fullTag.put(INTEGRITY_KEY, manifest);
     }
 
+    @Nullable
+    public static Evaporated evaporateStoredPayload(final ServerLevel level, final ItemStack stack) {
+        if (!isFilled(stack) || isSealed(stack) || payloadState(level, stack) != PayloadState.AVAILABLE) return null;
+        final ServerLevel sourceLevel = sourceLevel(level, stack);
+        if (sourceLevel == null) return null;
+
+        final UUID token = token(stack);
+        final PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(sourceLevel);
+        final CompoundTag fullTag = storage.getCopy(token);
+        if (fullTag == null) return null;
+
+        final NetherEvaporation.Drained drained = NetherEvaporation.drainPayload(level, fullTag);
+        if (drained.changed() == 0) return null;
+
+        final PayloadStructure structure = remeasureDrainedPayload(fullTag);
+        storage.put(token, fullTag);
+
+        final ItemStack drainedStack = stack.copy();
+        final CompoundTag tag = customTag(drainedStack);
+        tag.putInt(BLOCKS_KEY, structure.blocks());
+        final PocketRenderSnapshot snapshot = PocketRenderSnapshot.readFrom(tag);
+        if (snapshot != null) snapshot.evaporated(level).writeTo(tag);
+        drainedStack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+
+        PocketTrace.debug(
+                "[PocketTransfer] payload evaporated token={} changed={} water={} blocks={}",
+                token, drained.changed(), drained.water(), structure.blocks());
+        return new Evaporated(drainedStack, drained.water());
+    }
+
+    public record Evaporated(ItemStack stack, boolean water) {}
+
+    private static PayloadStructure remeasureDrainedPayload(final CompoundTag fullTag) {
+        final PayloadStructure structure = measureStoredStructure(fullTag);
+        if (fullTag.contains(INTEGRITY_KEY, Tag.TAG_COMPOUND)) {
+            writeIntegrityManifest(fullTag, new PayloadStructure(structure.blocks(),
+                    fullTag.getCompound(INTEGRITY_KEY).getInt(INTEGRITY_BLOCK_ENTITIES_KEY),
+                    structure.chunks(), structure.structureHash()));
+        }
+        return structure;
+    }
+
+    private static PayloadStructure measureStoredStructure(final CompoundTag fullTag) {
+        final CompoundTag chunks = fullTag.getCompound("plot").getCompound("chunks");
+        final List<Long> chunkKeys = new ArrayList<>();
+        for (final String key : chunks.getAllKeys()) chunkKeys.add(Long.parseLong(key));
+        chunkKeys.sort(Comparator.naturalOrder());
+
+        final List<StoredSection> sections = new ArrayList<>();
+        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+        for (final long chunkKey : chunkKeys) {
+            final ChunkPos chunkPos = new ChunkPos(chunkKey);
+            final CompoundTag sectionTags = chunks.getCompound(Long.toString(chunkKey)).getCompound("sections");
+            final List<Integer> indices = new ArrayList<>();
+            for (final String key : sectionTags.getAllKeys()) indices.add(Integer.parseInt(key));
+            indices.sort(Comparator.naturalOrder());
+
+            for (final int index : indices) {
+                final var states = NetherEvaporation.readStates(sectionTags.getCompound(Integer.toString(index)));
+                if (states == null) continue;
+                final StoredSection section = new StoredSection(chunkPos.getMinBlockX(), index << 4,
+                        chunkPos.getMinBlockZ(), states);
+                sections.add(section);
+                for (int y = 0; y < 16; y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
+                    if (states.get(x, y, z).isAir()) continue;
+                    minX = Math.min(minX, section.x() + x); maxX = Math.max(maxX, section.x() + x);
+                    minY = Math.min(minY, section.y() + y); maxY = Math.max(maxY, section.y() + y);
+                    minZ = Math.min(minZ, section.z() + z); maxZ = Math.max(maxZ, section.z() + z);
+                }
+            }
+        }
+
+        int blocks = 0;
+        long hash = STRUCTURE_HASH_OFFSET;
+        if (minX <= maxX) {
+            hash = hashStructure(hash, maxX - minX + 1);
+            hash = hashStructure(hash, maxY - minY + 1);
+            hash = hashStructure(hash, maxZ - minZ + 1);
+        }
+        for (final StoredSection section : sections) {
+            for (int y = 0; y < 16; y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++) {
+                final BlockState state = section.states().get(x, y, z);
+                if (state.isAir()) continue;
+                blocks++;
+                hash = hashStructure(hash, section.x() + x - minX);
+                hash = hashStructure(hash, section.y() + y - minY);
+                hash = hashStructure(hash, section.z() + z - minZ);
+                hash = hashBlockState(hash, state);
+            }
+        }
+        return new PayloadStructure(blocks, 0, chunks.size(), hash);
+    }
+
+    private record StoredSection(int x, int y, int z,
+                                 net.minecraft.world.level.chunk.PalettedContainer<BlockState> states) {}
+
     private static PayloadStructure measureStructure(final ServerSubLevel subLevel) {
         final var bounds = subLevel.getPlot().getBoundingBox();
         final List<LevelChunk> chunks = new ArrayList<>();
@@ -1677,7 +1961,11 @@ public class PocketCaseItem extends PackageItem {
             return;
         }
 
-        if (tag.contains(PACKED_BY_KEY)) {
+        final CaseSeal seal = caseSeal(stack);
+        if (seal != null) {
+            tooltip.add(Component.translatable("pocket.tooltip.sealed_by", seal.ownerName())
+                    .withStyle(ChatFormatting.AQUA));
+        } else if (tag.contains(PACKED_BY_KEY)) {
             tooltip.add(Component.translatable("pocket.tooltip.captured_by", tag.getString(PACKED_BY_KEY))
                     .withStyle(ChatFormatting.AQUA));
         }
@@ -1712,7 +2000,9 @@ public class PocketCaseItem extends PackageItem {
             tooltip.add(Component.translatable(passengers == 1 ? "pocket.tooltip.passenger" : "pocket.tooltip.passengers", passengers)
                     .withStyle(ChatFormatting.DARK_GRAY));
         }
-        tooltip.add(Component.translatable("pocket.tooltip.potato_cannon_ammo").withStyle(ChatFormatting.GOLD));
+        if (seal == null) {
+            tooltip.add(Component.translatable("pocket.tooltip.potato_cannon_ammo").withStyle(ChatFormatting.GOLD));
+        }
     }
 
     private static String describeMass(final double mass) {

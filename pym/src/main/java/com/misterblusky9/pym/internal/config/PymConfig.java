@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.config;
 
+import com.misterblusky9.pym.api.client.RenderDetail;
 import com.misterblusky9.pym.internal.scale.PlotScan;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -16,9 +17,13 @@ import java.util.Set;
 
 public final class PymConfig {
     public static final ModConfigSpec SPEC;
+    public static final ModConfigSpec CLIENT_SPEC;
 
     private static final ModConfigSpec.ConfigValue<List<? extends String>> NO_SHRINK_BLOCKS;
     private static final ModConfigSpec.IntValue SHRUNK_BLOCK_LIMIT;
+    private static final ModConfigSpec.DoubleValue DETAIL_CUTOFF;
+
+    private static volatile double detailCutoff = RenderDetail.DEFAULT_RATIO;
 
     static {
         final ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -31,25 +36,47 @@ public final class PymConfig {
                 )
                 .defineListAllowEmpty("noShrinkBlocks", List.<String>of(), PymConfig::isBlockId);
         SHRUNK_BLOCK_LIMIT = builder
-                .comment("The most blocks a sublevel may hold while it is below 1x.")
-                .defineInRange("shrunkBlockLimit", 1_048_576, 1, Integer.MAX_VALUE);
+                .comment("The most blocks a sublevel may hold while it is below 1x. " + Integer.MAX_VALUE + " means no limit.")
+                .defineInRange("shrunkBlockLimit", Integer.MAX_VALUE, 1, Integer.MAX_VALUE);
         builder.pop();
 
         SPEC = builder.build();
+
+        final ModConfigSpec.Builder client = new ModConfigSpec.Builder();
+        client.push("rendering");
+        DETAIL_CUTOFF = client
+                .comment(
+                        "Skip particles and shadows on a sublevel once the viewer is this many times its scale.",
+                        "16 means a 1x player stops drawing them on crafts at 1/16 and smaller."
+                )
+                .defineInRange("detailCutoffRatio", RenderDetail.DEFAULT_RATIO, 2.0D, 1024.0D);
+        client.pop();
+        CLIENT_SPEC = client.build();
     }
 
     public static void register(final IEventBus modBus, final ModContainer container) {
         container.registerConfig(ModConfig.Type.SERVER, SPEC);
+        container.registerConfig(ModConfig.Type.CLIENT, CLIENT_SPEC);
         modBus.addListener(PymConfig::onLoad);
         modBus.addListener(PymConfig::onReload);
     }
 
     private static void onLoad(final ModConfigEvent.Loading event) {
         if (event.getConfig().getSpec() == SPEC) refresh();
+        if (event.getConfig().getSpec() == CLIENT_SPEC) refreshClient();
     }
 
     private static void onReload(final ModConfigEvent.Reloading event) {
         if (event.getConfig().getSpec() == SPEC) refresh();
+        if (event.getConfig().getSpec() == CLIENT_SPEC) refreshClient();
+    }
+
+    public static double detailCutoff() {
+        return detailCutoff;
+    }
+
+    private static void refreshClient() {
+        detailCutoff = DETAIL_CUTOFF.get();
     }
 
     private static void refresh() {

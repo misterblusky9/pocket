@@ -7,5 +7,9 @@ public interface PocketLaserBeamColour {
 
     void pocket$colour(int colour);
 
+    int pocket$shooter();
+
+    void pocket$shooter(int shooter);
+
     Vec3 pocket$end();
 }

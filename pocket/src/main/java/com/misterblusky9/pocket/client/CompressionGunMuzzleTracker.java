@@ -1,5 +1,7 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.ScaleBounds;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -88,7 +90,8 @@ final class CompressionGunMuzzleTracker {
         // Recoil
         final double pull = 1.0D - CompressionGunRenderHandler.INSTANCE
                 .getAnimation(usedArm == HumanoidArm.RIGHT, partialTick) * RECOIL_PULL;
-        final Vec3 local = FIRST_PERSON_OFFSET.scale(pull);
+        final double scale = Pym.entities().renderScale(player, partialTick);
+        final Vec3 local = FIRST_PERSON_OFFSET.scale(pull * (ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL));
         final double lateral = usedArm == HumanoidArm.RIGHT ? -local.x : local.x;
 
         final var camera = minecraft.gameRenderer.getMainCamera();

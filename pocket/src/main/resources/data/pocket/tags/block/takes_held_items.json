@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "create:depot",
+    "create:weighted_ejector",
+    "create:belt",
+    "#create:table_cloths",
+    "minecraft:decorated_pot"
+  ]
+}

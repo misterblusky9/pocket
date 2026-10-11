@@ -119,7 +119,7 @@ public final class PocketedSubLevelEvents {
 
         final PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(level);
         storage.put(token, fullTag);
-        final String displayName = subLevel.getName() == null ? "Pocketed Contraption" : subLevel.getName();
+        final String displayName = subLevel.getName();
         final boolean highDetailPlate = packedInto.is(ModItems.BRASS_DISPLAY_PLATE.get())
                 || packedInto.is(ModItems.ANDESITE_DISPLAY_PLATE.get());
         final int previewBudget = highDetailPlate
@@ -135,6 +135,8 @@ public final class PocketedSubLevelEvents {
                 displayName, snapshot, canonicalMetrics.blocks(), canonicalMetrics.blockEntities(), mass);
         PocketCaseItem.setPackedBy(result, player.getGameProfile().getName());
         PocketCaseItem.setPocketedScale(result, Pym.scale().settled(subLevel));
+        PocketCaseItem.setFacadeOffset(result, com.misterblusky9.pocket.block.FacadeAlignment.of(subLevel));
+        PocketCaseItem.recallCaseTurns(subLevel, result);
 
         PocketCaseItem.setContainer(result, packedInto.isEmpty()
                 ? new ItemStack(ModItems.EMPTY_BOX.get())

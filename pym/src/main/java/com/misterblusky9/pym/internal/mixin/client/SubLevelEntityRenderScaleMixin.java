@@ -44,7 +44,7 @@ public abstract class SubLevelEntityRenderScaleMixin {
             final CallbackInfo ci
     ) {
         final ArrayDeque<Boolean> stack = pym$SCALE_STACK.get();
-        final double scale = EntityScaleTracker.renderScale(entity, partialTick) * pym$containingScale(entity, partialTick);
+        final double scale = EntityScaleTracker.nativeRenderScale(entity, partialTick) * pym$containingScale(entity, partialTick);
 
         final boolean applyScale = Double.isFinite(scale)
                 && Math.abs(scale - 1.0D) > ScaleBounds.EPSILON;
@@ -57,7 +57,7 @@ public abstract class SubLevelEntityRenderScaleMixin {
         poseStack.pushPose();
 
         final double pivotX = x;
-        final double pivotY = entity.isPassenger() ? y + entity.getEyeHeight() : y;
+        final double pivotY = y + EntityScaleTracker.nativePivotHeight(entity);
         final double pivotZ = z;
 
         poseStack.translate(pivotX, pivotY, pivotZ);

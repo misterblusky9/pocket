@@ -6,6 +6,7 @@
     "pocket:switch_bearing",
     "pocket:switch_piston",
     "pocket:blueprint_tile",
-    "pocket:diagram_tile"
+    "pocket:copycat_facade",
+    "pocket:subspace_harness"
   ]
 }

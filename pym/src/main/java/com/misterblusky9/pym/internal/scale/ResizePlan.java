@@ -2,14 +2,14 @@ package com.misterblusky9.pym.internal.scale;
 
 import com.misterblusky9.pym.api.ResizeResult;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Entity;
 
 import java.util.Map;
 
 record ResizePlan(
         ServerSubLevel origin,
         Map<ServerSubLevel, Double> goals,
-        Map<LivingEntity, Double> entityGoals,
+        Map<Entity, Double> entityGoals,
         Pivot pivot,
         double ticks,
         ResizeResult refusal

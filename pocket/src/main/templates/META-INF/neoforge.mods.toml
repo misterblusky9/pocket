@@ -10,7 +10,7 @@ authors="misterblusky9"
 description='''
 Experimental alpha: back up worlds before testing.
 Create-flavoured spatial compression and contraption logistics for Sable sublevels, built on Pym.
-Shrink and enlarge vehicles and structures along a power-of-two ladder, pocket the miniature directly,
+Shrink and enlarge vehicles and structures, pocket the miniature directly,
 recover wrecks, weld crafts of different sizes together with the Hot Glue Gun, and fire unprotected
 pocketed contraptions with Create machinery.
 '''
@@ -35,7 +35,7 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="pym"
 type="required"
-versionRange="[${pym_mod_version},0.3.0)"
+versionRange="[${pym_mod_version},0.4.0)"
 ordering="AFTER"
 side="BOTH"
 

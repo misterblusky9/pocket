@@ -1,5 +1,7 @@
 package com.misterblusky9.pym.internal.extension;
 
+import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.api.ScaleDriver;
 import com.misterblusky9.pym.api.spi.JointConductor;
 import com.misterblusky9.pym.api.spi.Participation;
 import com.misterblusky9.pym.api.spi.ResizeFollower;
@@ -9,15 +11,18 @@ import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import org.joml.Vector3d;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 public final class PymExtensions {
@@ -27,6 +32,7 @@ public final class PymExtensions {
     private static final List<Participation> PARTICIPATION = new CopyOnWriteArrayList<>();
     private static final List<ScaleCoupling> COUPLINGS = new CopyOnWriteArrayList<>();
     private static final List<Predicate<Entity>> NATIVE_STATIC_ENTITIES = new CopyOnWriteArrayList<>();
+    private static final List<Function<ServerSubLevel, Collection<UUID>>> OWNERSHIP = new CopyOnWriteArrayList<>();
 
     public static void register(final ResizePolicy policy) {
         POLICIES.add(Objects.requireNonNull(policy));
@@ -49,6 +55,21 @@ public final class PymExtensions {
         if (!COUPLINGS.contains(provider)) COUPLINGS.add(provider);
     }
 
+    public static void ownership(final Function<ServerSubLevel, Collection<UUID>> owned) {
+        OWNERSHIP.add(Objects.requireNonNull(owned));
+    }
+
+    public static Set<UUID> ownedBy(final ServerSubLevel owner) {
+        if (owner == null || OWNERSHIP.isEmpty()) return Set.of();
+        final java.util.LinkedHashSet<UUID> found = new java.util.LinkedHashSet<>();
+        for (final Function<ServerSubLevel, Collection<UUID>> ownership : OWNERSHIP) {
+            final Collection<UUID> owned = ownership.apply(owner);
+            if (owned != null) found.addAll(owned);
+        }
+        found.remove(owner.getUniqueId());
+        return found;
+    }
+
     public static void nativeStaticEntity(final Predicate<Entity> predicate) {
         NATIVE_STATIC_ENTITIES.add(Objects.requireNonNull(predicate));
     }
@@ -61,17 +82,29 @@ public final class PymExtensions {
         return false;
     }
 
-    public static Set<LivingEntity> resizeFollowers(final ServerSubLevel subLevel) {
-        if (subLevel == null || RESIZE_FOLLOWERS.isEmpty()) return Set.of();
-        final java.util.LinkedHashSet<LivingEntity> found = new java.util.LinkedHashSet<>();
+    public static Map<Entity, ScaleBounds> resizeFollowers(final ServerSubLevel subLevel) {
+        return resizeFollowers(subLevel, null);
+    }
+
+    public static Map<Entity, ScaleBounds> resizeFollowers(final ServerSubLevel subLevel, final ScaleDriver driver) {
+        if (subLevel == null || RESIZE_FOLLOWERS.isEmpty()) return Map.of();
+        final Map<Entity, ScaleBounds> found = new LinkedHashMap<>();
         for (final ResizeFollower follower : RESIZE_FOLLOWERS) {
-            final var entities = follower.followers(subLevel);
+            final var entities = follower.followers(subLevel, driver);
             if (entities == null) continue;
-            for (final LivingEntity entity : entities) {
-                if (entity != null && entity.isAlive()) found.add(entity);
+            for (final Entity entity : entities) {
+                if (entity == null || !entity.isAlive()) continue;
+                final ScaleBounds bounds = follower.bounds(entity);
+                found.merge(entity, bounds == null ? ScaleBounds.ANY : bounds, PymExtensions::narrower);
             }
         }
-        return Set.copyOf(found);
+        return found;
+    }
+
+    private static ScaleBounds narrower(final ScaleBounds a, final ScaleBounds b) {
+        final double min = Math.max(a.min(), b.min());
+        final double max = Math.min(a.max(), b.max());
+        return max >= min ? new ScaleBounds(min, max) : a;
     }
 
     public static boolean isConductor(final JointConductor.Context joint) {

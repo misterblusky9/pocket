@@ -9,6 +9,10 @@ public interface ScaleSelectingItem {
         return CreativeShrinkRayItem.limits(player);
     }
 
+    default ScaleBounds selectionRange(final ItemStack stack, final Player player) {
+        return selectionRange(player);
+    }
+
     default double selection(final ItemStack stack, final Player player) {
         return CreativeShrinkRayItem.selectedScale(stack, player);
     }
@@ -19,5 +23,9 @@ public interface ScaleSelectingItem {
 
     default boolean permitsSelection(final Player player, final double scale) {
         return ScaleBounds.isValid(scale) && selectionRange(player).contains(scale);
+    }
+
+    default boolean permitsSelection(final ItemStack stack, final Player player, final double scale) {
+        return ScaleBounds.isValid(scale) && selectionRange(stack, player).contains(scale);
     }
 }

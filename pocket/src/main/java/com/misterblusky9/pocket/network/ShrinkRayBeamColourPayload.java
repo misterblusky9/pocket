@@ -9,7 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-public record ShrinkRayBeamColourPayload(int colour, Vec3 target) implements CustomPacketPayload {
+public record ShrinkRayBeamColourPayload(int colour, Vec3 target, int shooter) implements CustomPacketPayload {
     public static final int SHRINK_COLOUR = 0x9AF0FF;
     public static final int GROW_COLOUR = 0xFFD24A;
     public static final int INERT_COLOUR = 0xFFFFFF;
@@ -25,10 +25,12 @@ public record ShrinkRayBeamColourPayload(int colour, Vec3 target) implements Cus
                         buf.writeDouble(packet.target().x);
                         buf.writeDouble(packet.target().y);
                         buf.writeDouble(packet.target().z);
+                        buf.writeVarInt(packet.shooter());
                     },
                     buf -> new ShrinkRayBeamColourPayload(
                             buf.readInt(),
-                            new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()))
+                            new Vec3(buf.readDouble(), buf.readDouble(), buf.readDouble()),
+                            buf.readVarInt())
             );
 
     @Override
@@ -37,6 +39,6 @@ public record ShrinkRayBeamColourPayload(int colour, Vec3 target) implements Cus
     public static void send(final ServerPlayer player, final Vec3 target, final int colour) {
         if (player == null || target == null) return;
         PacketDistributor.sendToPlayersTrackingEntityAndSelf(
-                player, new ShrinkRayBeamColourPayload(colour, target));
+                player, new ShrinkRayBeamColourPayload(colour, target, player.getId()));
     }
 }

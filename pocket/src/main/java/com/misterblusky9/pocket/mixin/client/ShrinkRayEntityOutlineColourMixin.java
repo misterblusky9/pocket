@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class ShrinkRayEntityOutlineColourMixin {
     @Inject(method = "getTeamColor", at = @At("HEAD"), cancellable = true)
     private void pocket$outlineColour(final CallbackInfoReturnable<Integer> cir) {
-        if (ShrinkRayHoverOutline.outlines((Entity) (Object) this)) cir.setReturnValue(ShrinkRayHoverOutline.ENTITY_COLOUR);
+        final Entity entity = (Entity) (Object) this;
+        if (ShrinkRayHoverOutline.outlines(entity)) cir.setReturnValue(ShrinkRayHoverOutline.entityColour(entity));
     }
 }

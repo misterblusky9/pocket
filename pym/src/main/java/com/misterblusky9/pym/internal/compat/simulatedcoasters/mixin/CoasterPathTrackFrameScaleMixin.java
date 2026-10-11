@@ -6,6 +6,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Constant;
@@ -16,12 +17,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.track.graph.CoasterPathTrackFrame", remap = false)
 public abstract class CoasterPathTrackFrameScaleMixin {
+    @Unique
     private static final String PYM$PATH_ANCHOR =
             "pathAnchorForSnappedBlock("
                     + "Lnet/minecraft/world/level/Level;"
                     + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;"
                     + "Ljava/lang/Double;)Lnet/minecraft/world/phys/Vec3;";
 
+    @Unique
     private static final String PYM$SPINE_ANCHOR =
             "pathAnchorForSnappedBlockAtSpine("
                     + "Lnet/minecraft/world/level/Level;"

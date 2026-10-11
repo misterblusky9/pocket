@@ -22,6 +22,6 @@ public abstract class PhysicsStaffHoldDistanceScaleMixin {
             final double max,
             final Operation<Double> original
     ) {
-        return original.call(value, PhysicsStaffScale.minHoldDistance(min), max);
+        return original.call(value, PhysicsStaffScale.minHoldDistance(min, max), max);
     }
 }

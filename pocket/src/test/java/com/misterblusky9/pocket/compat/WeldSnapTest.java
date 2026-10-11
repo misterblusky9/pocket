@@ -91,7 +91,6 @@ public final class WeldSnapTest {
             check(near(WeldGeometry.snapAxis(0.31D, divisor, SnapMode.FREE), 0.31D),
                     "free placement must not move");
 
-            // the whole point of free placement: the patch may hang over the seam
             final double half = 0.5D / divisor;
             check(near(WeldGeometry.snapAxis(0.0D, divisor, SnapMode.FREE), 0.0D),
                     "free placement must reach the seam itself, overhang and all");

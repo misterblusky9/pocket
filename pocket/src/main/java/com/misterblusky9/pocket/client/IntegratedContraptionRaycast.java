@@ -1,15 +1,21 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.create.ContraptionSightline;
 import com.misterblusky9.pocket.create.InteractiveContraption;
+import com.misterblusky9.pocket.mixin.create.ControlledContraptionEntityControllerPosAccessor;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.ContraptionHandler;
+import com.simibubi.create.content.contraptions.ControlledContraptionEntity;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
@@ -91,7 +97,6 @@ public final class IntegratedContraptionRaycast {
         if (entity == null || entity.isRemoved() || contraption == null || ray == null) {
             return Optional.empty();
         }
-
         final AABB bounds = contraption.getInteractionBounds();
         if (bounds == null) {
             return Optional.empty();
@@ -100,6 +105,9 @@ public final class IntegratedContraptionRaycast {
         final Vec3 localOrigin = toLocal(entity, ray.origin(), ray.partialTick());
         final Vec3 localTarget = toLocal(entity, ray.target(), ray.partialTick());
         if (localOrigin == null || localTarget == null || !finite(localOrigin) || !finite(localTarget)) {
+            return Optional.empty();
+        }
+        if (aimsAtOwnController(entity, localOrigin, ray.partialTick())) {
             return Optional.empty();
         }
 
@@ -227,6 +235,25 @@ public final class IntegratedContraptionRaycast {
         }
 
         return entity.toLocalVector(new Vec3(plotPoint.x, plotPoint.y, plotPoint.z), partialTick);
+    }
+
+    private static boolean aimsAtOwnController(
+            final AbstractContraptionEntity entity,
+            final Vec3 localOrigin,
+            final float partialTick
+    ) {
+        if (!(entity instanceof final ControlledContraptionEntity controlled)
+                || !(Minecraft.getInstance().hitResult instanceof final BlockHitResult blockHit)
+                || blockHit.getType() != HitResult.Type.BLOCK) {
+            return false;
+        }
+        final BlockPos controllerPos =
+                ((ControlledContraptionEntityControllerPosAccessor) controlled).pocket$getControllerPos();
+        if (!blockHit.getBlockPos().equals(controllerPos)) return false;
+
+        final Vec3 localController = toLocal(entity, blockHit.getLocation(), partialTick);
+        return localController == null || !finite(localController)
+                || !ContraptionSightline.between(entity.getContraption(), localOrigin, localController);
     }
 
     private static boolean finite(final Vec3 vec) {

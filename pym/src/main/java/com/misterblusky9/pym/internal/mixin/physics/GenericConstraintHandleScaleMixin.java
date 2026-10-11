@@ -71,7 +71,6 @@ public abstract class GenericConstraintHandleScaleMixin implements GenericConstr
     ) {
         final GenericConstraintState state = this.pym$state;
 
-        // A replay already carries metric values; scaling them again would compound.
         if (state != null && state.isReplayingLimits()) {
             original.call(axis, min, max);
             return;

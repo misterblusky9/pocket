@@ -53,7 +53,7 @@ public final class CreativeShrinkRayInteractionHandler {
             final ItemStack ray,
             final double scale
     ) {
-        if (!CreativeShrinkRayItem.permits(player, scale)) return;
+        if (!CreativeShrinkRayItem.permits(ray, player, scale)) return;
         if (ScaleBounds.same(CreativeShrinkRayItem.selectedScale(ray), scale)) return;
         CreativeShrinkRayItem.setSelectedScale(ray, scale);
         if (player.level().isClientSide) {

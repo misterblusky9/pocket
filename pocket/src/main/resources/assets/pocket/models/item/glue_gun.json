@@ -1,6 +1,3 @@
 {
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "pocket:item/glue_gun"
-  }
+  "parent": "pocket:item/glue_gun/item"
 }

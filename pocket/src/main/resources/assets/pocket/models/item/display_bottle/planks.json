@@ -1,0 +1,81 @@
+{
+	"textures": {
+		"bottle": "pocket:item/display_bottle",
+		"particle": "pocket:item/display_bottle"
+	},
+	"elements": [
+		{
+			"name": "planks",
+			"from": [
+				1.425,
+				0.251,
+				2.425
+			],
+			"to": [
+				15.075,
+				1.251,
+				13.075
+			],
+			"faces": {
+				"north": {
+					"uv": [
+						0,
+						14,
+						0.5,
+						7
+					],
+					"rotation": 90,
+					"texture": "#bottle"
+				},
+				"east": {
+					"uv": [
+						5.5,
+						13.5,
+						0,
+						14
+					],
+					"texture": "#bottle"
+				},
+				"south": {
+					"uv": [
+						5,
+						7,
+						5.5,
+						14
+					],
+					"rotation": 90,
+					"texture": "#bottle"
+				},
+				"west": {
+					"uv": [
+						0,
+						7,
+						5.5,
+						7.5
+					],
+					"texture": "#bottle"
+				},
+				"up": {
+					"uv": [
+						0,
+						7,
+						5.5,
+						14
+					],
+					"rotation": 90,
+					"texture": "#bottle"
+				},
+				"down": {
+					"uv": [
+						5.5,
+						7,
+						0,
+						14
+					],
+					"rotation": 90,
+					"texture": "#bottle"
+				}
+			}
+		}
+	]
+}

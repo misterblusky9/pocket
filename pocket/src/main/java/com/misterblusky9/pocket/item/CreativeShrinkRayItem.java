@@ -10,11 +10,13 @@ import com.misterblusky9.pocket.client.CreativeShrinkRayRenderer;
 import com.misterblusky9.pocket.client.MoonScaleClient;
 import com.misterblusky9.pocket.compression.EntityCompressionSessions;
 import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
+import com.misterblusky9.pocket.compression.PersonalScale;
 import com.misterblusky9.pocket.moon.MoonCompressionSessions;
 import com.misterblusky9.pocket.moon.MoonScale;
 import com.misterblusky9.pocket.moon.MoonTargeting;
 import com.misterblusky9.pocket.network.ShrinkRayBeamColourPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;
+import com.misterblusky9.pocket.scale.ResizeActor;
 import com.misterblusky9.pocket.scale.ResizeFeedback;
 import com.misterblusky9.pocket.scale.ScaleLadder;
 import com.misterblusky9.pocket.scale.ScaleLimits;
@@ -56,6 +58,7 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
     private static final String SCALE_KEY = "PocketScale";
     private static final String STAGE_KEY = "PocketStage";
     public static final double RANGE = 192.0D;
+    private static final Vec3 BARREL_OFFSET = new Vec3(0.35D, -0.1D, 1.0D);
 
     public CreativeShrinkRayItem(final Properties properties) {
         super(properties);
@@ -110,14 +113,24 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
         return DeviceRanges.of(DeviceRanges.Device.CREATIVE_SHRINK_RAY);
     }
 
-    public static boolean permits(final Player player, final double scale) {
-        final ScaleBounds limits = limits(player);
-        return ScaleBounds.isValid(scale) && limits.contains(scale);
+    public static ScaleBounds limits(final TargetingMode mode, final Player player) {
+        final ScaleBounds ray = limits(player);
+        if (mode != TargetingMode.ENTITIES) return ray;
+        final ScaleBounds personal = DeviceRanges.of(DeviceRanges.Device.PERSONAL_COMPRESSOR);
+        return new ScaleBounds(Math.min(ray.min(), personal.max()), personal.max());
+    }
+
+    public static ScaleBounds limits(final ItemStack stack, final Player player) {
+        return limits(targetingMode(stack), player);
+    }
+
+    public static boolean permits(final ItemStack stack, final Player player, final double scale) {
+        return ScaleBounds.isValid(scale) && limits(stack, player).contains(scale);
     }
 
     public static double selectedScale(final ItemStack stack, final Player player) {
         final double scale = selectedScale(stack);
-        return limits(player).clamp(scale);
+        return limits(stack, player).clamp(scale);
     }
 
     public static double selectedScale(final ItemStack stack) {
@@ -145,9 +158,15 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
         return TargetingMode.byId(stack.getOrDefault(ModDataComponents.SHRINK_RAY_TARGETING.get(), 0));
     }
 
-    public static void setTargetingMode(final ItemStack stack, final TargetingMode mode) {
-        stack.set(ModDataComponents.SHRINK_RAY_TARGETING.get(),
-                (mode == null ? TargetingMode.BOTH : mode).ordinal());
+    public static void setTargetingMode(final ItemStack stack, final TargetingMode mode, final Player player) {
+        final TargetingMode next = mode == null ? TargetingMode.BOTH : mode;
+        stack.set(ModDataComponents.SHRINK_RAY_TARGETING.get(), next.ordinal());
+        setSelectedScale(stack, limits(next, player).clamp(selectedScale(stack)));
+    }
+
+    @Override
+    public ScaleBounds selectionRange(final ItemStack stack, final Player player) {
+        return limits(stack, player);
     }
 
     @Override
@@ -175,8 +194,9 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
                 }
 
                 if (player instanceof final ServerPlayer serverPlayer) {
-                    final double targetScale = selectedScale(stack, player);
                     final double currentScale = EntityCompressionTargeting.scale(entityTarget.entity());
+                    final double targetScale = PersonalScale.goalFor(
+                            entityTarget.entity(), currentScale, selectedScale(stack, player));
                     final int beamColour = ScaleBounds.same(currentScale, targetScale)
                             ? ShrinkRayBeamColourPayload.INERT_COLOUR
                             : targetScale > currentScale
@@ -188,11 +208,7 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
                     ShootableGadgetItemMethods.applyCooldown(
                             player, stack, hand, this::isZapper, getCooldownDelay(stack));
 
-                    final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
-                            player,
-                            hand == InteractionHand.MAIN_HAND,
-                            new Vec3(0.35D, -0.1D, 1.0D)
-                    );
+                    final Vec3 barrel = barrelOf(player, hand == InteractionHand.MAIN_HAND);
                     ShrinkRayBeamColourPayload.send(serverPlayer, entityTarget.hitPos(), beamColour);
                     ShootableGadgetItemMethods.sendPackets(
                             player,
@@ -233,11 +249,7 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
                     final CompressionStage moonTarget = selectedStage(stack, player);
                     final CompressionStage moonCurrent =
                             MoonScale.stage(serverPlayer.serverLevel().getServer());
-                    final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
-                            player,
-                            hand == InteractionHand.MAIN_HAND,
-                            new Vec3(0.35D, -0.1D, 1.0D)
-                    );
+                    final Vec3 barrel = barrelOf(player, hand == InteractionHand.MAIN_HAND);
                     final int beamColour = moonCurrent == moonTarget
                             ? ShrinkRayBeamColourPayload.INERT_COLOUR
                             : moonTarget.depth() < moonCurrent.depth()
@@ -292,14 +304,19 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
             final BlockHitResult hit
     ) {
         final Vec3 end = beamPointOf(level, hit);
-        final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
-                player,
-                hand == InteractionHand.MAIN_HAND,
-                new Vec3(0.35D, -0.1D, 1.0D)
-        );
+        final Vec3 barrel = barrelOf(player, hand == InteractionHand.MAIN_HAND);
 
+        if (player instanceof final ServerPlayer serverPlayer) {
+            ShrinkRayBeamColourPayload.send(serverPlayer, end, ShrinkRayBeamColourPayload.INERT_COLOUR);
+        }
         ShootableGadgetItemMethods.sendPackets(
                 player, local -> new ZapperBeamPacket(barrel, hand, local, end));
+    }
+
+    private static Vec3 barrelOf(final Player player, final boolean mainHand) {
+        final double scale = Pym.entities().scaleOf(player);
+        return ShootableGadgetItemMethods.getGunBarrelVec(
+                player, mainHand, BARREL_OFFSET.scale(ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL));
     }
 
     @Override
@@ -396,11 +413,7 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
         }
 
         if (player instanceof final ServerPlayer serverPlayer) {
-            final Vec3 barrel = ShootableGadgetItemMethods.getGunBarrelVec(
-                    player,
-                    heldHand(player, stack) == InteractionHand.MAIN_HAND,
-                    new Vec3(0.35D, -0.1D, 1.0D)
-            );
+            final Vec3 barrel = barrelOf(player, heldHand(player, stack) == InteractionHand.MAIN_HAND);
             final boolean connected = ScaleToolModifier.propagate(player);
             final ScaleBounds scaleLimits = limits(player);
 
@@ -432,7 +445,7 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
                     .propagate(ScaleToolModifier.propagate(player))
                     .bounds(limits);
             if (ScaleLimits.confirmsUnsupported(limits)) request.unsupported();
-            ResizeFeedback.report(player, request.submit());
+            ResizeFeedback.report(player, ResizeActor.as(player, request::submit));
         }
         return false;
     }

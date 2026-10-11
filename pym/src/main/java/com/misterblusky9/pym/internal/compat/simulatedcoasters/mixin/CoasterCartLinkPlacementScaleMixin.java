@@ -8,23 +8,28 @@ import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterPlacementS
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.track.cart.CoasterCartLinkPlacement", remap = false)
 public abstract class CoasterCartLinkPlacementScaleMixin {
+    @Unique
     private static final String PYM$POSE =
             "Ldev/silvergold/simulatedcoasters/track/cart/CoasterCartMidTrackPlacement$PlacementPose;";
+    @Unique
     private static final String PYM$ADJUSTED =
             "Ldev/silvergold/simulatedcoasters/track/cart/CoasterCartLinkPlacement$AdjustedPlacement;";
 
+    @Unique
     private static final String PYM$BEARING_DISTANCE =
             "bearingCenterDistance("
                     + "Ldev/ryanhcode/sable/sublevel/SubLevel;"
                     + "Ldev/ryanhcode/sable/sublevel/SubLevel;"
                     + "Ljava/lang/Double;)D";
 
+    @Unique
     private static final String PYM$SNAP =
             "snapPlacementToLinkPartner("
                     + "Lnet/minecraft/world/level/Level;"
@@ -32,11 +37,13 @@ public abstract class CoasterCartLinkPlacementScaleMixin {
                     + "Lnet/minecraft/world/phys/Vec3;"
                     + "Ljava/lang/Double;)" + PYM$ADJUSTED;
 
+    @Unique
     private static final String PYM$NO_SNAP =
             "placementAtLinkPartnerWithoutSnap("
                     + PYM$POSE
                     + "Lnet/minecraft/world/phys/Vec3;)" + PYM$ADJUSTED;
 
+    @Unique
     private static final String PYM$ADJUSTED_INIT =
             PYM$ADJUSTED + "<init>(" + PYM$POSE + "DZ)V";
 

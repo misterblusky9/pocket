@@ -1,16 +1,20 @@
 package com.misterblusky9.pym.internal.mixin.client;
 
+import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.api.client.RenderDetail;
 import com.misterblusky9.pym.internal.scale.ScaleState;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.mixinterface.particle.ParticleExtension;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.particle.TerrainParticle;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3dc;
 import org.spongepowered.asm.mixin.Mixin;
@@ -61,6 +65,12 @@ public abstract class ParticleSpawnScaleMixin {
         }
 
         if (uniform <= 0.0D || Math.abs(uniform - 1.0D) <= ScaleBounds.EPSILON) return;
+
+        final Entity viewer = Minecraft.getInstance().getCameraEntity();
+        if (viewer != null && !RenderDetail.worthDrawing(uniform, Pym.entities().scaleOf(viewer))) {
+            particle.remove();
+            return;
+        }
 
         particle.scale((float) uniform);
 

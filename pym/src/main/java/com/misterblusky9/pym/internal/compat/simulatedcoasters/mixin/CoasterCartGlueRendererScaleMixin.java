@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Constant;
@@ -21,6 +22,7 @@ import java.lang.reflect.Method;
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.client.cart.CoasterCartGlueRenderer", remap = false)
 public abstract class CoasterCartGlueRendererScaleMixin {
+    @Unique
     private static final String PYM$RENDER_CELL =
             "renderCell("
                     + "Lcom/mojang/blaze3d/vertex/PoseStack;"
@@ -30,6 +32,7 @@ public abstract class CoasterCartGlueRendererScaleMixin {
                     + "DDD"
                     + "Lnet/minecraft/core/BlockPos$MutableBlockPos;)V";
 
+    @Unique
     private static final String PYM$RENDER_CROSS =
             "renderGlueCross("
                     + "Lorg/joml/Matrix4f;"
@@ -42,6 +45,7 @@ public abstract class CoasterCartGlueRendererScaleMixin {
                     + "Lnet/minecraft/world/phys/Vec3;"
                     + "Lnet/minecraft/world/phys/Vec3;I)V";
 
+    @Unique
     private static final String PYM$RENDER_STRANDS =
             "renderGlueStrands("
                     + "Lorg/joml/Matrix4f;"

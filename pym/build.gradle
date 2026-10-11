@@ -26,7 +26,6 @@ configurations {
     aeronauticsBundle
 }
 
-// Simulated ships inside the Aeronautics bundle jar; compat code compiles against the inner jar.
 tasks.register('extractSimulated', Copy) {
     from({ zipTree(configurations.aeronauticsBundle.singleFile) }) {
         include 'META-INF/jarjar/dev.simulated_team.simulated.*.jar'
@@ -69,8 +68,11 @@ dependencies {
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
     testRuntimeOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
     compileOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    gametestRuntimeOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
 
-    // Optional mods with compat modules. Pym loads each module only when its mod is installed.
+    compileOnly(annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:0.3.3"))
+    implementation(jarJar("com.github.bawnorton.mixinsquared:mixinsquared-neoforge:0.3.3"))
+
     compileOnly("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
     compileOnly "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
     compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}"

@@ -1,18 +1,13 @@
 package com.misterblusky9.pocket.moon;
 
 import com.misterblusky9.pocket.scale.CompressionStage;
-import com.mojang.brigadier.arguments.BoolArgumentType;
-import com.mojang.brigadier.arguments.FloatArgumentType;
-import net.minecraft.commands.Commands;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 @EventBusSubscriber(modid = "pocket")
@@ -101,54 +96,6 @@ public final class MoonScale {
         data.setDirty();
         MoonScaleNetwork.broadcast(data.scale);
     }
-
-    /*
-    @SubscribeEvent
-    public static void registerCommands(final RegisterCommandsEvent event) {
-        event.getDispatcher().register(
-                Commands.literal("pocket")
-                        .then(Commands.literal("moonScale")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(context -> {
-                                    final float scale = get(context.getSource().getServer());
-                                    context.getSource().sendSuccess(
-                                            () -> Component.literal("Moon scale: " + scale),
-                                            false);
-                                    return 1;
-                                })
-                                .then(Commands.argument("scale", FloatArgumentType.floatArg(0.0F))
-                                        .executes(context -> {
-                                            final float scale = FloatArgumentType.getFloat(context, "scale");
-                                            if (!set(context.getSource().getServer(), scale)) {
-                                                context.getSource().sendFailure(
-                                                        Component.literal("Moon scale must be finite and non-negative."));
-                                                return 0;
-                                            }
-                                            context.getSource().sendSuccess(
-                                                    () -> Component.literal("Moon scale set to " + scale),
-                                                    true);
-                                            return 1;
-                                        })))
-                        .then(Commands.literal("moonPresent")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(context -> {
-                                    final boolean present = isPresent(context.getSource().getServer());
-                                    context.getSource().sendSuccess(
-                                            () -> Component.literal("Moon present: " + present),
-                                            false);
-                                    return 1;
-                                })
-                                .then(Commands.argument("present", BoolArgumentType.bool())
-                                        .executes(context -> {
-                                            final boolean present = BoolArgumentType.getBool(context, "present");
-                                            setPresent(context.getSource().getServer(), present);
-                                            context.getSource().sendSuccess(
-                                                    () -> Component.literal("Moon present set to " + present),
-                                                    true);
-                                            return 1;
-                                        }))));
-    }
-    */
 
     @SubscribeEvent
     public static void playerLoggedIn(final PlayerEvent.PlayerLoggedInEvent event) {

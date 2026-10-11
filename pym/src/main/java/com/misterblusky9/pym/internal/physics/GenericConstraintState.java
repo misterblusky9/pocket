@@ -80,9 +80,6 @@ public final class GenericConstraintState {
                 || axis == ConstraintJointAxis.LINEAR_Z;
     }
 
-    // A linear limit is relative joint travel, not a coordinate owned by either end. It only has a
-    // nominal reading when both ends share a scale; a mismatched pair has no single nominal frame,
-    // so it stays in metric units rather than inheriting an endpoint's scale.
     public static double limitScale(
             final ConstraintJointAxis axis, final double scale1, final double scale2
     ) {
@@ -132,7 +129,6 @@ public final class GenericConstraintState {
         }
     }
 
-    // lockAxes replaces the whole lock mask, so the newest call is the whole truth.
     public void captureLockedAxes(final ConstraintJointAxis... axes) {
         if (this.replayingLockedAxes) return;
         final EnumSet<ConstraintJointAxis> locked = EnumSet.noneOf(ConstraintJointAxis.class);

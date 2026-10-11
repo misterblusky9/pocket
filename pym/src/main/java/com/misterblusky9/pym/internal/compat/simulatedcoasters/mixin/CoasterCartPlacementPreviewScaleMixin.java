@@ -12,6 +12,7 @@ import org.joml.Quaterniondc;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -19,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.client.cart.CoasterCartPlacementPreviewRenderer", remap = false)
 public abstract class CoasterCartPlacementPreviewScaleMixin {
+    @Unique
     private static final int[][] PYM$EDGES = {
             {0, 1}, {1, 3}, {3, 2}, {2, 0},
             {4, 5}, {5, 7}, {7, 6}, {6, 4},

@@ -14,6 +14,18 @@ subprojects {
         exclusiveContent {
             forRepository {
                 maven {
+                    name = "JitPack"
+                    url = "https://jitpack.io"
+                }
+            }
+            filter {
+                includeGroupAndSubgroups "com.github.bawnorton"
+            }
+        }
+
+        exclusiveContent {
+            forRepository {
+                maven {
                     name = "SableCompanion"
                     url = "https://maven.ryanhcode.dev/releases"
                 }

@@ -3,6 +3,7 @@ package com.misterblusky9.pocket.client;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.item.ScaleSelectingItem;
 import com.misterblusky9.pocket.item.SelfResizeDeviceItem;
+import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.compression.PersonalLock;
 import com.misterblusky9.pocket.network.PersonalLockPayload;
 import com.misterblusky9.pocket.network.ShrinkRayScalePayload;
@@ -135,6 +136,7 @@ public final class ScaleSelectionScreen extends Screen {
     private int top;
     private boolean shrinkRayMenu;
     private boolean playerPreview;
+    private boolean pvpToggleVisible;
     private boolean unlocked;
 
     public ScaleSelectionScreen(final InteractionHand hand) {
@@ -152,26 +154,7 @@ public final class ScaleSelectionScreen extends Screen {
         }
         final ScaleSelectingItem tool = (ScaleSelectingItem) stack.getItem();
 
-        this.range = tool.selectionRange(player);
-        this.stops = DoubleStream.concat(
-                        IntStream.rangeClosed(-10, -1).mapToDouble(exponent -> Math.pow(2.0D, exponent)),
-                        IntStream.rangeClosed(1, (int) BOARD_MAX).asDoubleStream())
-                .filter(stop -> stop >= BOARD_MIN - ScaleBounds.EPSILON && stop <= BOARD_MAX + ScaleBounds.EPSILON)
-                .filter(this.range::contains)
-                .toArray();
-        final double[] seen = this.stops;
-        this.detents = DoubleStream.concat(DoubleStream.of(seen), DoubleStream.of(FINE_STOPS)
-                        .filter(stop -> stop >= BOARD_MIN - ScaleBounds.EPSILON && stop <= BOARD_MAX + ScaleBounds.EPSILON)
-                        .filter(this.range::contains)
-                        .filter(stop -> DoubleStream.of(seen).noneMatch(other -> ScaleBounds.same(stop, other))))
-                .sorted()
-                .toArray();
-        this.extendedDetents = DoubleStream.concat(DoubleStream.of(this.detents), DoubleStream.of(EXTENDED_STOPS)
-                        .filter(this.range::contains))
-                .sorted()
-                .toArray();
-        this.detents = this.extendedDetents;
-        this.fieldDetents = this.detents;
+        applyRange(tool.selectionRange(stack, player));
 
         this.initial = tool.selection(stack, player);
         this.value = this.range.clamp(this.initial);
@@ -184,6 +167,7 @@ public final class ScaleSelectionScreen extends Screen {
         }
         if (this.playerPreview) {
             this.unlocked = PersonalLock.unlocked(player);
+            this.pvpToggleVisible = PersonalLock.canToggle();
         }
 
         this.left = (this.width - this.background.getWidth()) / 2;
@@ -216,11 +200,34 @@ public final class ScaleSelectionScreen extends Screen {
                     "pocket.screen.shrinkray.targeting.entities");
             refreshTargetingButtons();
         }
-        if (this.playerPreview) {
+        if (this.pvpToggleVisible) {
             addLockButton(0, false, AllIcons.I_CONFIG_LOCKED, "pocket.screen.personal.locked");
             addLockButton(1, true, AllIcons.I_CONFIG_UNLOCKED, "pocket.screen.personal.unlocked");
             refreshTargetingButtons();
         }
+    }
+
+    private void applyRange(final ScaleBounds range) {
+        this.range = range;
+        this.stops = DoubleStream.concat(
+                        IntStream.rangeClosed(-10, -1).mapToDouble(exponent -> Math.pow(2.0D, exponent)),
+                        IntStream.rangeClosed(1, (int) BOARD_MAX).asDoubleStream())
+                .filter(stop -> stop >= BOARD_MIN - ScaleBounds.EPSILON && stop <= BOARD_MAX + ScaleBounds.EPSILON)
+                .filter(this.range::contains)
+                .toArray();
+        final double[] seen = this.stops;
+        this.detents = DoubleStream.concat(DoubleStream.of(seen), DoubleStream.of(FINE_STOPS)
+                        .filter(stop -> stop >= BOARD_MIN - ScaleBounds.EPSILON && stop <= BOARD_MAX + ScaleBounds.EPSILON)
+                        .filter(this.range::contains)
+                        .filter(stop -> DoubleStream.of(seen).noneMatch(other -> ScaleBounds.same(stop, other))))
+                .sorted()
+                .toArray();
+        this.extendedDetents = DoubleStream.concat(DoubleStream.of(this.detents), DoubleStream.of(EXTENDED_STOPS)
+                        .filter(this.range::contains))
+                .sorted()
+                .toArray();
+        this.detents = this.extendedDetents;
+        this.fieldDetents = this.detents;
     }
 
     private void addLockButton(final int index, final boolean unlocked, final AllIcons icon, final String tooltip) {
@@ -260,6 +267,9 @@ public final class ScaleSelectionScreen extends Screen {
     private void setTargeting(final CreativeShrinkRayItem.TargetingMode mode) {
         this.targeting = mode;
         refreshTargetingButtons();
+        applyRange(CreativeShrinkRayItem.limits(mode, Minecraft.getInstance().player));
+        releaseField(false);
+        set(this.range.clamp(this.value));
     }
 
     private void refreshTargetingButtons() {
@@ -274,8 +284,8 @@ public final class ScaleSelectionScreen extends Screen {
         releaseField(false);
         if (this.range.contains(ScaleBounds.FULL)) set(ScaleBounds.FULL);
         if (this.shrinkRayMenu) setTargeting(CreativeShrinkRayItem.TargetingMode.BOTH);
-        if (this.playerPreview) {
-            this.unlocked = false;
+        if (this.pvpToggleVisible) {
+            this.unlocked = DeviceRanges.pvpScalingMode().defaultAllowed();
             refreshTargetingButtons();
         }
     }
@@ -299,7 +309,7 @@ public final class ScaleSelectionScreen extends Screen {
                 this.top + 3, this.playerPreview ? PEHKUI_TEXT : TITLE_TEXT, false);
         graphics.drawString(this.font, Component.translatable("pocket.screen.shrinkray.scale"),
                 this.left + SCALE_LABEL_LEFT, this.top + SCALE_LABEL_TOP, 0xFFFFFF, false);
-        if (this.shrinkRayMenu || this.playerPreview) {
+        if (this.shrinkRayMenu || this.pvpToggleVisible) {
             graphics.drawString(this.font, Component.translatable(this.playerPreview
                             ? "pocket.screen.personal.lock"
                             : "pocket.screen.shrinkray.targeting"),
@@ -839,17 +849,19 @@ public final class ScaleSelectionScreen extends Screen {
         if (this.field != null && this.field.isFocused()) commitField();
 
         final ScaleSelectingItem tool = (ScaleSelectingItem) stack.getItem();
-        if (!tool.permitsSelection(player, this.value)) return;
+        if (!ScaleBounds.isValid(this.value) || !this.range.contains(this.value)) return;
 
+        if (stack.getItem() instanceof CreativeShrinkRayItem) {
+            CreativeShrinkRayItem.setTargetingMode(stack, this.targeting, player);
+        }
         tool.select(stack, this.value);
 
         if (stack.getItem() instanceof CreativeShrinkRayItem) {
-            CreativeShrinkRayItem.setTargetingMode(stack, this.targeting);
             PacketDistributor.sendToServer(new ShrinkRaySettingsPayload(this.hand, this.value, this.targeting.ordinal()));
         } else {
             PacketDistributor.sendToServer(new ShrinkRayScalePayload(this.hand, this.value));
         }
-        if (stack.getItem() instanceof SelfResizeDeviceItem) {
+        if (stack.getItem() instanceof SelfResizeDeviceItem && this.pvpToggleVisible) {
             PersonalLock.setClient(this.unlocked);
             PacketDistributor.sendToServer(new PersonalLockPayload(this.unlocked));
         }

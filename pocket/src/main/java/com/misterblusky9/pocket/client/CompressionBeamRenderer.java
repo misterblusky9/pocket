@@ -26,6 +26,8 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.SubLevelShape;
+import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.api.client.LineEmitter;
 import org.joml.Vector3d;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -191,7 +193,7 @@ public final class CompressionBeamRenderer {
         for (final Map.Entry<UUID, Beam> entry : ACTIVE.entrySet()) {
             final Player owner = level.getPlayerByUUID(entry.getKey());
             if (owner == null) continue;
-            if (entry.getValue().render(poses, buffer, camera, partialTick, muzzleOf(owner, partialTick))) {
+            if (entry.getValue().render(poses, buffer, camera, partialTick, muzzleOf(owner, partialTick), owner)) {
                 drew = true;
             }
         }
@@ -218,7 +220,9 @@ public final class CompressionBeamRenderer {
         final float pitch = (float) ((Mth.lerp(partialTick, player.xRotO, player.getXRot())) / -180.0F * Math.PI);
 
         final int flip = mainHand == (player.getMainArm() == HumanoidArm.RIGHT) ? -1 : 1;
-        final Vec3 local = new Vec3(flip * BARREL_OFFSET.x, BARREL_OFFSET.y, BARREL_OFFSET.z);
+        final double scale = Pym.entities().renderScale(player, partialTick);
+        final Vec3 local = new Vec3(flip * BARREL_OFFSET.x, BARREL_OFFSET.y, BARREL_OFFSET.z)
+                .scale(ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL);
         return start.add(local.xRot(pitch).yRot(yaw));
     }
 
@@ -241,8 +245,10 @@ public final class CompressionBeamRenderer {
                 ? null : Sable.HELPER.getContaining(level, hit.getBlockPos());
 
         if (hit == null || hit.getType() == HitResult.Type.MISS) {
+            final double scale = Pym.entities().scaleOf(player);
             return new Landing(
-                    eye.add(player.getViewVector(1.0F).scale(RANGE * MISS_REACH_FRACTION)), false, false);
+                    eye.add(player.getViewVector(1.0F).scale(RANGE * MISS_REACH_FRACTION
+                            * (ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL))), false, false);
         }
 
         final SubLevel found = struck;
@@ -355,6 +361,7 @@ public final class CompressionBeamRenderer {
         private final UUID owner;
 
         private double nodeRadius;
+        private double ownerScale = ScaleBounds.FULL;
         private volatile float energy;
 
         private float chargeTicks;
@@ -431,6 +438,8 @@ public final class CompressionBeamRenderer {
             tickSurge();
 
             this.muzzle = muzzleOf(owner);
+            final double scale = Pym.entities().scaleOf(owner);
+            this.ownerScale = ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL;
 
             final Landing landing = endpointOf(owner, level, this.lockedTarget);
             this.endpoint = landing.point();
@@ -448,7 +457,7 @@ public final class CompressionBeamRenderer {
             final boolean established = targetSurface && this.lockedTarget.equals(this.establishedSurfaceTarget);
 
             if (established || this.reach >= wanted) this.reach = wanted;
-            else this.reach = Math.min(wanted, this.reach + TRAVEL_SPEED);
+            else this.reach = Math.min(wanted, this.reach + TRAVEL_SPEED * this.ownerScale);
 
             final boolean reached = this.reach + 1.0E-6D >= wanted;
             if (targetSurface && reached) this.establishedSurfaceTarget = this.lockedTarget;
@@ -476,12 +485,12 @@ public final class CompressionBeamRenderer {
 
             final Vec3 tip = this.muzzle.add(direction.normalize().scale(this.reach));
 
-            this.nodeRadius = (NODE_RADIUS_BASE + SURGE_WOBBLE * this.energy) * Math.sqrt(
-                    Mth.clamp(this.reach / WOBBLE_REFERENCE_LENGTH,
+            this.nodeRadius = (NODE_RADIUS_BASE + SURGE_WOBBLE * this.energy) * this.ownerScale * Math.sqrt(
+                    Mth.clamp(this.reach / (WOBBLE_REFERENCE_LENGTH * this.ownerScale),
                             1.0D, MAX_WOBBLE_FACTOR * MAX_WOBBLE_FACTOR));
 
             final int wanted = Mth.clamp(
-                    (int) Math.round(this.reach / SEGMENT_SPACING) + 1, MIN_NODES, MAX_NODES);
+                    (int) Math.round(this.reach / (SEGMENT_SPACING * this.ownerScale)) + 1, MIN_NODES, MAX_NODES);
 
             while (this.nodes.size() < wanted) {
                 final double t = this.nodes.size() / (double) Math.max(1, wanted - 1);
@@ -502,7 +511,7 @@ public final class CompressionBeamRenderer {
                     final double t = i / (double) last;
                     final double taper = Math.sin(t * Math.PI);
 
-                    final double arc = LAUNCH_ARC * this.arcAmount * taper;
+                    final double arc = LAUNCH_ARC * this.ownerScale * this.arcAmount * taper;
 
                     final Vec3 ideal = this.muzzle.lerp(tip, t).add(
                             (RANDOM.nextDouble() - 0.5D) * this.nodeRadius * taper,
@@ -520,9 +529,11 @@ public final class CompressionBeamRenderer {
                 final SuperRenderTypeBuffer buffer,
                 final Vec3 camera,
                 final float partialTick,
-                final Vec3 frameMuzzle
+                final Vec3 frameMuzzle,
+                final Player owner
         ) {
             if (this.nodes.size() < 2) return false;
+            LineEmitter.firedBy(this.line.getParams(), owner);
 
             this.nodes.get(0).pinTo(frameMuzzle);
             if (Mth.lerp(partialTick, (float) this.previousReach, (float) this.reach) <= 0.01F) return false;

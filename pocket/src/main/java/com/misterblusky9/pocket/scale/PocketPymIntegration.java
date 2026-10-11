@@ -6,17 +6,18 @@ import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.compression.CompressionSessions;
-import com.misterblusky9.pocket.item.PocketCaseItem;
+import com.misterblusky9.pocket.compression.PersonalScale;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.event.PhysicsSceneClosingEvent;
+import com.misterblusky9.pym.api.event.ResizeFollowedEvent;
 import com.misterblusky9.pym.api.event.ScaleTickEvent;
 import com.misterblusky9.pym.api.event.SubLevelScaleEvent;
 import com.misterblusky9.pym.api.spi.Participation;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.storage.SubLevelRemovalReason;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.List;
@@ -26,11 +27,18 @@ public final class PocketPymIntegration {
     public static void register() {
         Pym.extensions().register(new PocketParticipation());
         Pym.extensions().register(new CreateSeatResizeFollower());
+        Pym.extensions().register(new TrackingResizeFollower());
+        NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, true, PlayerSpawnScale::onJoin);
 
         NeoForge.EVENT_BUS.addListener(PocketPymIntegration::onSettled);
         NeoForge.EVENT_BUS.addListener(PocketPymIntegration::onReleased);
         NeoForge.EVENT_BUS.addListener(PocketPymIntegration::onScaleTick);
         NeoForge.EVENT_BUS.addListener(PocketPymIntegration::onSceneClosing);
+        NeoForge.EVENT_BUS.addListener(PocketPymIntegration::onFollowed);
+    }
+
+    private static void onFollowed(final ResizeFollowedEvent event) {
+        if (event.entity() instanceof final ServerPlayer player) PersonalScale.remember(player, event.scale());
     }
 
     private static void onSettled(final SubLevelScaleEvent.Settled event) {
@@ -68,13 +76,6 @@ public final class PocketPymIntegration {
         @Override
         public boolean holdsScale(final UUID subLevelId) {
             return CompressionSessions.isHeld(subLevelId);
-        }
-
-        @Override
-        public boolean exemptsEntity(final Entity entity) {
-            return entity instanceof final ItemEntity item
-                    && item.getItem().getItem() instanceof PocketCaseItem
-                    && PocketCaseItem.isFilled(item.getItem());
         }
     }
 

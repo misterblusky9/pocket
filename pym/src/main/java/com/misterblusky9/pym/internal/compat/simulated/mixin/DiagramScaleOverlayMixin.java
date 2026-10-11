@@ -12,6 +12,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
@@ -21,6 +22,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
         remap = false
 )
 public abstract class DiagramScaleOverlayMixin {
+    @Unique
     private static final String SCREEN_COORDS =
             "Ldev/simulated_team/simulated/content/entities/diagram/screen/DiagramScreen;" +
             "getScreenCoords(Lorg/joml/Vector3d;Lorg/joml/Quaternionfc;" +

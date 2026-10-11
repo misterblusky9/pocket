@@ -4,6 +4,7 @@ import com.misterblusky9.pym.api.ResizeResult;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.api.ScaleDriver;
 import com.misterblusky9.pym.api.ScaleFormat;
+import com.misterblusky9.pym.api.event.ResizeFollowedEvent;
 import com.misterblusky9.pym.api.spi.ScaleCoupling;
 import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterRivets;
 import com.misterblusky9.pym.internal.entity.EntityScaleTracker;
@@ -15,7 +16,8 @@ import com.misterblusky9.pym.internal.physics.ScalePhysicsTransitions;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Entity;
+import net.neoforged.neoforge.common.NeoForge;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 
@@ -93,6 +95,7 @@ public final class Resizer {
             final ResizeResult refusal = refusal(member, from, to, request);
             if (refusal != null) {
                 return ResizePlan.refused(origin, member == origin
+                        || refusal.status() == ResizeResult.Status.OUT_OF_BOUNDS
                         ? refusal
                         : ResizeResult.refused(refusal.status(), CONNECTED + refusal.message()));
             }
@@ -100,22 +103,15 @@ public final class Resizer {
             slowest = Math.min(slowest, massSpeed(member));
         }
 
-        final Map<LivingEntity, Double> entityGoals = new LinkedHashMap<>();
+        final Map<Entity, Double> entityGoals = new LinkedHashMap<>();
         if (!ScaleBounds.same(ratio, 1.0D)) {
             for (final ServerSubLevel member : members) {
-                for (final LivingEntity entity : PymExtensions.resizeFollowers(member)) {
-                    if (!EntityScaleTracker.supports(entity)) {
-                        return ResizePlan.refused(origin, ResizeResult.refused(
-                                ResizeResult.Status.BLOCKED,
-                                "A resize-following entity cannot be scaled by this Pym installation."));
-                    }
+                for (final Map.Entry<Entity, ScaleBounds> follower : PymExtensions.resizeFollowers(member, request.driver()).entrySet()) {
+                    final Entity entity = follower.getKey();
+                    if (!EntityScaleTracker.supports(entity)) continue;
                     final double from = EntityScaleTracker.target(entity);
-                    final double to = ScaleSnap.snap(from * ratio);
-                    if (!ScaleBounds.isValid(to)) {
-                        return ResizePlan.refused(origin, ResizeResult.refused(
-                                ResizeResult.Status.INVALID_SCALE,
-                                "A seated entity would be resized to an invalid scale: " + to));
-                    }
+                    final double to = clampFollower(ScaleSnap.snap(from * ratio), from, follower.getValue());
+                    if (!ScaleBounds.isValid(to)) continue;
                     if (!ScaleBounds.same(from, to)) entityGoals.put(entity, to);
                 }
             }
@@ -139,8 +135,10 @@ public final class Resizer {
         }
 
         final int entityTicks = (int) Math.max(0.0D, Math.round(plan.ticks()));
-        for (final Map.Entry<LivingEntity, Double> entry : plan.entityGoals().entrySet()) {
-            EntityScaleTracker.set(entry.getKey(), entry.getValue(), entityTicks);
+        for (final Map.Entry<Entity, Double> entry : plan.entityGoals().entrySet()) {
+            if (EntityScaleTracker.set(entry.getKey(), entry.getValue(), entityTicks)) {
+                NeoForge.EVENT_BUS.post(new ResizeFollowedEvent(entry.getKey(), entry.getValue()));
+            }
         }
     }
 
@@ -196,11 +194,13 @@ public final class Resizer {
                 next.addAll(coupling.component(id));
             }
             final UUID parent = SubLevelParentage.parentOf(id);
-            if (parent != null) next.add(parent);
+            if (parent != null && !owns(container, parent, id)) next.add(parent);
             next.addAll(SubLevelParentage.childrenOf(id));
+            next.addAll(PymExtensions.ownedBy(current));
             if (joints) {
                 for (final UUID neighbour : ConstraintRefresh.conductingNeighbours(container, id)) {
-                    if (!PymExtensions.holdsScale(neighbour)) next.add(neighbour);
+                    if (PymExtensions.holdsScale(neighbour) || owns(container, neighbour, id)) continue;
+                    next.add(neighbour);
                 }
             }
 
@@ -218,6 +218,11 @@ public final class Resizer {
         return null;
     }
 
+    private static boolean owns(final ServerSubLevelContainer container, final UUID owner, final UUID owned) {
+        return container.getSubLevel(owner) instanceof final ServerSubLevel subLevel
+                && PymExtensions.ownedBy(subLevel).contains(owned);
+    }
+
     private static ResizeResult refusal(
             final ServerSubLevel subLevel,
             final double from,
@@ -231,14 +236,19 @@ public final class Resizer {
         if (ScaleBounds.same(from, to)) return null;
         final ScaleBounds bounds = request.bounds();
         if (!bounds.permits(from, to)) {
-            return ResizeResult.refused(ResizeResult.Status.OUT_OF_BOUNDS,
-                    "Scale " + ScaleFormat.label(to) + " is outside "
-                            + ScaleFormat.label(bounds.min()) + " to " + ScaleFormat.label(bounds.max()) + ".");
+            return ResizeResult.refused(ResizeResult.Status.OUT_OF_BOUNDS, to < from
+                    ? "Can't scale below " + ScaleFormat.label(bounds.min())
+                    : "Can't scale above " + ScaleFormat.label(bounds.max()));
         }
         final String shrink = PlotScan.refuseShrink(subLevel, from, to);
         if (shrink != null) return ResizeResult.refused(ResizeResult.Status.BLOCKED, shrink);
         final String blocked = PymExtensions.refuse(subLevel, from, to);
         return blocked == null ? null : ResizeResult.refused(ResizeResult.Status.BLOCKED, blocked);
+    }
+
+    private static double clampFollower(final double to, final double from, final ScaleBounds bounds) {
+        if (!ScaleBounds.isValid(to)) return to;
+        return Math.max(Math.min(from, bounds.min()), Math.min(Math.max(from, bounds.max()), to));
     }
 
     private static Pivot pivot(

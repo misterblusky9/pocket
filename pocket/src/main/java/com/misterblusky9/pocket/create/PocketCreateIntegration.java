@@ -44,6 +44,7 @@ public final class PocketCreateIntegration {
     public static final double SWITCH_BEARING_STRESS_IMPACT = 4.0D;
     public static final double SWITCH_PISTON_STRESS_IMPACT = 4.0D;
     public static final double HELM_BEARING_STRESS_CAPACITY = 16.0D;
+    public static final double SUBSPACE_HARNESS_STRESS_IMPACT = 4.0D;
 
     public static void register(final IEventBus modBus) {
         BLOCK_HIT_ACTIONS.register(modBus);
@@ -68,6 +69,9 @@ public final class PocketCreateIntegration {
         );
         BlockStressValues.CAPACITIES.register(
                 ModBlocks.HELM_BEARING.get(), () -> HELM_BEARING_STRESS_CAPACITY
+        );
+        BlockStressValues.IMPACTS.register(
+                ModBlocks.SUBSPACE_HARNESS.get(), () -> SUBSPACE_HARNESS_STRESS_IMPACT
         );
         BlockStressValues.setGeneratorSpeed(HelmBearingBlockEntity.RPM).accept(ModBlocks.HELM_BEARING.get());
         MovementBehaviour.REGISTRY.register(

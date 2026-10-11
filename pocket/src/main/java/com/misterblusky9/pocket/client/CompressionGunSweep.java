@@ -248,7 +248,6 @@ final class CompressionGunSweep {
         return new Source(x, y, disc, min.z, max.z);
     }
 
-    // --- part ---
 
     private record Cell(Vector3f[] corners, Vector3f center, Vector3f normal) {}
 
@@ -300,7 +299,6 @@ final class CompressionGunSweep {
         }
     }
 
-    // --- lattice ---
 
     private record Frame(Quaternionf rotation, Vector3f origin, Vector3f scale) {}
 

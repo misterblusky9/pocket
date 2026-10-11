@@ -103,7 +103,11 @@ public final class SwitchPistonBlock extends MechanicalPistonBlock {
                 return ItemInteractionResult.SUCCESS;
             }
             if (level.getBlockEntity(pos) instanceof SwitchPistonBlockEntity piston) {
-                piston.toggleAssembly();
+                if (piston.clickedThroughContraption(player, hitResult.getLocation())) {
+                    piston.onContraptionInteraction(player, hand);
+                } else {
+                    piston.toggleAssembly();
+                }
             }
             return ItemInteractionResult.SUCCESS;
         }

@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Render-only material data needed to rebuild copycat ModelData in an item preview. */
 public final class PocketCopycatPreview {
     public static final String COPYCATS_KEY = "preview_copycats";
 

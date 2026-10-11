@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
@@ -19,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 @Pseudo
 @Mixin(targets = "dev.silvergold.simulatedcoasters.client.cart.CoasterCartTrainCouplingRenderer", remap = false)
 public abstract class CoasterCartTrainCouplingRendererScaleMixin {
+    @Unique
     private static final String PYM$LAMBDA =
             "lambda$render$0("
                     + "Ljava/util/Map;"
@@ -32,6 +34,7 @@ public abstract class CoasterCartTrainCouplingRendererScaleMixin {
                     + "Lnet/minecraft/world/level/block/state/BlockState;"
                     + "Ldev/ryanhcode/sable/sublevel/SubLevel;)V";
 
+    @Unique
     private static final String PYM$RENDER_COUPLING =
             "renderCoupling("
                     + "Lcom/mojang/blaze3d/vertex/PoseStack;"

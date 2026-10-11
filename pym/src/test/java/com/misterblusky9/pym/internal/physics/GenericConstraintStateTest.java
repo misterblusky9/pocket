@@ -129,7 +129,6 @@ public final class GenericConstraintStateTest {
         check(handle.limits.get(ConstraintJointAxis.LINEAR_X).equals(new Bounds(3, 4)), "replay guard remained set");
     }
 
-    // 1, 2: a shared scale is the only case with an unambiguous nominal -> metric conversion.
     private static void sameScaleJointConvertsLinearLimits() {
         check(GenericConstraintState.toMetricLimit(ConstraintJointAxis.LINEAR_X, 1, 1, 1) == 1,
                 "1x/1x linear limit was not left alone");
@@ -157,7 +156,6 @@ public final class GenericConstraintStateTest {
                 "1/8 replay did not contract the limit");
     }
 
-    // 3: the stored value stays nominal, so rescaling is not cumulative.
     private static void rescalingBothEndsReducesLinearLimits() {
         final GenericConstraintState state = state(new Vector3d(), new Vector3d(), null, null);
         final RecordingHandle handle = new RecordingHandle(state);
@@ -171,7 +169,6 @@ public final class GenericConstraintStateTest {
         }
     }
 
-    // 4, 5: a mismatched pair has no nominal frame, and the answer cannot depend on endpoint order.
     private static void crossScaleJointLeavesLinearLimitsAlone() {
         for (final ConstraintJointAxis axis : ConstraintJointAxis.LINEAR) {
             final double forwards = GenericConstraintState.toMetricLimit(axis, 1, 1, 0.125);
@@ -194,7 +191,6 @@ public final class GenericConstraintStateTest {
         check(forwards.equals(backwards), "cross-scale replay depended on endpoint order");
     }
 
-    // 6: angles do not scale, whatever the pair does.
     private static void angularLimitsAreNeverScaled() {
         final double min = -0.75;
         final double max = 2.5;
@@ -221,7 +217,6 @@ public final class GenericConstraintStateTest {
         }
     }
 
-    // 7: lockAxes replaces the whole mask, so the newest runtime call must outlive the rebuild.
     private static void lockedAxesSurviveRebuild() {
         final GenericConstraintState state = state(new Vector3d(), new Vector3d(), null, null);
         final RecordingHandle handle = new RecordingHandle(state);
@@ -253,7 +248,6 @@ public final class GenericConstraintStateTest {
         check(handle.locked == null, "invalid handle was mutated");
     }
 
-    // 8: frames, limits and the lock mask all have to come through a run of resizes intact.
     private static void everythingSurvivesSuccessiveResizes() {
         final Vector3d pivot = new Vector3d(100, 0, 0);
         final GenericConstraintState state = state(new Vector3d(104, 0, 0), new Vector3d(3, 4, 5), pivot, null);
@@ -267,7 +261,6 @@ public final class GenericConstraintStateTest {
 
         final Quaterniond expected = new Quaterniond().rotationY(0.4);
 
-        // Frame 2 is a world endpoint, so this joint is cross-scale for every shrunken step.
         for (final double scale : new double[]{0.5, 0.125, 1, 0.0625, 1, 0.125}) {
             handle.limits.clear();
             handle.locked = null;
@@ -292,7 +285,6 @@ public final class GenericConstraintStateTest {
                     "lock mask was lost at scale " + scale);
         }
 
-        // Same joint once both ends share a scale: now the nominal reading applies.
         state.bake(pivot, 0.125, null, 0.125);
         handle.limits.clear();
         state.replayLimits(handle, 0.125, 0.125);

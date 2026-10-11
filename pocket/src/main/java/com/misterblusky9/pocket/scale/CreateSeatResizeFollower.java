@@ -1,5 +1,10 @@
 package com.misterblusky9.pocket.scale;
 
+import com.misterblusky9.pocket.compression.PersonalLock;
+import com.misterblusky9.pocket.config.DeviceRanges;
+import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.api.ScaleDriver;
 import com.misterblusky9.pym.api.spi.ResizeFollower;
 import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
 import com.simibubi.create.content.contraptions.actors.seat.SeatEntity;
@@ -8,7 +13,6 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 
@@ -19,7 +23,12 @@ final class CreateSeatResizeFollower implements ResizeFollower {
     private static final double SEARCH_MARGIN = 3.0D;
 
     @Override
-    public Set<LivingEntity> followers(final ServerSubLevel subLevel) {
+    public Set<Entity> followers(final ServerSubLevel subLevel) {
+        return followers(subLevel, null);
+    }
+
+    @Override
+    public Set<Entity> followers(final ServerSubLevel subLevel, final ScaleDriver driver) {
         if (subLevel == null || subLevel.isRemoved() || !(subLevel.getLevel() instanceof final ServerLevel level)) {
             return Set.of();
         }
@@ -29,17 +38,24 @@ final class CreateSeatResizeFollower implements ResizeFollower {
                 bounds.minX() - SEARCH_MARGIN, bounds.minY() - SEARCH_MARGIN, bounds.minZ() - SEARCH_MARGIN,
                 bounds.maxX() + SEARCH_MARGIN, bounds.maxY() + SEARCH_MARGIN, bounds.maxZ() + SEARCH_MARGIN);
 
-        final Set<LivingEntity> found = new LinkedHashSet<>();
-        for (final LivingEntity entity : level.getEntitiesOfClass(
-                LivingEntity.class,
-                search,
-                candidate -> candidate != null && candidate.isAlive() && !(candidate instanceof Player))) {
-            if (seatSubLevel(entity) == subLevel) found.add(entity);
+        final Set<Entity> found = new LinkedHashSet<>();
+        for (final Entity entity : level.getEntities((Entity) null, search,
+                candidate -> candidate != null && candidate.isAlive() && !candidate.isSpectator())) {
+            if (Pym.entities().supports(entity)
+                    && (!(entity instanceof Player player) || !PersonalLock.blocksResize(driver, player))
+                    && seatSubLevel(entity) == subLevel) found.add(entity);
         }
         return found;
     }
 
-    private static ServerSubLevel seatSubLevel(final LivingEntity passenger) {
+    @Override
+    public ScaleBounds bounds(final Entity entity) {
+        return entity instanceof Player
+                ? DeviceRanges.of(DeviceRanges.Device.PERSONAL_COMPRESSOR)
+                : ScaleBounds.ANY;
+    }
+
+    private static ServerSubLevel seatSubLevel(final Entity passenger) {
         final Entity vehicle = passenger == null ? null : passenger.getVehicle();
         if (vehicle == null || !isCreateSeatRide(passenger, vehicle)) return null;
 
@@ -53,7 +69,7 @@ final class CreateSeatResizeFollower implements ResizeFollower {
         return null;
     }
 
-    private static boolean isCreateSeatRide(final LivingEntity passenger, final Entity vehicle) {
+    private static boolean isCreateSeatRide(final Entity passenger, final Entity vehicle) {
         if (vehicle instanceof SeatEntity) return true;
         if (!(vehicle instanceof final AbstractContraptionEntity contraptionEntity)) return false;
         final var contraption = contraptionEntity.getContraption();

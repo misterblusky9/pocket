@@ -26,12 +26,11 @@ public abstract class PhysicsStaffScrollStepScaleMixin {
             final double max,
             final Operation<Double> original
     ) {
-        final double scale = PhysicsStaffScale.dragScale();
-        if (scale >= 1.0D) {
+        final double frame = PhysicsStaffScale.scrollFrame();
+        if (frame == 1.0D) {
             return original.call(value, min, max);
         }
 
-        final double inSubLevelFrame = value / Math.sqrt(scale);
-        return original.call(inSubLevelFrame, min, max) * scale;
+        return original.call(value / Math.sqrt(frame), min, max) * frame;
     }
 }

@@ -2,6 +2,8 @@ package com.misterblusky9.pocket.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
+import com.misterblusky9.pocket.block.FacadeTiling;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.item.PocketContainer;
 import com.misterblusky9.pocket.pocket.PocketCopycatPreview;
@@ -20,6 +22,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.inventory.InventoryMenu;
@@ -28,6 +31,7 @@ import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.Blocks;
@@ -108,6 +112,11 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     ) {
         final UUID token = PocketCaseItem.token(stack);
         PocketRenderSnapshot snapshot = token == null ? null : CACHE.get(token);
+        final CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+        if (snapshot != null && customData != null
+                && snapshot.revision() != PocketRenderSnapshot.revisionOf(customData.getUnsafe())) {
+            snapshot = null;
+        }
 
         if (snapshot == null) {
             snapshot = PocketCaseItem.renderSnapshot(stack);
@@ -120,16 +129,39 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             return;
         }
 
+        final PocketRenderSnapshot drawn = snapshot;
+        final double scale = PocketCaseItem.pocketedScale(stack);
+        final int[] anchor = drawn.gridAnchor();
+        final int[] shift = FacadeTiling.reduce(PocketCaseItem.facadeOffset(stack), scale);
+        for (int axis = 0; axis < 3; axis++) anchor[axis] += shift[axis];
+        CopycatFacadeFrames.inPreview(scale, anchor,
+                () -> drawCraft(stack, drawn, poseStack, bufferSource, packedLight, packedOverlay));
+    }
+
+    private static void drawCraft(
+            final ItemStack stack,
+            final PocketRenderSnapshot snapshot,
+            final PoseStack poseStack,
+            final MultiBufferSource bufferSource,
+            final int packedLight,
+            final int packedOverlay
+    ) {
         poseStack.pushPose();
 
         final PocketContainer container = PocketContainer.of(stack);
-        poseStack.translate(0.0D, container.floorY(), 0.0D);
+        poseStack.translate(container.centreX(), container.floorY(), container.centreZ());
 
-        final int widest = Math.max(snapshot.sizeX(), snapshot.sizeZ());
+        final int quarterTurns = PocketCaseItem.modelQuarterTurns(stack);
+        final boolean sideways = (quarterTurns & 1) == 1;
+        final int footprintX = sideways ? snapshot.sizeZ() : snapshot.sizeX();
+        final int footprintZ = sideways ? snapshot.sizeX() : snapshot.sizeZ();
         final float fit = (float) Math.min(
-                Math.min(COMPRESSED_SCALE, container.clearWidth() / Math.max(1, widest)),
-                container.clearHeight() / Math.max(1, snapshot.sizeY()));
+                Math.min(COMPRESSED_SCALE, container.clearHeight() / Math.max(1, snapshot.sizeY())),
+                Math.min(container.clearWidthX() / Math.max(1, footprintX),
+                        container.clearWidthZ() / Math.max(1, footprintZ)));
         poseStack.scale(fit, fit, fit);
+
+        if (quarterTurns != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F * quarterTurns));
 
         poseStack.translate(-snapshot.sizeX() * 0.5D, 0.0D, -snapshot.sizeZ() * 0.5D);
 

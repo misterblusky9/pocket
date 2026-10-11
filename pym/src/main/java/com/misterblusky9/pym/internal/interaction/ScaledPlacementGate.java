@@ -17,22 +17,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class ScaledPlacementGate {
-    // (sqrt(3) - 1) / 2 -- reach of a rotated unit cube past its axis-aligned footprint, in LOCAL units
     private static final double ROTATION_PAD = 0.36602540380000004D;
 
-    // sqrt(3) / 2 -- circumradius of a full-size cube, in WORLD units
     private static final double BROADPHASE_PAD = 0.8660254037844386D;
 
-    // squared MTV depth tolerated between two blocks of scale 1
     private static final double CONTACT_TOLERANCE_SQ = 0.05D;
 
-    // degenerate pose backstop; a correctly scaled search is ~2^3
     private static final double MAX_SEARCH_VOLUME = 4096.0D;
 
     private static final ThreadLocal<LevelReusedVectors> SINK =
             ThreadLocal.withInitial(LevelReusedVectors::new);
 
-    // null -- no scale in play, defer to Sable
     public static Boolean evaluate(final BlockPlaceContext context) {
         final Level level = context.getLevel();
         final BlockPos clicked = context.getClickedPos();
@@ -90,7 +85,6 @@ public final class ScaledPlacementGate {
     ) {
         final double otherScale = scaleOf(other);
 
-        // pad in the frame we iterate, so the search stays ~2^3 candidates at any scale
         final BoundingBox3d search = other == null
                 ? new BoundingBox3d(worldBox)
                 : worldBox.transformInverse(other.logicalPose(), new BoundingBox3d());

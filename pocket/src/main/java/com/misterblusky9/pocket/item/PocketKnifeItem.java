@@ -10,6 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -47,21 +48,45 @@ public class PocketKnifeItem extends Item implements PriorityInteractionItem {
                     : InteractionResult.PASS;
         }
 
-        final WeldRecord record = CrossScaleWelds.weldNear(serverLevel, point);
-        if (record == null) return InteractionResult.PASS;
-
-        WeldRuntime.drop(record.weldId());
-        WeldStore.get(serverLevel).remove(record.weldId());
-        CrossScaleWeldSync.broadcast(serverLevel);
-
-        final Player player = context.getPlayer();
-        if (player != null) {
-            context.getItemInHand().hurtAndBreak(1, player, LivingEntity.getSlotForHand(context.getHand()));
-        }
-
-        serverLevel.playSound(
-                null, pos, SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.4F);
-        return InteractionResult.CONSUME;
+        return cutWeld(serverLevel, point, pos, context.getPlayer(), context.getItemInHand(), context.getHand())
+                ? InteractionResult.CONSUME
+                : InteractionResult.PASS;
     }
 
+    public static boolean cutWeld(
+            final ServerLevel level,
+            final Vec3 point,
+            final BlockPos pos,
+            final Player player,
+            final ItemStack tool,
+            final InteractionHand hand
+    ) {
+        final WeldRecord record = CrossScaleWelds.weldNear(level, point);
+        if (record == null) return false;
+
+        WeldRuntime.drop(record.weldId());
+        WeldStore.get(level).remove(record.weldId());
+        CrossScaleWeldSync.broadcast(level);
+
+        if (player != null) {
+            tool.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
+        }
+
+        level.playSound(
+                null, pos, SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.4F);
+        return true;
+    }
+
+    @Override
+    public boolean hasCraftingRemainingItem(final ItemStack stack) {
+        return true;
+    }
+
+    @Override
+    public ItemStack getCraftingRemainingItem(final ItemStack stack) {
+        if (stack.getDamageValue() + 1 >= stack.getMaxDamage()) return ItemStack.EMPTY;
+        final ItemStack knife = stack.copyWithCount(1);
+        knife.setDamageValue(stack.getDamageValue() + 1);
+        return knife;
+    }
 }
