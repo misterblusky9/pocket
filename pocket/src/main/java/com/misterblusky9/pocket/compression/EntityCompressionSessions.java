@@ -124,7 +124,7 @@ public final class EntityCompressionSessions {
             if (beam.expired(holder.level().getGameTime())) return false;
             if (!session.resizing() && ScaleBounds.same(session.settled, session.goal)) return true;
             if (!beam.drain(holder)) {
-                holder.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
+                holder.displayClientMessage(Component.translatable("pocket.message.no_power"), true);
                 return false;
             }
         }

@@ -164,9 +164,9 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
                 : state.fill + (targetFill - state.fill) * Math.min(1.0F, FILL_EASE * delta);
 
         Player holderPlayer = holder.player();
-        boolean fueled = CompressionGunTank.amount(stack) > 0;
+        boolean powered = CompressionGunTank.hasPower(holderPlayer, stack);
         boolean triggered = holderPlayer != null && isSpooling(holder);
-        boolean spooling = triggered && fueled;
+        boolean spooling = triggered && powered;
         float ticksUsing = triggered
                 ? holderPlayer.getTicksUsingItem() + AnimationTickHolder.getPartialTicks()
                 : 0.0F;
@@ -178,7 +178,7 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         float direction = com.misterblusky9.pocket.item.CompressionGunItem.isGrowing(stack)
                 ? 1.0F : -1.0F;
 
-        boolean kickOnly = !fueled
+        boolean kickOnly = !powered
                 && ticksUsing >= com.misterblusky9.pocket.item.CompressionGunItem.SPIN_KICK_TICKS;
 
         if (isDriving(holder) && !kickOnly) {
@@ -186,7 +186,7 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
             float coasting = state.speed * direction > 0.0F ? Math.abs(state.speed) : 0.0F;
             state.speed = direction * Math.max(curve, coasting);
         } else {
-            float rest = CompressionGunTank.hasAirPressure(holder.player()) ? IDLE_SPIN_SPEED * direction : 0.0F;
+            float rest = CompressionGunTank.hasPower(holder.player(), holder.live()) ? IDLE_SPIN_SPEED * direction : 0.0F;
             state.speed += (rest - state.speed) * COAST_RATE * delta;
             if (Math.abs(state.speed - rest) < 0.05F) state.speed = rest;
         }
@@ -251,10 +251,10 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
     }
 
     private static CompressionGunStateModel.State panelState(Holder holder) {
-        if (CompressionGunTank.amount(holder.live()) <= 0) {
-            return CompressionGunStateModel.State.EMPTY;
-        }
-        return isSpooling(holder) ? CompressionGunStateModel.State.ACTIVE : CompressionGunStateModel.State.IDLE;
+        if (isSpooling(holder)) return CompressionGunStateModel.State.ACTIVE;
+        return CompressionGunTank.amount(holder.live()) <= 0
+                ? CompressionGunStateModel.State.EMPTY
+                : CompressionGunStateModel.State.IDLE;
     }
 
     private static boolean isSpooling(Holder holder) {

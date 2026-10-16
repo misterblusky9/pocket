@@ -96,6 +96,7 @@
   "block.pocket.subspace_harness": "Subspace Harness (WIP!)",
   "pocket.message.levitite_depleted": "Levitite Blend depleted",
   "pocket.message.no_air_pressure": "No air pressure",
+  "pocket.message.no_power": "No levitite or usable durability remaining",
   "pocket.message.hard_limit": "Pocket Sized limit: %s blocks",
   "pocket.message.hard_limit_ratio": "Pocket Sized hard limit: %s/%s blocks",
   "pocket.message.moon_not_full": "MisterBluSky's words echoed... \"There's a time and place for everything! But not now.\"",

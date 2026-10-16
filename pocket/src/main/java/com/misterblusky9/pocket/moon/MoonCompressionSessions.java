@@ -201,7 +201,7 @@ public final class MoonCompressionSessions {
         BeamSession beam = session.beam;
         if (!beam.sealed()) {
             if (!beam.acquire(holder)) {
-                holder.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
+                holder.displayClientMessage(Component.translatable("pocket.message.no_power"), true);
                 return false;
             }
             return true;

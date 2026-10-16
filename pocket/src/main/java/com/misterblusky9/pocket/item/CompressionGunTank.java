@@ -1,7 +1,6 @@
 package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.PocketSized;
-import com.simibubi.create.content.equipment.armor.BacktankUtil;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -21,21 +20,14 @@ import net.neoforged.neoforge.fluids.capability.templates.FluidHandlerItemStack;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-
 public final class CompressionGunTank {
     public static final int CAPACITY = 3000;
 
     private static final ResourceLocation LEVITITE_BLEND =
             ResourceLocation.fromNamespaceAndPath("aeronautics", "levitite_blend");
 
-    private static final int BACKTANK_DRAW_TICKS = 40;
-    private static final int BACKTANK_AIR_PER_DRAW = 3;
-    private static final int ENGINE_TICKS_PER_AIR = 4;
-    private static final int AIR_PER_DURABILITY = 12;
+    // Legacy engine wear rate, now used ONLY as an empty-tank backup.
+    private static final int BACKUP_WEAR_INTERVAL_TICKS = 48;
 
     public static final DeferredRegister.DataComponents COMPONENTS =
             DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, PocketSized.MOD_ID);
@@ -44,8 +36,6 @@ public final class CompressionGunTank {
             COMPONENTS.registerComponentType("levitite_tank", builder -> builder
                     .persistent(SimpleFluidContent.CODEC)
                     .networkSynchronized(SimpleFluidContent.STREAM_CODEC));
-
-    private static final Map<UUID, Integer> DURABILITY_DEBT = new ConcurrentHashMap<>();
 
     private CompressionGunTank() {}
 
@@ -101,21 +91,18 @@ public final class CompressionGunTank {
         return drained;
     }
 
-    public static boolean hasAirPressure(Player player) {
-        return player != null && (player.isCreative() || !BacktankUtil.getAllWithAir(player).isEmpty());
-    }
-
+    /** Levitite is the primary fuel; tool durability is the fallback, never a concurrent cost. */
     public static boolean hasPower(Player player, ItemStack stack) {
-        if (hasAirPressure(player)) return true;
-        return amount(stack) > 0 && hasDurability(stack);
+        return player != null && (player.isCreative() || amount(stack) > 0 || hasDurability(stack));
     }
 
     public static boolean hasDurability(ItemStack stack) {
+        // Preserve the gun's existing 1-durability safety margin for backup operation.
         return stack.isDamageableItem() && stack.getMaxDamage() - stack.getDamageValue() > 1;
     }
 
     public static boolean canFire(Player player, ItemStack stack) {
-        return hasPower(player, stack) && amount(stack) > 0;
+        return hasPower(player, stack);
     }
 
     public static boolean runEngine(
@@ -124,57 +111,66 @@ public final class CompressionGunTank {
             InteractionHand hand,
             int elapsed
     ) {
-        if (player.isCreative()) return true;
-
-        List<ItemStack> tanks = BacktankUtil.getAllWithAir(player);
-        if (!tanks.isEmpty()) {
-            if (elapsed % BACKTANK_DRAW_TICKS == 0) {
-                BacktankUtil.consumeAir(player, tanks.get(0), BACKTANK_AIR_PER_DRAW);
-            }
+        if (player.isCreative() || amount(stack) > 0) {
             return true;
         }
 
-        if (elapsed % ENGINE_TICKS_PER_AIR != 0) return hasPower(player, stack);
-        if (!hasPower(player, stack)) return false;
-        int debt = DURABILITY_DEBT.merge(player.getUUID(), 1, Integer::sum);
-        if (debt < AIR_PER_DURABILITY) return true;
+        if (!hasDurability(stack)) return false;
+        if (elapsed <= 0 || elapsed % BACKUP_WEAR_INTERVAL_TICKS != 0) return true;
 
-        DURABILITY_DEBT.remove(player.getUUID());
+        // Empty-tank backup retains the legacy rate: one damage every 48 use ticks.
         stack.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         return true;
     }
 
-    public static boolean runEngineOnce(
-            ServerPlayer player,
-            ItemStack stack,
-            InteractionHand hand
-    ) {
-        if (player.isCreative()) return true;
-
-        List<ItemStack> tanks = BacktankUtil.getAllWithAir(player);
-        if (!tanks.isEmpty()) {
-            BacktankUtil.consumeAir(player, tanks.get(0), BACKTANK_AIR_PER_DRAW);
-            return true;
-        }
-
+    /**
+     * Legacy one-shot durability backup; intentionally cannot wear a fuelled item.
+     * Kept for callers that used this public helper before the levitite migration.
+     */
+    public static boolean runEngineOnce(ServerPlayer player, ItemStack stack, InteractionHand hand) {
+        if (player.isCreative() || amount(stack) > 0) return true;
         if (!hasDurability(stack)) return false;
         stack.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         return true;
     }
 
-    public static boolean runEngineOnce(
-            ServerPlayer player,
-            ItemStack stack,
-            int durabilityCost
-    ) {
-        if (player.isCreative()) return true;
-        if (!stack.isDamageableItem() || stack.getMaxDamage() - stack.getDamageValue() < durabilityCost) return false;
+    /** Legacy backup helper; see {@link #consumeForActivation} for levitite-first activation. */
+    public static boolean runEngineOnce(ServerPlayer player, ItemStack stack, int durabilityCost) {
+        if (player.isCreative() || amount(stack) > 0) return true;
+        if (durabilityCost <= 0) return true;
+        if (!canAffordDurability(stack, durabilityCost)) return false;
         stack.setDamageValue(stack.getDamageValue() + durabilityCost);
         return true;
     }
 
+    /**
+     * Exactly one resource pays per activation. Even the last partial dose of levitite
+     * is a levitite-only use; durability is charged only when the tank began empty.
+     * Rejected backup uses do not alter the item.
+     */
+    public static boolean consumeForActivation(
+            ServerPlayer player, ItemStack stack, int levititeCost, int fullDurabilityCost
+    ) {
+        if (player.isCreative()) return true;
+        LevititeUseCost.Charge charge = LevititeUseCost.plan(
+                amount(stack), levititeCost, fullDurabilityCost);
+
+        if (charge.durability() > 0 && !canAffordDurability(stack, charge.durability())) return false;
+
+        if (charge.levitite() > 0) drain(stack, charge.levitite());
+        else if (charge.durability() > 0) {
+            stack.setDamageValue(stack.getDamageValue() + charge.durability());
+        }
+        return true;
+    }
+
+    private static boolean canAffordDurability(ItemStack stack, int durabilityCost) {
+        return stack.isDamageableItem()
+                && stack.getMaxDamage() - stack.getDamageValue() >= durabilityCost;
+    }
+
     public static void stopEngine(Player player) {
-        if (player != null) DURABILITY_DEBT.remove(player.getUUID());
+        // Retained for binary/source compatibility; no per-player engine debt remains.
     }
 
     private static final class Handler extends FluidHandlerItemStack {

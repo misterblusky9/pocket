@@ -14,6 +14,14 @@ sourceSets.main.resources {
     exclude("src/generated/**/.cache")
 }
 
+// dev runs only - never packaged into the jar
+sourceSets {
+    debug {
+        compileClasspath += main.output + main.compileClasspath
+        runtimeClasspath += main.output + main.runtimeClasspath
+    }
+}
+
 evaluationDependsOn(':pym')
 
 base {
@@ -47,6 +55,7 @@ neoForge {
     runs {
         client1 {
             client()
+            sourceSet = sourceSets.debug
             devLogin = true
             gameDirectory = rootProject.file("runs/client1")
 
@@ -61,6 +70,7 @@ neoForge {
 
         client2 {
             client()
+            sourceSet = sourceSets.debug
             gameDirectory = rootProject.file("runs/client2")
 
             programArguments = [
@@ -71,6 +81,7 @@ neoForge {
 
         server {
             server()
+            sourceSet = sourceSets.debug
             gameDirectory = rootProject.file("runs/server")
 
         }
@@ -108,6 +119,9 @@ neoForge {
         }
         "${pym_mod_id}" {
             sourceSet(project(':pym').sourceSets.main)
+        }
+        pocketdebug {
+            sourceSet(sourceSets.debug)
         }
     }
 }

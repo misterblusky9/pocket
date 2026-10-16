@@ -45,13 +45,10 @@ public final class SelfResizeDeviceItem extends Item implements ScaleSelectingIt
         double target = ScaleBounds.same(current, selected) ? ScaleBounds.FULL : selected;
         if (ScaleBounds.same(target, current)) return InteractionResultHolder.pass(stack);
 
-        if (!player.isCreative()) {
-            if (CompressionGunTank.amount(stack) >= LEVITITE_PER_USE) {
-                CompressionGunTank.drain(stack, LEVITITE_PER_USE);
-            } else if (!CompressionGunTank.runEngineOnce(serverPlayer, stack, DURABILITY_PER_USE)) {
-                player.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
-                return InteractionResultHolder.fail(stack);
-            }
+        if (!CompressionGunTank.consumeForActivation(
+                serverPlayer, stack, LEVITITE_PER_USE, DURABILITY_PER_USE)) {
+            player.displayClientMessage(Component.translatable("pocket.message.no_power"), true);
+            return InteractionResultHolder.fail(stack);
         }
 
         PersonalScale.instant(serverPlayer, target);

@@ -29,6 +29,7 @@
     "collision.SubLevelEntityCollisionMixin",
     "collision.PlayerSubLevelEdgeScaleMixin",
     "collision.SubLevelEdgeProbeBoundsMixin",
+    "collision.SubLevelStandupClearanceScaleMixin",
     "entity.EntityDimensionsScaleMixin",
     "entity.EntityResizeFootingMixin",
     "entity.LivingEntityDimensionsScaleMixin",
