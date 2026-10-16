@@ -1,0 +1,10 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'Create-Pocket-Sized'
+
+include 'pym'
+include 'pocket'

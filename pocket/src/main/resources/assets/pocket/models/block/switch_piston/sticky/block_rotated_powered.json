@@ -1,0 +1,7 @@
+{
+  "parent": "pocket:block/switch_piston/sticky/block_rotated",
+  "textures": {
+    "0": "pocket:block/switch_piston/andesite_casing_piston_powered",
+    "particle": "pocket:block/switch_piston/andesite_casing_piston_powered"
+  }
+}

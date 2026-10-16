@@ -1,0 +1,150 @@
+package com.misterblusky9.pocket.compat.simulated;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import org.joml.Quaterniond;
+import org.joml.Vector3d;
+
+import java.util.UUID;
+
+public record WeldRecord(
+        UUID weldId,
+        UUID smallSubLevel,
+        UUID bigSubLevel,
+        BlockPos smallPos,
+        BlockPos bigPos,
+        Direction smallFacing,
+        Direction bigFacing,
+        Vector3d smallAnchor,
+        Vector3d bigAnchor,
+        double smallSpan,
+        double bigSpan,
+        Quaterniond orientation
+) {
+    public boolean worldAnchored() {
+        return this.bigSubLevel == null;
+    }
+
+    public boolean touches(UUID subLevelId) {
+        return subLevelId != null
+                && (subLevelId.equals(this.smallSubLevel) || subLevelId.equals(this.bigSubLevel));
+    }
+
+    public UUID other(UUID subLevelId) {
+        if (subLevelId == null) return null;
+        if (subLevelId.equals(this.smallSubLevel)) return this.bigSubLevel;
+        if (subLevelId.equals(this.bigSubLevel)) return this.smallSubLevel;
+        return null;
+    }
+
+    public boolean connects(UUID first, UUID second) {
+        return !worldAnchored() && touches(first) && touches(second) && !first.equals(second);
+    }
+
+    public UUID subLevelFor(boolean small) {
+        return small ? this.smallSubLevel : this.bigSubLevel;
+    }
+
+    public BlockPos posFor(boolean small) {
+        return small ? this.smallPos : this.bigPos;
+    }
+
+    public Direction facingFor(boolean small) {
+        return small ? this.smallFacing : this.bigFacing;
+    }
+
+    public Vector3d anchorFor(boolean small) {
+        return new Vector3d(small ? this.smallAnchor : this.bigAnchor);
+    }
+
+    public double spanFor(boolean small) {
+        return small ? this.smallSpan : this.bigSpan;
+    }
+
+    public WeldRecord withSpans(double smallSpan, double bigSpan) {
+        return new WeldRecord(
+                this.weldId,
+                this.smallSubLevel,
+                this.bigSubLevel,
+                this.smallPos,
+                this.bigPos,
+                this.smallFacing,
+                this.bigFacing,
+                new Vector3d(this.smallAnchor),
+                new Vector3d(this.bigAnchor),
+                smallSpan,
+                bigSpan,
+                new Quaterniond(this.orientation));
+    }
+
+    public CompoundTag save() {
+        CompoundTag tag = new CompoundTag();
+        tag.putUUID("weld", this.weldId);
+        tag.putUUID("small", this.smallSubLevel);
+        tag.putBoolean("world", worldAnchored());
+        if (!worldAnchored()) tag.putUUID("big", this.bigSubLevel);
+        putPos(tag, "small_pos", this.smallPos);
+        putPos(tag, "big_pos", this.bigPos);
+        tag.putInt("small_facing", this.smallFacing.get3DDataValue());
+        tag.putInt("big_facing", this.bigFacing.get3DDataValue());
+        putVec(tag, "small_anchor", this.smallAnchor);
+        putVec(tag, "big_anchor", this.bigAnchor);
+        tag.putDouble("small_span", this.smallSpan);
+        tag.putDouble("big_span", this.bigSpan);
+        tag.putDouble("orient_x", this.orientation.x);
+        tag.putDouble("orient_y", this.orientation.y);
+        tag.putDouble("orient_z", this.orientation.z);
+        tag.putDouble("orient_w", this.orientation.w);
+        return tag;
+    }
+
+    public static WeldRecord load(CompoundTag tag) {
+        if (tag == null || !tag.hasUUID("weld") || !tag.hasUUID("small")) {
+            return null;
+        }
+        boolean world = tag.getBoolean("world") || !tag.hasUUID("big");
+        try {
+            return new WeldRecord(
+                    tag.getUUID("weld"),
+                    tag.getUUID("small"),
+                    world ? null : tag.getUUID("big"),
+                    readPos(tag, "small_pos"),
+                    readPos(tag, "big_pos"),
+                    Direction.from3DDataValue(tag.getInt("small_facing")),
+                    Direction.from3DDataValue(tag.getInt("big_facing")),
+                    readVec(tag, "small_anchor"),
+                    readVec(tag, "big_anchor"),
+                    tag.getDouble("small_span"),
+                    tag.getDouble("big_span"),
+                    new Quaterniond(
+                            tag.getDouble("orient_x"),
+                            tag.getDouble("orient_y"),
+                            tag.getDouble("orient_z"),
+                            tag.getDouble("orient_w")).normalize());
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static void putPos(CompoundTag tag, String key, BlockPos pos) {
+        tag.putLong(key, pos.asLong());
+    }
+
+    private static BlockPos readPos(CompoundTag tag, String key) {
+        return BlockPos.of(tag.getLong(key));
+    }
+
+    private static void putVec(CompoundTag tag, String key, Vector3d vec) {
+        tag.putDouble(key + "_x", vec.x);
+        tag.putDouble(key + "_y", vec.y);
+        tag.putDouble(key + "_z", vec.z);
+    }
+
+    private static Vector3d readVec(CompoundTag tag, String key) {
+        return new Vector3d(
+                tag.getDouble(key + "_x"),
+                tag.getDouble(key + "_y"),
+                tag.getDouble(key + "_z"));
+    }
+}

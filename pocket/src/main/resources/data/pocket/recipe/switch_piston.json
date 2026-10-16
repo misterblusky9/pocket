@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BLA",
+    "TMT",
+    "TTT"
+  ],
+  "key": {
+    "B": [
+      { "tag": "minecraft:wooden_buttons" },
+      { "item": "minecraft:stone_button" }
+    ],
+    "L": { "item": "minecraft:lever" },
+    "A": { "item": "create:analog_lever" },
+    "T": { "item": "create:railway_casing" },
+    "M": { "item": "create:sticky_mechanical_piston" }
+  },
+  "result": {
+    "id": "pocket:switch_piston",
+    "count": 1
+  }
+}

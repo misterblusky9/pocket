@@ -1,0 +1,29 @@
+{
+  "display": {
+    "icon": {
+      "id": "pocket:compression_gun",
+      "components": {
+        "pocket:levitite_tank": {
+          "id": "aeronautics:levitite_blend",
+          "amount": 3000
+        }
+      }
+    },
+    "title": {
+      "text": "Create Pocket Sized"
+    },
+    "description": {
+      "text": ""
+    },
+    "background": "pocket:textures/block/blueprint_casing.png",
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "tick": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}

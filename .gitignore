@@ -1,0 +1,16 @@
+.gradle/
+build/
+run/
+run-data/
+runs/
+.idea/
+*.iml
+log.txt
+*.zip
+.vscode/
+*.bbmodel
+logs/
+Minecraft-Model-Auto-Sync/
+.minecraft-model-sync.json
+.blockbench-sync-backups/
+.bb-sync-*

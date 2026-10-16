@@ -1,0 +1,6 @@
+{
+  "parent": "simulated:block/portable_engine/exhaust_pipe_left",
+  "textures": {
+    "1": "pocket:block/portable_compressor"
+  }
+}

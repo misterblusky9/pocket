@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    { "item": "minecraft:iron_sword" },
+    { "item": "create:wrench" }
+  ],
+  "result": {
+    "id": "pocket:pocket_knife",
+    "count": 1
+  }
+}

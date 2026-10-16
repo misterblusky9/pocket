@@ -1,0 +1,29 @@
+{
+  "parent": "pocket:root",
+  "display": {
+    "icon": {
+      "id": "pocket:pearlescent_compression_gun",
+      "components": {
+        "pocket:levitite_tank": {
+          "id": "aeronautics:levitite_blend",
+          "amount": 3000
+        }
+      }
+    },
+    "title": {
+      "text": "Light Mode"
+    },
+    "description": {
+      "text": "Haunt a Compression Cannon"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "haunted_cannon": {
+      "trigger": "pocket:haunted_compression_gun"
+    }
+  }
+}

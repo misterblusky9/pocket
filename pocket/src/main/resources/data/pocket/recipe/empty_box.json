@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "C C",
+    " C "
+  ],
+  "key": {
+    "C": { "item": "create:cardboard" }
+  },
+  "result": {
+    "id": "pocket:empty_box",
+    "count": 1
+  }
+}

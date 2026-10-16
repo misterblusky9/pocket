@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "values": [
+    "pocket:blueprint_casing",
+    "pocket:blueprint_encased_shaft",
+    "pocket:blueprint_encased_cogwheel",
+    "pocket:blueprint_encased_large_cogwheel",
+    "pocket:subspace_recycler",
+    "pocket:flexible_coupling",
+    "pocket:static_subspace_compressor",
+    "pocket:switch_bearing",
+    "pocket:switch_piston",
+    "pocket:copycat_facade",
+    "pocket:subspace_harness"
+  ]
+}

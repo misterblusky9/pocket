@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "pocket:block/subspace_recycler/block"
+    }
+  }
+}

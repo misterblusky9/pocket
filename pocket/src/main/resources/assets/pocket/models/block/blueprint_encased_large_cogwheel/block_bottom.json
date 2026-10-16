@@ -1,0 +1,356 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "ambientocclusion": true,
+  "textures": {
+    "casing": "pocket:block/blueprint_casing",
+    "side_connected": "pocket:block/blueprint_encased_cogwheel_side_connected",
+    "opening": "pocket:block/blueprint_gearbox",
+    "casing_legacy": "pocket:block/blueprint_casing_legacy",
+    "particle": "pocket:block/blueprint_casing"
+  },
+  "elements": [
+    {
+      "name": "cube",
+      "from": [
+        0,
+        1,
+        0
+      ],
+      "to": [
+        16,
+        6,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            8,
+            13,
+            16,
+            15.5
+          ],
+          "texture": "#side_connected"
+        },
+        "east": {
+          "uv": [
+            8,
+            13,
+            16,
+            15.5
+          ],
+          "texture": "#side_connected"
+        },
+        "south": {
+          "uv": [
+            8,
+            13,
+            16,
+            15.5
+          ],
+          "texture": "#side_connected"
+        },
+        "west": {
+          "uv": [
+            8,
+            13,
+            16,
+            15.5
+          ],
+          "texture": "#side_connected"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing_legacy"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#opening"
+        }
+      }
+    },
+    {
+      "name": "cube",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        1,
+        2
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            15,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "east": {
+          "uv": [
+            14,
+            15,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "south": {
+          "uv": [
+            0,
+            0,
+            16,
+            1
+          ],
+          "texture": "#casing"
+        },
+        "west": {
+          "uv": [
+            0,
+            15,
+            2,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            0,
+            14,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        }
+      }
+    },
+    {
+      "name": "cube",
+      "from": [
+        14,
+        0,
+        2
+      ],
+      "to": [
+        16,
+        1,
+        14
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            2,
+            15,
+            14,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "west": {
+          "uv": [
+            2,
+            0,
+            14,
+            1
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            14,
+            2,
+            16,
+            14
+          ],
+          "texture": "#casing"
+        }
+      }
+    },
+    {
+      "name": "cube",
+      "from": [
+        0,
+        0,
+        2
+      ],
+      "to": [
+        2,
+        1,
+        14
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            2,
+            0,
+            14,
+            1
+          ],
+          "texture": "#casing"
+        },
+        "west": {
+          "uv": [
+            2,
+            15,
+            14,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            0,
+            2,
+            2,
+            14
+          ],
+          "texture": "#casing"
+        }
+      }
+    },
+    {
+      "name": "cube",
+      "from": [
+        0,
+        0,
+        14
+      ],
+      "to": [
+        16,
+        1,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            0,
+            16,
+            1
+          ],
+          "texture": "#casing"
+        },
+        "east": {
+          "uv": [
+            0,
+            15,
+            2,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "south": {
+          "uv": [
+            0,
+            15,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "west": {
+          "uv": [
+            14,
+            15,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            2
+          ],
+          "texture": "#casing"
+        }
+      }
+    },
+    {
+      "name": "cube",
+      "from": [
+        0,
+        10,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "east": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "south": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "west": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing_legacy"
+        }
+      }
+    }
+  ]
+}

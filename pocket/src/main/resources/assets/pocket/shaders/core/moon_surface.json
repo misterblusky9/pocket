@@ -1,0 +1,63 @@
+{
+    "vertex": "pocket:moon_surface",
+    "fragment": "pocket:moon_surface",
+    "samplers": [
+        {
+            "name": "Sampler0"
+        }
+    ],
+    "uniforms": [
+        {
+            "name": "ModelViewMat",
+            "type": "matrix4x4",
+            "count": 16,
+            "values": [
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            ]
+        },
+        {
+            "name": "ProjMat",
+            "type": "matrix4x4",
+            "count": 16,
+            "values": [
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0
+            ]
+        },
+        {
+            "name": "LocalCamera",
+            "type": "float",
+            "count": 3,
+            "values": [0.0, 0.0, 2.0]
+        },
+        {
+            "name": "KeyLightDir",
+            "type": "float",
+            "count": 3,
+            "values": [0.28, 0.86, -0.42]
+        },
+        {
+            "name": "AmbientLight",
+            "type": "float",
+            "count": 1,
+            "values": [1.0]
+        },
+        {
+            "name": "SunVisibility",
+            "type": "float",
+            "count": 1,
+            "values": [1.0]
+        },
+        {
+            "name": "SheenTexels",
+            "type": "float",
+            "count": 1,
+            "values": [8.0]
+        }
+    ]
+}

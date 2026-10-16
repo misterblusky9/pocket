@@ -1,0 +1,16 @@
+{
+  "type": "create:item_application",
+  "ingredients": [
+    {
+      "tag": "c:stripped_woods"
+    },
+    {
+      "item": "create:empty_schematic"
+    }
+  ],
+  "results": [
+    {
+      "id": "pocket:blueprint_casing"
+    }
+  ]
+}

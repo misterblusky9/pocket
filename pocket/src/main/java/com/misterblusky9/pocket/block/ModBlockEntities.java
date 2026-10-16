@@ -1,0 +1,119 @@
+package com.misterblusky9.pocket.block;
+
+import com.misterblusky9.pocket.PocketSized;
+import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
+import com.simibubi.create.content.equipment.armor.BacktankBlockEntity;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public final class ModBlockEntities {
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
+            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, PocketSized.MOD_ID);
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PortableSubspaceCompressorBlockEntity>>
+            PORTABLE_SUBSPACE_COMPRESSOR = BLOCK_ENTITIES.register(
+                    "portable_subspace_compressor",
+                    () -> BlockEntityType.Builder.of(
+                            PortableSubspaceCompressorBlockEntity::new,
+                            ModBlocks.PORTABLE_SUBSPACE_COMPRESSOR.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SubspaceRecyclerBlockEntity>>
+            SUBSPACE_RECYCLER = BLOCK_ENTITIES.register(
+                    "subspace_recycler",
+                    () -> BlockEntityType.Builder.of(
+                            SubspaceRecyclerBlockEntity::new,
+                            ModBlocks.SUBSPACE_RECYCLER.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<StaticSubspaceCompressorBlockEntity>>
+            STATIC_SUBSPACE_COMPRESSOR = BLOCK_ENTITIES.register(
+                    "static_subspace_compressor",
+                    () -> BlockEntityType.Builder.of(
+                            StaticSubspaceCompressorBlockEntity::new,
+                            ModBlocks.STATIC_SUBSPACE_COMPRESSOR.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SwitchBearingBlockEntity>>
+            SWITCH_BEARING = BLOCK_ENTITIES.register(
+                    "switch_bearing",
+                    () -> BlockEntityType.Builder.of(
+                            SwitchBearingBlockEntity::new,
+                            ModBlocks.SWITCH_BEARING.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HelmBearingBlockEntity>>
+            HELM_BEARING = BLOCK_ENTITIES.register(
+                    "helm_bearing",
+                    () -> BlockEntityType.Builder.of(
+                            HelmBearingBlockEntity::new,
+                            ModBlocks.HELM_BEARING.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SwitchPistonBlockEntity>>
+            SWITCH_PISTON = BLOCK_ENTITIES.register(
+                    "switch_piston",
+                    () -> BlockEntityType.Builder.of(
+                            SwitchPistonBlockEntity::new,
+                            ModBlocks.SWITCH_PISTON.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CopycatBlockEntity>>
+            COPYCAT_FACADE = BLOCK_ENTITIES.register(
+                    "copycat_facade",
+                    () -> BlockEntityType.Builder.of(
+                            (pos, state) -> new CopycatBlockEntity(ModBlockEntities.COPYCAT_FACADE.get(), pos, state),
+                            ModBlocks.COPYCAT_FACADE.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<BacktankBlockEntity>>
+            SUBSPACE_HARNESS = BLOCK_ENTITIES.register(
+                    "subspace_harness",
+                    () -> BlockEntityType.Builder.of(
+                            (pos, state) -> new BacktankBlockEntity(ModBlockEntities.SUBSPACE_HARNESS.get(), pos, state),
+                            ModBlocks.SUBSPACE_HARNESS.get()
+                    ).build(null)
+            );
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FlexibleCouplingBlockEntity>>
+            FLEXIBLE_COUPLING = BLOCK_ENTITIES.register(
+                    "flexible_coupling",
+                    () -> BlockEntityType.Builder.of(
+                            FlexibleCouplingBlockEntity::new,
+                            ModBlocks.FLEXIBLE_COUPLING.get()
+                    ).build(null)
+            );
+
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.simibubi.create.content.kinetics.base.KineticBlockEntity>>
+            BLUEPRINT_ENCASED_SHAFT = BLOCK_ENTITIES.register("blueprint_encased_shaft",
+                    () -> BlockEntityType.Builder.of(
+                            (pos, state) -> new com.simibubi.create.content.kinetics.base.KineticBlockEntity(
+                                    ModBlockEntities.BLUEPRINT_ENCASED_SHAFT.get(), pos, state),
+                            ModBlocks.BLUEPRINT_ENCASED_SHAFT.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.simibubi.create.content.kinetics.simpleRelays.SimpleKineticBlockEntity>>
+            BLUEPRINT_ENCASED_COGWHEEL = BLOCK_ENTITIES.register("blueprint_encased_cogwheel",
+                    () -> BlockEntityType.Builder.of(
+                            (pos, state) -> new com.simibubi.create.content.kinetics.simpleRelays.SimpleKineticBlockEntity(
+                                    ModBlockEntities.BLUEPRINT_ENCASED_COGWHEEL.get(), pos, state),
+                            ModBlocks.BLUEPRINT_ENCASED_COGWHEEL.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.simibubi.create.content.kinetics.simpleRelays.SimpleKineticBlockEntity>>
+            BLUEPRINT_ENCASED_LARGE_COGWHEEL = BLOCK_ENTITIES.register("blueprint_encased_large_cogwheel",
+                    () -> BlockEntityType.Builder.of(
+                            (pos, state) -> new com.simibubi.create.content.kinetics.simpleRelays.SimpleKineticBlockEntity(
+                                    ModBlockEntities.BLUEPRINT_ENCASED_LARGE_COGWHEEL.get(), pos, state),
+                            ModBlocks.BLUEPRINT_ENCASED_LARGE_COGWHEEL.get()).build(null));
+
+    private ModBlockEntities() {}
+}

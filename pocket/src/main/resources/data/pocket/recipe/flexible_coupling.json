@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "create:metal_bracket"
+    },
+    {
+      "item": "pocket:flexible_shaft"
+    }
+  ],
+  "result": {
+    "id": "pocket:flexible_coupling",
+    "count": 2
+  }
+}

@@ -1,0 +1,54 @@
+plugins {
+    id 'net.neoforged.moddev' version '2.0.143' apply false
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+subprojects {
+    repositories {
+        maven { url = "https://maven.createmod.net" }
+        maven { url = "https://maven.ithundxr.dev/snapshots" }
+
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "JitPack"
+                    url = "https://jitpack.io"
+                }
+            }
+            filter {
+                includeGroupAndSubgroups "com.github.bawnorton"
+            }
+        }
+
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "SableCompanion"
+                    url = "https://maven.ryanhcode.dev/releases"
+                }
+            }
+            filter {
+                includeGroup "dev.ryanhcode.sable-companion"
+            }
+        }
+
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "Modrinth"
+                    url = "https://api.modrinth.com/maven"
+                }
+            }
+            filter {
+                includeGroup "maven.modrinth"
+            }
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}

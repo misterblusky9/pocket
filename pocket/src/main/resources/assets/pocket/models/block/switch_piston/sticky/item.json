@@ -1,0 +1,6 @@
+{
+	"parent": "pocket:block/switch_piston/normal/item",
+    "textures": {
+        "5": "block/piston_top_sticky"
+    }
+}

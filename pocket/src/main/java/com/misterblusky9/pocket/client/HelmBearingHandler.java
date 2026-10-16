@@ -1,0 +1,266 @@
+package com.misterblusky9.pocket.client;
+
+import com.misterblusky9.pocket.block.HelmBearingBlockEntity;
+import com.misterblusky9.pocket.create.HelmBearingContraption;
+import com.misterblusky9.pocket.mixin.create.ControlledContraptionEntityControllerPosAccessor;
+import com.misterblusky9.pocket.network.HelmBearingUpdatePayload;
+import com.simibubi.create.content.contraptions.ControlledContraptionEntity;
+import com.simibubi.create.content.equipment.goggles.GogglesItem;
+import dev.simulated_team.simulated.Simulated;
+import dev.simulated_team.simulated.index.SimClickInteractions;
+import dev.simulated_team.simulated.service.SimConfigService;
+import dev.simulated_team.simulated.util.hold_interaction.BlockHoldInteraction;
+import dev.simulated_team.simulated.util.hold_interaction.HoldInteractionManager;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.network.PacketDistributor;
+import org.lwjgl.glfw.GLFW;
+
+public final class HelmBearingHandler extends BlockHoldInteraction {
+    public static final HelmBearingHandler INSTANCE = new HelmBearingHandler();
+
+    private HelmBearingBlockEntity blockEntity;
+    private boolean updated;
+    private float rawAngle;
+    private float effectiveAngle;
+    private boolean wasShiftKeyDown;
+    private int angleSgn = 1;
+    private float angleLimit;
+
+    private HelmBearingHandler() {
+    }
+
+    public static void register() {
+        SimClickInteractions.register(INSTANCE);
+    }
+
+
+    @Override
+    public Result onUse(int modifiers, int action, KeyMapping rightKey) {
+        Result result = super.onUse(modifiers, action, rightKey);
+        if (result.cancelled() || action == GLFW.GLFW_RELEASE) {
+            return result;
+        }
+        if (isActive()) {
+            return new Result(true);
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        LocalPlayer player = minecraft.player;
+        if (player == null || minecraft.level == null || player.isSpectator()) {
+            return result;
+        }
+
+        ControlledContraptionEntity controlled = findTargetHelm(player);
+        if (controlled == null) {
+            return result;
+        }
+
+        BlockPos controllerPos =
+                ((ControlledContraptionEntityControllerPosAccessor) controlled).pocket$getControllerPos();
+        if (controllerPos == null
+                || !(minecraft.level.getBlockEntity(controllerPos) instanceof HelmBearingBlockEntity)) {
+            return result;
+        }
+
+        startHold(minecraft.level, player, controllerPos);
+        return isActive() ? new Result(true) : result;
+    }
+
+    private static ControlledContraptionEntity findTargetHelm(LocalPlayer player) {
+        IntegratedContraptionRaycast.Hit hit = IntegratedContraptionRaycast.pick(
+                player,
+                contraption -> contraption instanceof HelmBearingContraption
+        );
+        if (hit == null || !(hit.entity() instanceof ControlledContraptionEntity controlled)) {
+            return null;
+        }
+        return controlled;
+    }
+
+    @Override
+    public void startHold(Level level, Player player, BlockPos blockPos) {
+        if (!(level.getBlockEntity(blockPos) instanceof HelmBearingBlockEntity be)) {
+            return;
+        }
+        super.startHold(level, player, blockPos);
+        blockEntity = be;
+        rawAngle = blockEntity.getInteractionAngle(Minecraft.getInstance().getTimer().getGameTimeDeltaTicks());
+        effectiveAngle = rawAngle;
+        angleSgn = (int) blockEntity.directionConvert(1);
+        updated = true;
+        wasShiftKeyDown = false;
+        angleLimit = blockEntity.angleInput.getValue();
+    }
+
+    @Override
+    public void renderOverlay(GuiGraphics guiGraphics, int width, int height, boolean hideGui) {
+        if (hideGui || blockEntity == null) {
+            return;
+        }
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null && !GogglesItem.isWearingGoggles(mc.player)) {
+            return;
+        }
+
+        ResourceLocation tex = Simulated.path("textures/gui/steering_wheel.png");
+        float magicOffset = 0.56F;
+        int x = ((width - 223) / 2) + SimConfigService.INSTANCE.client().blockConfig.steeringWheelXOffset.get();
+        int y = 10 + SimConfigService.INSTANCE.client().blockConfig.steeringWheelYOffset.get();
+
+        guiGraphics.blit(tex, x, y, 0, 0, 223, 31, 256, 256);
+
+        float offset = wrapDegrees(angleLimit) * magicOffset;
+        int activeWidth = (int) Math.abs(offset);
+        int centerX = x + 111 - 4;
+        float realDegrees = angleSgn * -effectiveAngle;
+
+        if (Math.abs(angleLimit) <= 180) {
+            int leftDeadZoneWidth = (centerX - x) - activeWidth + 4;
+            if (leftDeadZoneWidth > 0) {
+                guiGraphics.blit(tex, x, y, 0, 32, leftDeadZoneWidth, 31, 256, 256);
+            }
+            int rightSideStart = centerX + activeWidth + 8;
+            int rightDeadZoneWidth = x + 223 - rightSideStart;
+            if (rightDeadZoneWidth > 0) {
+                guiGraphics.blit(tex, rightSideStart, y, rightSideStart - x, 32, rightDeadZoneWidth, 31, 256, 256);
+            }
+        } else {
+            if (realDegrees <= -180) {
+                int rightSideStart = centerX - activeWidth + 4;
+                int rightDeadZoneWidth = x + 223 - rightSideStart;
+                if (rightDeadZoneWidth > 0) {
+                    guiGraphics.blit(tex, rightSideStart, y, rightSideStart - x, 32, rightDeadZoneWidth, 31, 256, 256);
+                }
+            }
+            if (realDegrees >= 180) {
+                int leftDeadZoneWidth = centerX - x + activeWidth + 4;
+                if (leftDeadZoneWidth > 0) {
+                    guiGraphics.blit(tex, x, y, 0, 32, leftDeadZoneWidth, 31, 256, 256);
+                }
+            }
+        }
+
+        if (Math.abs(angleLimit) > 180) {
+            if (-realDegrees >= 180) {
+                guiGraphics.blit(tex, (int) (centerX + offset) + 2, y + 10, 239, 0, 6, 20, 256, 256);
+            }
+            if (-realDegrees <= -180) {
+                guiGraphics.blit(tex, (int) (centerX - offset) + 2, y + 10, 239, 0, 6, 20, 256, 256);
+            }
+        } else {
+            guiGraphics.blit(tex, (int) (centerX + offset) + 2, y + 10, 239, 0, 6, 20, 256, 256);
+            guiGraphics.blit(tex, (int) (centerX - offset) + 2, y + 10, 239, 0, 6, 20, 256, 256);
+        }
+
+        float degrees = Math.abs(angleLimit) <= 180
+                ? Mth.clamp(realDegrees, -180.0F, 180.0F)
+                : wrapDegrees(realDegrees);
+        int markerX = (int) (centerX - degrees * magicOffset) + 1;
+        guiGraphics.blit(tex, markerX, y + 11, 224, 0, 9, 18, 256, 256);
+
+        String text = (int) -realDegrees + "°";
+        int textWidth = mc.font.width(text);
+        int centeredX = markerX + 6 - textWidth / 2;
+        for (int xoff = -1; xoff < 2; xoff++) {
+            for (int yoff = -1; yoff < 2; yoff++) {
+                if (xoff == 0 && yoff == 0) {
+                    continue;
+                }
+                guiGraphics.drawString(mc.font, text, centeredX + xoff, y + yoff, 0x2b2117, false);
+            }
+        }
+        guiGraphics.drawString(mc.font, text, centeredX, y, 0x886539, false);
+    }
+
+    public static float wrapDegrees(float value) {
+        float result = value % 360.0F;
+        if (result >= 180.0F) {
+            result -= 360.0F;
+        } else if (result <= -180.0F) {
+            result += 360.0F;
+        }
+        return result;
+    }
+
+    @Override
+    public void stop() {
+        if (blockEntity != null && !blockEntity.isRemoved() && getInteractionPos() != null) {
+            blockEntity.held = false;
+            PacketDistributor.sendToServer(new HelmBearingUpdatePayload(true, effectiveAngle, getInteractionPos()));
+        }
+        blockEntity = null;
+        super.stop();
+    }
+
+    @Override
+    public boolean activeOnMouseMove(double yaw, double pitch) {
+        if (blockEntity == null) {
+            return true;
+        }
+        if (yaw != 0) {
+            float oldAngle = rawAngle;
+            rawAngle += (float) (yaw / 10.0D * angleSgn);
+            rawAngle = Mth.clamp(rawAngle, -blockEntity.angleInput.getValue(), blockEntity.angleInput.getValue());
+            updated |= oldAngle != rawAngle;
+        }
+        return true;
+    }
+
+    @Override
+    public boolean activeTick(Level level, LocalPlayer player) {
+        if (blockEntity == null || blockEntity.isRemoved() || getInteractionPos() == null) {
+            return true;
+        }
+
+        effectiveAngle = rawAngle;
+        if (HoldInteractionManager.unblockedShift()) {
+            effectiveAngle = Mth.clamp(
+                    Math.round(effectiveAngle / 45.0F) * 45.0F,
+                    -blockEntity.angleInput.getValue(),
+                    blockEntity.angleInput.getValue()
+            );
+            if (!wasShiftKeyDown) {
+                updated = true;
+            }
+            wasShiftKeyDown = true;
+        } else {
+            if (wasShiftKeyDown) {
+                updated = true;
+            }
+            wasShiftKeyDown = false;
+        }
+
+        setTargetAngle(effectiveAngle);
+        return false;
+    }
+
+    @Override
+    public boolean isBlockActive(BlockPos pos) {
+        return super.isBlockActive(pos) && !Float.isNaN(rawAngle);
+    }
+
+    public void setTargetAngle(float targetAngle) {
+        if (!updated || blockEntity == null || getInteractionPos() == null) {
+            return;
+        }
+
+        PacketDistributor.sendToServer(new HelmBearingUpdatePayload(false, targetAngle, getInteractionPos()));
+        updated = false;
+        blockEntity.setTargetAngleToUpdate(targetAngle);
+        blockEntity.held = true;
+    }
+
+    @Override
+    public int getCrouchBlockingTicks() {
+        return 6;
+    }
+}

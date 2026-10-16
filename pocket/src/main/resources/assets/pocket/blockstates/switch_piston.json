@@ -1,0 +1,316 @@
+{
+  "variants": {
+    "axis_along_first=false,facing=down,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block",
+      "x": 180
+    },
+    "axis_along_first=false,facing=down,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_powered",
+      "x": 180
+    },
+    "axis_along_first=false,facing=down,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block",
+      "x": 180
+    },
+    "axis_along_first=false,facing=down,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_powered",
+      "x": 180
+    },
+    "axis_along_first=false,facing=down,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block",
+      "x": 180
+    },
+    "axis_along_first=false,facing=down,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_powered",
+      "x": 180
+    },
+    "axis_along_first=false,facing=east,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block_rotated",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=false,facing=east,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_rotated_powered",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=false,facing=east,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block_rotated",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=false,facing=east,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_rotated_powered",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=false,facing=east,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=false,facing=east,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated_powered",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=false,facing=north,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block",
+      "x": 90
+    },
+    "axis_along_first=false,facing=north,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_powered",
+      "x": 90
+    },
+    "axis_along_first=false,facing=north,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block",
+      "x": 90
+    },
+    "axis_along_first=false,facing=north,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_powered",
+      "x": 90
+    },
+    "axis_along_first=false,facing=north,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block",
+      "x": 90
+    },
+    "axis_along_first=false,facing=north,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_powered",
+      "x": 90
+    },
+    "axis_along_first=false,facing=south,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=false,facing=south,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_powered",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=false,facing=south,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=false,facing=south,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_powered",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=false,facing=south,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=false,facing=south,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_powered",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=false,facing=up,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block"
+    },
+    "axis_along_first=false,facing=up,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_powered"
+    },
+    "axis_along_first=false,facing=up,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block"
+    },
+    "axis_along_first=false,facing=up,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_powered"
+    },
+    "axis_along_first=false,facing=up,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block"
+    },
+    "axis_along_first=false,facing=up,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_powered"
+    },
+    "axis_along_first=false,facing=west,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block_rotated",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=false,facing=west,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_rotated_powered",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=false,facing=west,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block_rotated",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=false,facing=west,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_rotated_powered",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=false,facing=west,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=false,facing=west,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated_powered",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=true,facing=down,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block_rotated",
+      "x": 180
+    },
+    "axis_along_first=true,facing=down,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_rotated_powered",
+      "x": 180
+    },
+    "axis_along_first=true,facing=down,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block_rotated",
+      "x": 180
+    },
+    "axis_along_first=true,facing=down,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_rotated_powered",
+      "x": 180
+    },
+    "axis_along_first=true,facing=down,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated",
+      "x": 180
+    },
+    "axis_along_first=true,facing=down,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated_powered",
+      "x": 180
+    },
+    "axis_along_first=true,facing=east,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=true,facing=east,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_powered",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=true,facing=east,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=true,facing=east,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_powered",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=true,facing=east,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=true,facing=east,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_powered",
+      "x": 90,
+      "y": 90
+    },
+    "axis_along_first=true,facing=north,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block_rotated",
+      "x": 90
+    },
+    "axis_along_first=true,facing=north,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_rotated_powered",
+      "x": 90
+    },
+    "axis_along_first=true,facing=north,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block_rotated",
+      "x": 90
+    },
+    "axis_along_first=true,facing=north,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_rotated_powered",
+      "x": 90
+    },
+    "axis_along_first=true,facing=north,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated",
+      "x": 90
+    },
+    "axis_along_first=true,facing=north,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated_powered",
+      "x": 90
+    },
+    "axis_along_first=true,facing=south,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block_rotated",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=true,facing=south,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_rotated_powered",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=true,facing=south,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block_rotated",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=true,facing=south,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_rotated_powered",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=true,facing=south,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=true,facing=south,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated_powered",
+      "x": 90,
+      "y": 180
+    },
+    "axis_along_first=true,facing=up,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block_rotated"
+    },
+    "axis_along_first=true,facing=up,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_rotated_powered"
+    },
+    "axis_along_first=true,facing=up,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block_rotated"
+    },
+    "axis_along_first=true,facing=up,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_rotated_powered"
+    },
+    "axis_along_first=true,facing=up,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated"
+    },
+    "axis_along_first=true,facing=up,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_rotated_powered"
+    },
+    "axis_along_first=true,facing=west,state=extended,powered=false": {
+      "model": "pocket:block/switch_piston/extended/block",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=true,facing=west,state=extended,powered=true": {
+      "model": "pocket:block/switch_piston/extended/block_powered",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=true,facing=west,state=moving,powered=false": {
+      "model": "pocket:block/switch_piston/moving/block",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=true,facing=west,state=moving,powered=true": {
+      "model": "pocket:block/switch_piston/moving/block_powered",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=true,facing=west,state=retracted,powered=false": {
+      "model": "pocket:block/switch_piston/sticky/block",
+      "x": 90,
+      "y": 270
+    },
+    "axis_along_first=true,facing=west,state=retracted,powered=true": {
+      "model": "pocket:block/switch_piston/sticky/block_powered",
+      "x": 90,
+      "y": 270
+    }
+  }
+}

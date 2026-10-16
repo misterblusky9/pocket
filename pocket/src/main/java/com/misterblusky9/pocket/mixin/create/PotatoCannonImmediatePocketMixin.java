@@ -1,0 +1,82 @@
+package com.misterblusky9.pocket.mixin.create;
+
+import com.misterblusky9.pocket.item.PocketCaseItem;
+import com.misterblusky9.pocket.pocket.CannonDeploymentQueue;
+import com.misterblusky9.pocket.pocket.CannonExpansionMode;
+import com.simibubi.create.content.equipment.potatoCannon.PotatoCannonItem;
+import com.simibubi.create.content.equipment.potatoCannon.PotatoProjectileEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import java.util.UUID;
+import java.util.function.Predicate;
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Redirect;
+
+@Mixin(value = PotatoCannonItem.class, remap = false)
+public abstract class PotatoCannonImmediatePocketMixin {
+    @org.spongepowered.asm.mixin.Unique
+    private static CannonExpansionMode pocket$firingMode(Entity owner) {
+        if (!(owner instanceof Player player)) return CannonExpansionMode.IMMEDIATE;
+
+        for (net.minecraft.world.InteractionHand hand : net.minecraft.world.InteractionHand.values()) {
+            ItemStack held = player.getItemInHand(hand);
+            if (held.getItem() instanceof PotatoCannonItem) return CannonExpansionMode.of(held);
+        }
+        return CannonExpansionMode.IMMEDIATE;
+    }
+
+    @ModifyReturnValue(method = "getAllSupportedProjectiles", at = @At("RETURN"), remap = false)
+    private Predicate<ItemStack> pocket$sealedCasesAreNotAmmo(Predicate<ItemStack> original) {
+        return original.and(stack -> !PocketCaseItem.isSealed(stack));
+    }
+
+    @Redirect(
+            method = "use",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/world/level/Level;addFreshEntity(Lnet/minecraft/world/entity/Entity;)Z"
+            ),
+            remap = false
+    )
+    private boolean pocket$replacePocketProjectileBeforeSpawn(Level rawLevel, Entity entity) {
+        if (!(rawLevel instanceof ServerLevel level)
+                || !(entity instanceof PotatoProjectileEntity projectile)) {
+            return rawLevel.addFreshEntity(entity);
+        }
+
+        ItemStack payload = projectile.getItem();
+        if (!PocketCaseItem.isCannonPayload(payload)) {
+            return rawLevel.addFreshEntity(entity);
+        }
+
+        Vec3 motion = projectile.getDeltaMovement();
+        Vec3 forward = motion.lengthSqr() > 1.0E-8D ? motion.normalize() : Vec3.ZERO;
+
+        Vec3 spawnPos = projectile.position().add(forward.scale(0.45D));
+        boolean creativeShot = projectile.getOwner() instanceof Player player && player.isCreative();
+        if (creativeShot && projectile.getOwner() instanceof Player player) {
+            var token = PocketCaseItem.token(payload);
+            for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+                ItemStack candidate = player.getInventory().getItem(slot);
+                if (!PocketCaseItem.isCannonPayload(candidate)) continue;
+                if (token != null && token.equals(PocketCaseItem.token(candidate))) {
+                    candidate.shrink(1);
+                    if (candidate.isEmpty()) player.getInventory().setItem(slot, ItemStack.EMPTY);
+                    player.getInventory().setChanged();
+                    break;
+                }
+            }
+        }
+
+        UUID ownerId = projectile.getOwner() == null ? null : projectile.getOwner().getUUID();
+        CannonDeploymentQueue.enqueue(level, payload, spawnPos, motion, ownerId, pocket$firingMode(projectile.getOwner()));
+
+        return true;
+    }
+}

@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    { "item": "create:linked_controller" },
+    { "item": "pocket:compression_gun" }
+  ],
+  "result": {
+    "id": "pocket:self_resize_device",
+    "count": 1
+  }
+}

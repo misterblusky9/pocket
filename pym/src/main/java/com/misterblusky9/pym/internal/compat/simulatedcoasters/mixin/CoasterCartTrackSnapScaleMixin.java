@@ -1,0 +1,188 @@
+package com.misterblusky9.pym.internal.compat.simulatedcoasters.mixin;
+
+import com.misterblusky9.pym.api.Pym;
+
+import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterCartScaleContext;
+import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterScaleLookup;
+import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterPlacementScaleContext;
+import com.llamalad7.mixinextras.sugar.Local;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.List;
+
+@Pseudo
+@Mixin(targets = "dev.silvergold.simulatedcoasters.track.cart.CoasterCartTrackSnap", remap = false)
+public abstract class CoasterCartTrackSnapScaleMixin {
+    @Unique
+    private static final String PYM$IDEAL =
+            "idealRepresentativeSnapCenterWorld("
+                    + "Lnet/minecraft/server/level/ServerLevel;"
+                    + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;Z)"
+                    + "Lnet/minecraft/world/phys/Vec3;";
+
+
+    @Unique
+    private static final String PYM$PRE_TICK =
+            "onPrePhysicsTick("
+                    + "Ldev/ryanhcode/sable/neoforge/event/ForgeSablePrePhysicsTickEvent;)V";
+
+    @Unique
+    private static final String PYM$APPLY =
+            "applySnap("
+                    + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
+                    + "Lnet/minecraft/server/level/ServerLevel;"
+                    + "Ldev/ryanhcode/sable/sublevel/system/SubLevelPhysicsSystem;"
+                    + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;"
+                    + "Lnet/minecraft/world/phys/Vec3;"
+                    + "Lnet/minecraft/world/phys/Vec3;Z)V";
+
+    @Unique
+    private static final String PYM$OPEN_END =
+            "shouldDisengageAtOpenEndHit("
+                    + "Lnet/minecraft/world/level/Level;"
+                    + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathGraph;"
+                    + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathTrackFrame$GraphHit;"
+                    + "Ljava/util/List;)Z";
+
+    @ModifyConstant(
+            method = PYM$PRE_TICK,
+            constant = @Constant(doubleValue = 0.0484D),
+            remap = false,
+            require = 2
+    )
+    private static double pym$scaleGluePeelReleaseDistanceSq(
+            double original,
+            @Local(ordinal = 0) ServerSubLevel cart
+    ) {
+        double scale = Pym.scale().ofBody(cart);
+        return original * scale * scale;
+    }
+
+    @Inject(method = PYM$IDEAL, at = @At("HEAD"), remap = false, require = 1)
+    private static void pym$enterIdeal(
+            ServerLevel level,
+            @Coerce Object graphHit,
+            boolean negateEdgeTangent,
+            CallbackInfoReturnable<Vec3> cir
+    ) {
+        CoasterCartScaleContext.push(
+                CoasterScaleLookup.scaleForGraphHit(
+                        level,
+                        graphHit,
+                        null,
+                        CoasterPlacementScaleContext.remembered()
+                ));
+    }
+
+    @ModifyConstant(
+            method = PYM$IDEAL,
+            constant = @Constant(doubleValue = 0.3125D),
+            remap = false,
+            require = 1
+    )
+    private static double pym$scaleIdealRailOffset(double original) {
+        return original * CoasterCartScaleContext.current();
+    }
+
+    @Inject(method = PYM$IDEAL, at = @At("RETURN"), remap = false, require = 1)
+    private static void pym$exitIdeal(
+            ServerLevel level,
+            @Coerce Object graphHit,
+            boolean negateEdgeTangent,
+            CallbackInfoReturnable<Vec3> cir
+    ) {
+        CoasterCartScaleContext.pop();
+    }
+
+    @Inject(method = PYM$APPLY, at = @At("HEAD"), remap = false, require = 1)
+    private static void pym$enterApply(
+            ServerSubLevel cart,
+            ServerLevel level,
+            SubLevelPhysicsSystem physicsSystem,
+            @Coerce Object graphHit,
+            Vec3 currentBearingCenter,
+            Vec3 bearingPlotCenter,
+            boolean negateEdgeTangent,
+            CallbackInfo ci
+    ) {
+        CoasterCartScaleContext.push(
+                CoasterScaleLookup.scaleForGraphHit(
+                        level,
+                        graphHit,
+                        null,
+                        CoasterPlacementScaleContext.placementOr(Pym.scale().ofBody(cart))
+                ));
+    }
+
+    @ModifyConstant(
+            method = PYM$APPLY,
+            constant = @Constant(doubleValue = 0.3125D),
+            remap = false,
+            require = 1
+    )
+    private static double pym$scaleAppliedRailOffset(double original) {
+        return original * CoasterCartScaleContext.current();
+    }
+
+    @Inject(method = PYM$APPLY, at = @At("RETURN"), remap = false, require = 1)
+    private static void pym$exitApply(
+            ServerSubLevel cart,
+            ServerLevel level,
+            SubLevelPhysicsSystem physicsSystem,
+            @Coerce Object graphHit,
+            Vec3 currentBearingCenter,
+            Vec3 bearingPlotCenter,
+            boolean negateEdgeTangent,
+            CallbackInfo ci
+    ) {
+        CoasterCartScaleContext.pop();
+    }
+
+    @Inject(method = PYM$OPEN_END, at = @At("HEAD"), remap = false, require = 1)
+    private static void pym$enterOpenEnd(
+            Level level,
+            @Coerce Object graph,
+            @Coerce Object graphHit,
+            List<?> openEnds,
+            CallbackInfoReturnable<Boolean> cir
+    ) {
+        CoasterCartScaleContext.push(
+                CoasterScaleLookup.scaleForGraphHit(level, graphHit, null));
+    }
+
+    @ModifyConstant(
+            method = PYM$OPEN_END,
+            constant = @Constant(doubleValue = 0.019600000000000003D),
+            remap = false,
+            require = 1
+    )
+    private static double pym$scaleOpenEndMatchDistanceSq(double original) {
+        double scale = CoasterCartScaleContext.current();
+        return original * scale * scale;
+    }
+
+    @Inject(method = PYM$OPEN_END, at = @At("RETURN"), remap = false, require = 1)
+    private static void pym$exitOpenEnd(
+            Level level,
+            @Coerce Object graph,
+            @Coerce Object graphHit,
+            List<?> openEnds,
+            CallbackInfoReturnable<Boolean> cir
+    ) {
+        CoasterCartScaleContext.pop();
+    }
+}

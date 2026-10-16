@@ -1,0 +1,11 @@
+{
+  "loader": "neoforge:separate_transforms",
+  "base": {
+    "parent": "pocket:item/magnifying_glass_raised_in_hand"
+  },
+  "perspectives": {
+    "gui": { "parent": "pocket:item/magnifying_glass_gui" },
+    "ground": { "parent": "pocket:item/magnifying_glass_gui" },
+    "fixed": { "parent": "pocket:item/magnifying_glass_gui" }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "CES",
+    "RPM",
+    "CLC"
+  ],
+  "key": {
+    "S": { "item": "minecraft:spyglass" },
+    "P": { "item": "create:potato_cannon" },
+    "C": { "item": "create:sturdy_sheet" },
+    "M": { "item": "create:precision_mechanism" },
+    "E": { "item":  "minecraft:ender_pearl"},
+    "R": { "item":  "minecraft:redstone_torch"},
+    "L": { "item":  "aeronautics:levitite_blend_bucket"}
+  },
+  "result": {
+    "id": "pocket:compression_gun",
+    "count": 1
+  }
+}

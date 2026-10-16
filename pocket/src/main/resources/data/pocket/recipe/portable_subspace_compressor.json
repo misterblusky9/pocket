@@ -1,0 +1,73 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "AE",
+    "SP"
+  ],
+  "key": {
+    "A": {
+      "item": "create:analog_lever"
+    },
+    "E": {
+      "item": "minecraft:ender_eye"
+    },
+    "S": {
+      "item": "pocket:static_subspace_compressor"
+    },
+    "P": [
+      {
+        "item": "simulated:white_portable_engine"
+      },
+      {
+        "item": "simulated:orange_portable_engine"
+      },
+      {
+        "item": "simulated:magenta_portable_engine"
+      },
+      {
+        "item": "simulated:light_blue_portable_engine"
+      },
+      {
+        "item": "simulated:yellow_portable_engine"
+      },
+      {
+        "item": "simulated:lime_portable_engine"
+      },
+      {
+        "item": "simulated:pink_portable_engine"
+      },
+      {
+        "item": "simulated:gray_portable_engine"
+      },
+      {
+        "item": "simulated:light_gray_portable_engine"
+      },
+      {
+        "item": "simulated:cyan_portable_engine"
+      },
+      {
+        "item": "simulated:purple_portable_engine"
+      },
+      {
+        "item": "simulated:blue_portable_engine"
+      },
+      {
+        "item": "simulated:brown_portable_engine"
+      },
+      {
+        "item": "simulated:green_portable_engine"
+      },
+      {
+        "item": "simulated:red_portable_engine"
+      },
+      {
+        "item": "simulated:black_portable_engine"
+      }
+    ]
+  },
+  "result": {
+    "id": "pocket:portable_subspace_compressor",
+    "count": 1
+  }
+}

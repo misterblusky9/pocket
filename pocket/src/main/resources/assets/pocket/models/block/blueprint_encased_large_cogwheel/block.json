@@ -1,0 +1,151 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "ambientocclusion": true,
+  "textures": {
+    "casing": "pocket:block/blueprint_casing",
+    "side_connected": "pocket:block/blueprint_encased_cogwheel_side_connected",
+    "casing_legacy": "pocket:block/blueprint_casing_legacy",
+    "particle": "pocket:block/blueprint_casing"
+  },
+  "elements": [
+    {
+      "name": "cube",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        6,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "east": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "south": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "west": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing_legacy"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        }
+      }
+    },
+    {
+      "name": "cube",
+      "from": [
+        0,
+        10,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "east": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "south": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "west": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing_legacy"
+        }
+      }
+    }
+  ]
+}

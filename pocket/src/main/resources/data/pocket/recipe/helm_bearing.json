@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "create:mechanical_bearing"
+    },
+    {
+      "item": "simulated:steering_wheel"
+    }
+  ],
+  "result": {
+    "id": "pocket:helm_bearing",
+    "count": 1
+  }
+}

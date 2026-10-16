@@ -1,0 +1,12 @@
+{
+  "replace": false,
+  "values": [
+    "pocket:blueprint_casing",
+    "pocket:blueprint_encased_shaft",
+    "pocket:blueprint_encased_cogwheel",
+    "pocket:blueprint_encased_large_cogwheel",
+    "pocket:switch_bearing",
+    "pocket:switch_piston",
+    "pocket:copycat_facade"
+  ]
+}

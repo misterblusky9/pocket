@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "axis=x,top_shaft=false,bottom_shaft=false": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,top_shaft=false,bottom_shaft=true": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_bottom",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,top_shaft=true,bottom_shaft=false": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_top",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,top_shaft=true,bottom_shaft=true": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_top_bottom",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y,top_shaft=false,bottom_shaft=false": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block",
+      "x": 0,
+      "y": 0
+    },
+    "axis=y,top_shaft=false,bottom_shaft=true": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_bottom",
+      "x": 0,
+      "y": 0
+    },
+    "axis=y,top_shaft=true,bottom_shaft=false": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_top",
+      "x": 0,
+      "y": 0
+    },
+    "axis=y,top_shaft=true,bottom_shaft=true": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_top_bottom",
+      "x": 0,
+      "y": 0
+    },
+    "axis=z,top_shaft=false,bottom_shaft=false": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block",
+      "x": 90,
+      "y": 180
+    },
+    "axis=z,top_shaft=false,bottom_shaft=true": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_bottom",
+      "x": 90,
+      "y": 180
+    },
+    "axis=z,top_shaft=true,bottom_shaft=false": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_top",
+      "x": 90,
+      "y": 180
+    },
+    "axis=z,top_shaft=true,bottom_shaft=true": {
+      "model": "pocket:block/blueprint_encased_large_cogwheel/block_top_bottom",
+      "x": 90,
+      "y": 180
+    }
+  }
+}

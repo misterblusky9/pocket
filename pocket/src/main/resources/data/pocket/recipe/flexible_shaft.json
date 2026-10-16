@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BSB",
+    "BSB",
+    "BSB"
+  ],
+  "key": {
+    "S": {
+      "item": "create:shaft"
+    },
+    "B": {
+      "item": "create:belt_connector"
+    }
+  },
+  "result": {
+    "id": "pocket:flexible_shaft",
+    "count": 6
+  }
+}

@@ -1,0 +1,23 @@
+{
+	"credit": "Made with Blockbench",
+	"textures": {
+		"bearing_top": "pocket:block/helm_bearing/top",
+		"particle": "pocket:block/helm_bearing/side",
+		"bearing_side": "pocket:block/helm_bearing/side"
+	},
+	"elements": [
+		{
+			"name": "Top",
+			"from": [0, 12, 0],
+			"to": [16, 16, 16],
+			"faces": {
+				"north": {"uv": [0, 0, 16, 4], "texture": "#bearing_side"},
+				"east": {"uv": [0, 0, 16, 4], "texture": "#bearing_side"},
+				"south": {"uv": [0, 0, 16, 4], "texture": "#bearing_side"},
+				"west": {"uv": [0, 0, 16, 4], "texture": "#bearing_side"},
+				"up": {"uv": [0, 0, 16, 16], "texture": "#bearing_top"},
+				"down": {"uv": [0, 0, 16, 16], "texture": "#bearing_top"}
+			}
+		}
+	]
+}

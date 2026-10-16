@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "pocket:andesite_display_case"
+    }
+  ],
+  "result": {
+    "id": "pocket:andesite_display_plate",
+    "count": 1
+  }
+}

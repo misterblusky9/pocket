@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SSS",
+    "ALG",
+    "SSS"
+  ],
+  "key": {
+    "S": { "item": "create:sturdy_sheet" },
+    "A": { "item": "create:shaft" },
+    "L": { "item": "simulated:laser_pointer" },
+    "G": { "item": "minecraft:spyglass" }
+  },
+  "result": {
+    "id": "pocket:static_subspace_compressor",
+    "count": 1
+  }
+}

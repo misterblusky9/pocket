@@ -1,0 +1,7 @@
+{
+  "parent": "simulated:block/portable_engine/item",
+  "textures": {
+    "0": "pocket:block/portable_compressor",
+    "particle": "pocket:block/portable_compressor"
+  }
+}

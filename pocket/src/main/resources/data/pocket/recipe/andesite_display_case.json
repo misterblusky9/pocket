@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "G G",
+    " A "
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "A": {
+      "item": "create:andesite_alloy_block"
+    }
+  },
+  "result": {
+    "id": "pocket:andesite_display_case",
+    "count": 1
+  }
+}

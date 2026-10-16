@@ -1,0 +1,30 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "pocket:block/flexible_coupling/block",
+      "x": 180
+    },
+    "facing=up": {
+      "model": "pocket:block/flexible_coupling/block"
+    },
+    "facing=north": {
+      "model": "pocket:block/flexible_coupling/block",
+      "x": 90
+    },
+    "facing=south": {
+      "model": "pocket:block/flexible_coupling/block",
+      "x": 90,
+      "y": 180
+    },
+    "facing=west": {
+      "model": "pocket:block/flexible_coupling/block",
+      "x": 90,
+      "y": 270
+    },
+    "facing=east": {
+      "model": "pocket:block/flexible_coupling/block",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "pocket:block/switch_bearing/block",
+  "textures": {
+    "particle": "pocket:block/switch_bearing/side_powered",
+    "bearing_side": "pocket:block/switch_bearing/side_powered"
+  }
+}

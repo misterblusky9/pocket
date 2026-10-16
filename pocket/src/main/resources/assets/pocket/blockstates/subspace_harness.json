@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=east,waterlogged=false": {
+      "model": "pocket:block/subspace_harness/block",
+      "y": 90
+    },
+    "facing=east,waterlogged=true": {
+      "model": "pocket:block/subspace_harness/block",
+      "y": 90
+    },
+    "facing=north,waterlogged=false": {
+      "model": "pocket:block/subspace_harness/block"
+    },
+    "facing=north,waterlogged=true": {
+      "model": "pocket:block/subspace_harness/block"
+    },
+    "facing=south,waterlogged=false": {
+      "model": "pocket:block/subspace_harness/block",
+      "y": 180
+    },
+    "facing=south,waterlogged=true": {
+      "model": "pocket:block/subspace_harness/block",
+      "y": 180
+    },
+    "facing=west,waterlogged=false": {
+      "model": "pocket:block/subspace_harness/block",
+      "y": 270
+    },
+    "facing=west,waterlogged=true": {
+      "model": "pocket:block/subspace_harness/block",
+      "y": 270
+    }
+  }
+}

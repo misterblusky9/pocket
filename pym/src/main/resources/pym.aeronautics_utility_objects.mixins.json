@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.aeronautics_utility_objects.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "LinkageBodyAccess",
+    "UniversalJointForceMixin",
+    "HydraulicConstraintMixin"
+  ],
+  "client": [
+    "UniversalJointSleeveMixin",
+    "HydraulicSleeveMixin",
+    "UniversalJointTaperMixin",
+    "HydraulicTaperMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

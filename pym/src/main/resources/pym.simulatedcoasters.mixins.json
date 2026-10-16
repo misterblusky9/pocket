@@ -1,0 +1,36 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.simulatedcoasters.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CoasterCartTrackSnapScaleMixin",
+    "CoasterPathTraceEndpointsScaleMixin",
+    "CoasterCartTrackHitCacheScaleMixin",
+    "CoasterCartTrainLinkConstraintScaleMixin",
+    "CoasterCartSpawnerScaleMixin",
+    "CoasterCartItemPlacementScaleMixin",
+    "CoasterCartMidTrackPlacementScaleMixin",
+    "CoasterCartPlacementCollisionScaleMixin",
+    "CoasterCartLinkPlacementScaleMixin",
+    "CoasterPathTrackFrameScaleMixin"
+  ],
+  "client": [
+    "CoasterCartClientFrameScaleMixin",
+    "CoasterCartBottomSliceScaleMixin",
+    "CoasterCartWheelAxisScaleMixin",
+    "CoasterCartGlueRendererScaleMixin",
+    "CoasterCartTrainCouplingRendererScaleMixin",
+    "CoasterCurveSelectionScaleMixin",
+    "CoasterAnchorSelectionScaleMixin",
+    "AnchorPeerCurvePickScaleMixin",
+    "CoasterCartPlacementPreviewScaleMixin",
+    "CoasterCartOutlineRendererScaleMixin",
+    "CoasterCartHoverOutlineScaleMixin",
+    "CoasterCartModeOutlineScaleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

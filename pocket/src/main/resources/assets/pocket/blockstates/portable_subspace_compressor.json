@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "pocket:block/portable_subspace_compressor" },
+    "facing=east":  { "model": "pocket:block/portable_subspace_compressor", "y": 90 },
+    "facing=south": { "model": "pocket:block/portable_subspace_compressor", "y": 180 },
+    "facing=west":  { "model": "pocket:block/portable_subspace_compressor", "y": 270 }
+  }
+}

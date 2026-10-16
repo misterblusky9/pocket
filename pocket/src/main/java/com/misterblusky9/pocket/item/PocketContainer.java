@@ -1,0 +1,154 @@
+package com.misterblusky9.pocket.item;
+
+import com.misterblusky9.pocket.PocketSized;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+
+public enum PocketContainer {
+    CARDBOARD_BOX(
+            "empty_box", "item/container/cardboard_box",
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
+            1.5D, 12.0D, -1.0D,
+            false
+    ),
+
+    DISPLAY_BOTTLE(
+            "display_bottle", "item/display_bottle",
+            1.25D, 15.25D, 2.25D, 13.25D, 0.5D,
+            1.251D, 11.0D, 0.5D,
+            true
+    ),
+
+    BRASS_DISPLAY_CASE(
+            "brass_display_case", "item/brass_display_case",
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
+            1.25D, 13.0D, 0.5D,
+            true
+    ),
+
+    BRASS_DISPLAY_PLATE(
+            "brass_display_plate", "item/brass_display_plate",
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
+            1.25D, 13.0D, -1.0D,
+            false
+    ),
+
+    ANDESITE_DISPLAY_CASE(
+            "andesite_display_case", "item/andesite_display_case",
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
+            1.25D, 13.0D, 0.5D,
+            true
+    ),
+
+    ANDESITE_DISPLAY_PLATE(
+            "andesite_display_plate", "item/andesite_display_plate",
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
+            1.25D, 13.0D, -1.0D,
+            false
+    );
+
+    private final String registryPath;
+    private final String modelPath;
+    private final double interiorMinXVoxels;
+    private final double interiorMaxXVoxels;
+    private final double interiorMinZVoxels;
+    private final double interiorMaxZVoxels;
+    private final double sideMarginVoxels;
+    private final double floorVoxels;
+    private final double ceilingVoxels;
+    private final double topMarginVoxels;
+    private final boolean translucent;
+
+    PocketContainer(
+            String registryPath,
+            String modelPath,
+            double interiorMinXVoxels,
+            double interiorMaxXVoxels,
+            double interiorMinZVoxels,
+            double interiorMaxZVoxels,
+            double sideMarginVoxels,
+            double floorVoxels,
+            double ceilingVoxels,
+            double topMarginVoxels,
+            boolean translucent
+    ) {
+        this.registryPath = registryPath;
+        this.modelPath = modelPath;
+        this.interiorMinXVoxels = interiorMinXVoxels;
+        this.interiorMaxXVoxels = interiorMaxXVoxels;
+        this.interiorMinZVoxels = interiorMinZVoxels;
+        this.interiorMaxZVoxels = interiorMaxZVoxels;
+        this.sideMarginVoxels = sideMarginVoxels;
+        this.floorVoxels = floorVoxels;
+        this.ceilingVoxels = ceilingVoxels;
+        this.topMarginVoxels = topMarginVoxels;
+        this.translucent = translucent;
+    }
+
+    public Item item() {
+        Item item = BuiltInRegistries.ITEM.get(id());
+        return item == Items.AIR ? ModItems.EMPTY_BOX.get() : item;
+    }
+
+    public ResourceLocation id() {
+        return ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, this.registryPath);
+    }
+
+    public ResourceLocation modelId() {
+        return ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, this.modelPath);
+    }
+
+    public double clearWidthX() {
+        return (this.interiorMaxXVoxels - this.interiorMinXVoxels - 2.0D * this.sideMarginVoxels) / 16.0D;
+    }
+
+    public double clearWidthZ() {
+        return (this.interiorMaxZVoxels - this.interiorMinZVoxels - 2.0D * this.sideMarginVoxels) / 16.0D;
+    }
+
+    public double centreX() {
+        return ((this.interiorMinXVoxels + this.interiorMaxXVoxels) * 0.5D - 8.0D) / 16.0D;
+    }
+
+    public double centreZ() {
+        return ((this.interiorMinZVoxels + this.interiorMaxZVoxels) * 0.5D - 8.0D) / 16.0D;
+    }
+
+    public double clearHeight() {
+        if (this.topMarginVoxels < 0.0D) return Double.POSITIVE_INFINITY;
+        return (this.ceilingVoxels - this.floorVoxels - this.topMarginVoxels) / 16.0D;
+    }
+
+    public double floorY() {
+        return -0.5D + this.floorVoxels / 16.0D;
+    }
+
+    public boolean translucent() {
+        return this.translucent;
+    }
+
+    public static PocketContainer byItem(Item item) {
+        if (item == null) return null;
+        for (PocketContainer container : values()) {
+            if (container.item() == item) return container;
+        }
+        return null;
+    }
+
+    public static boolean isContainer(ItemStack stack) {
+        return stack != null && !stack.isEmpty() && byItem(stack.getItem()) != null;
+    }
+
+    public static PocketContainer of(ItemStack carrier) {
+        ResourceLocation recorded = PocketCaseItem.containerId(carrier);
+        if (recorded != null) {
+            for (PocketContainer container : values()) {
+                if (container.id().equals(recorded)) return container;
+            }
+        }
+        return CARDBOARD_BOX;
+    }
+}

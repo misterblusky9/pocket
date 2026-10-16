@@ -1,0 +1,13 @@
+{
+    "entries": [
+        {
+            "enum": "net/minecraft/client/model/HumanoidModel$ArmPose",
+            "name": "POCKET_MAGNIFYING_GLASS_POINTING",
+            "constructor": "(ZLnet/neoforged/neoforge/client/IArmPoseTransformer;)V",
+            "parameters": {
+                "class": "com/misterblusky9/pocket/client/MagnifyingGlassArmPose",
+                "field": "POINTING"
+            }
+        }
+    ]
+}

@@ -1,0 +1,1244 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "ambientocclusion": true,
+  "textures": {
+    "large_cogwheel": "create:block/large_cogwheel",
+    "casing": "pocket:block/blueprint_casing",
+    "side_connected": "pocket:block/blueprint_encased_cogwheel_side_connected",
+    "casing_legacy": "pocket:block/blueprint_casing_legacy",
+    "particle": "pocket:block/blueprint_casing"
+  },
+  "elements": [
+    {
+      "name": "cube",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        6,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "east": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "south": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "west": {
+          "uv": [
+            8,
+            13,
+            16,
+            16
+          ],
+          "texture": "#side_connected"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing_legacy"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        }
+      }
+    },
+    {
+      "name": "cube",
+      "from": [
+        0,
+        10,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "east": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "south": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "west": {
+          "uv": [
+            8,
+            8,
+            16,
+            11
+          ],
+          "texture": "#side_connected"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#casing_legacy"
+        }
+      }
+    },
+    {
+      "name": "GearCaseInnerRotated",
+      "from": [
+        -2,
+        6.625,
+        -2
+      ],
+      "to": [
+        18,
+        9.375,
+        18
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          8,
+          8,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            10,
+            10
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            10,
+            10
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "Gear2",
+      "from": [
+        -7,
+        6.525,
+        6.5
+      ],
+      "to": [
+        23,
+        9.475,
+        9.5
+      ],
+      "rotation": {
+        "angle": 22.5,
+        "axis": "y",
+        "origin": [
+          8,
+          8,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "Gear3",
+      "from": [
+        -7,
+        6.525,
+        6.5
+      ],
+      "to": [
+        23,
+        9.475,
+        9.5
+      ],
+      "rotation": {
+        "angle": -22.5,
+        "axis": "y",
+        "origin": [
+          8,
+          8,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "Gear4",
+      "from": [
+        6.5,
+        6.525,
+        -7
+      ],
+      "to": [
+        9.5,
+        9.475,
+        23
+      ],
+      "rotation": {
+        "angle": 22.5,
+        "axis": "y",
+        "origin": [
+          8,
+          8,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        }
+      }
+    },
+    {
+      "name": "GearCaseInner",
+      "from": [
+        -2,
+        6.6,
+        -2
+      ],
+      "to": [
+        18,
+        9.4,
+        18
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            0,
+            10,
+            10,
+            11.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            0,
+            10,
+            10
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            0,
+            0,
+            10,
+            10
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "GearCaseOuter",
+      "from": [
+        1,
+        5.975,
+        1
+      ],
+      "to": [
+        15,
+        10.025,
+        15
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            0,
+            12.5,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "east": {
+          "uv": [
+            10,
+            0,
+            12.5,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "south": {
+          "uv": [
+            10,
+            0,
+            12.5,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "west": {
+          "uv": [
+            10,
+            0,
+            12.5,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "up": {
+          "uv": [
+            1.5,
+            1.5,
+            8.5,
+            8.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            1.5,
+            1.5,
+            8.5,
+            8.5
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "GearCaseOuter",
+      "from": [
+        -1,
+        5.975,
+        1
+      ],
+      "to": [
+        1,
+        10.025,
+        15
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            0,
+            11,
+            1
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "south": {
+          "uv": [
+            10,
+            6,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "west": {
+          "uv": [
+            10,
+            0,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "up": {
+          "uv": [
+            12,
+            0,
+            13,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 180
+        },
+        "down": {
+          "uv": [
+            13,
+            0,
+            14,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 180
+        }
+      }
+    },
+    {
+      "name": "GearCaseOuter",
+      "from": [
+        1,
+        5.975,
+        -1
+      ],
+      "to": [
+        15,
+        10.025,
+        1
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            0,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "east": {
+          "uv": [
+            10,
+            0,
+            11,
+            1
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "west": {
+          "uv": [
+            10,
+            6,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "up": {
+          "uv": [
+            13,
+            0,
+            14,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 270
+        },
+        "down": {
+          "uv": [
+            12,
+            0,
+            13,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        }
+      }
+    },
+    {
+      "name": "GearCaseOuter",
+      "from": [
+        15,
+        5.975,
+        1
+      ],
+      "to": [
+        17,
+        10.025,
+        15
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            6,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "east": {
+          "uv": [
+            10,
+            0,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "south": {
+          "uv": [
+            10,
+            0,
+            11,
+            1
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "up": {
+          "uv": [
+            15,
+            0,
+            16,
+            7
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            14,
+            0,
+            15,
+            7
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "GearCaseOuter",
+      "from": [
+        1,
+        5.975,
+        15
+      ],
+      "to": [
+        15,
+        10.025,
+        17
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            10,
+            6,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "south": {
+          "uv": [
+            10,
+            0,
+            11,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "west": {
+          "uv": [
+            10,
+            0,
+            11,
+            1
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "up": {
+          "uv": [
+            14,
+            0,
+            15,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "down": {
+          "uv": [
+            15,
+            0,
+            16,
+            7
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 270
+        }
+      }
+    },
+    {
+      "name": "Gear",
+      "from": [
+        6.5,
+        6.525,
+        -7
+      ],
+      "to": [
+        9.5,
+        9.475,
+        23
+      ],
+      "rotation": {
+        "angle": -22.5,
+        "axis": "y",
+        "origin": [
+          8,
+          8,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        }
+      }
+    },
+    {
+      "name": "Gear5",
+      "from": [
+        -7,
+        6.525,
+        6.5
+      ],
+      "to": [
+        23,
+        9.475,
+        9.5
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          8,
+          8,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "Gear6",
+      "from": [
+        6.5,
+        6.525,
+        -7
+      ],
+      "to": [
+        9.5,
+        9.475,
+        23
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          8,
+          8,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        }
+      }
+    },
+    {
+      "name": "Gear7",
+      "from": [
+        -7,
+        6.525,
+        6.5
+      ],
+      "to": [
+        23,
+        9.475,
+        9.5
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel"
+        }
+      }
+    },
+    {
+      "name": "Gear8",
+      "from": [
+        6.5,
+        6.525,
+        -7
+      ],
+      "to": [
+        9.5,
+        9.475,
+        23
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "east": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "south": {
+          "uv": [
+            10,
+            9.5,
+            11.5,
+            11
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "west": {
+          "uv": [
+            0,
+            13,
+            15,
+            14.5
+          ],
+          "texture": "#large_cogwheel"
+        },
+        "up": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        },
+        "down": {
+          "uv": [
+            0,
+            11.5,
+            15,
+            13
+          ],
+          "texture": "#large_cogwheel",
+          "rotation": 90
+        }
+      }
+    }
+  ]
+}

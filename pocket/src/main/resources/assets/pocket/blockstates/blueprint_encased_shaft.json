@@ -1,0 +1,18 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "pocket:block/blueprint_encased_shaft/block",
+      "y": 90,
+      "uvlock": true
+    },
+    "axis=y": {
+      "model": "pocket:block/blueprint_encased_shaft/block",
+      "x": 90,
+      "uvlock": true
+    },
+    "axis=z": {
+      "model": "pocket:block/blueprint_encased_shaft/block",
+      "uvlock": true
+    }
+  }
+}

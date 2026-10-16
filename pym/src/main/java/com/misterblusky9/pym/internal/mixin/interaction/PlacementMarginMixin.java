@@ -1,0 +1,28 @@
+package com.misterblusky9.pym.internal.mixin.interaction;
+
+import com.misterblusky9.pym.internal.interaction.ScaledPlacementGate;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+@Mixin(value = BlockPlaceContext.class, priority = 500)
+public abstract class PlacementMarginMixin {
+    @Shadow protected boolean replaceClicked;
+
+    @Inject(method = "canPlace", at = @At("HEAD"), cancellable = true)
+    private void pym$scaleAwareCrossSubLevelGate(CallbackInfoReturnable<Boolean> cir) {
+        BlockPlaceContext context = (BlockPlaceContext) (Object) this;
+
+        if (!this.replaceClicked
+                && !context.getLevel().getBlockState(context.getClickedPos()).canBeReplaced(context)) {
+            cir.setReturnValue(false);
+            return;
+        }
+
+        Boolean decision = ScaledPlacementGate.evaluate(context);
+        if (decision != null) cir.setReturnValue(decision);
+    }
+}

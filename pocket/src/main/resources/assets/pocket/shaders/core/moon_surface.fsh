@@ -1,0 +1,40 @@
+#version 150
+uniform sampler2D Sampler0;
+uniform vec3 LocalCamera;
+uniform vec3 KeyLightDir;
+uniform float AmbientLight;
+uniform float SunVisibility;
+uniform float SheenTexels;
+in vec2 vUv;
+in vec3 vLocalPosition;
+in vec3 vLocalNormal;
+out vec4 fragColor;
+void main() {
+    vec4 texel = texture(Sampler0, vUv);
+    if (texel.a <= 0.01) discard;
+    vec3 normal = normalize(vLocalNormal);
+    vec3 lightDir = normalize(KeyLightDir);
+    float cell = 1.0 / max(SheenTexels, 1.0);
+    vec3 snapped = (floor(vLocalPosition / cell) + 0.5) * cell;
+    vec3 samplePosition = mix(snapped, vLocalPosition, step(0.5, abs(normal)));
+    vec3 toCamera = normalize(LocalCamera - samplePosition);
+    float ndv = clamp(dot(normal, toCamera), 0.0, 1.0);
+    float fresnel = pow(1.0 - ndv, 3.4);
+    float luma = dot(texel.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 silver = vec3(luma * 0.94, luma * 0.975, luma * 1.035);
+    vec3 albedo = mix(texel.rgb, silver, 0.38);
+    const float EMISSIVE_FLOOR = 0.42;
+    float surfaceLight = max(EMISSIVE_FLOOR, clamp(AmbientLight, 0.0, 1.0));
+    vec3 color = albedo * surfaceLight;
+    vec3 reflectedView = reflect(-toCamera, normal);
+    float broadSpec = pow(max(dot(reflectedView, lightDir), 0.0), 7.0);
+    float tightSpec = pow(max(dot(reflectedView, lightDir), 0.0), 30.0);
+    float textureMask = mix(0.55, 1.0, luma);
+    vec3 specularColor = vec3(0.92, 0.965, 1.0);
+    color += specularColor * textureMask * (broadSpec * 0.20 + tightSpec * 0.58) * SunVisibility;
+    float rimStrength = mix(0.30, 1.0, SunVisibility);
+    vec3 rimColor = vec3(0.62, 0.70, 0.82);
+    color += rimColor * fresnel * 0.34 * rimStrength;
+    color += vec3(1.0) * pow(fresnel, 4.0) * 0.10 * rimStrength;
+    fragColor = vec4(color, texel.a);
+}
