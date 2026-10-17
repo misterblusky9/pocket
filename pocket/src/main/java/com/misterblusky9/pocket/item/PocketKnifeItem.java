@@ -6,6 +6,7 @@ import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -42,15 +43,24 @@ public class PocketKnifeItem extends Item implements PriorityInteractionItem {
         BlockPos pos = context.getClickedPos();
         Vec3 point = context.getClickLocation();
 
+        var subLevel = Sable.HELPER.getContaining(level, pos);
+        boolean casing = subLevel != null && BlueprintCasingSplit.isCasing(level, pos);
+
         if (!(level instanceof ServerLevel serverLevel)) {
-            return CrossScaleWelds.weldNear(level, point) != null
+            return CrossScaleWelds.weldNear(level, point) != null || casing
                     ? InteractionResult.SUCCESS
                     : InteractionResult.PASS;
         }
 
-        return cutWeld(serverLevel, point, pos, context.getPlayer(), context.getItemInHand(), context.getHand())
-                ? InteractionResult.CONSUME
-                : InteractionResult.PASS;
+        if (cutWeld(serverLevel, point, pos, context.getPlayer(), context.getItemInHand(), context.getHand())) {
+            return InteractionResult.CONSUME;
+        }
+        if (!casing || !(subLevel instanceof ServerSubLevel serverSubLevel)
+                || serverSubLevel.isRemoved()) return InteractionResult.PASS;
+
+        BlueprintCasingSplit.cut(serverLevel, serverSubLevel, pos, context.getClickedFace(),
+                context.getPlayer(), context.getItemInHand(), context.getHand());
+        return InteractionResult.CONSUME;
     }
 
     public static boolean cutWeld(

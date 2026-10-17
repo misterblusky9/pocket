@@ -7,6 +7,7 @@ import net.createmod.catnip.data.Iterate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -71,6 +72,9 @@ public final class SubspaceRecyclerBlock extends KineticBlock
         if (level.isClientSide) return ItemInteractionResult.SUCCESS;
 
         withBlockEntityDo(level, pos, recycler -> {
+            player.displayClientMessage(Component.literal(
+                    "[Subspace Recycler] " + recycler.inspectionStatus()), false);
+            if (recycler.isPreparing()) return;
             boolean emptyOutput = true;
             IItemHandlerModifiable inv = recycler.outputInv;
             for (int slot = 0; slot < inv.getSlots(); slot++) {

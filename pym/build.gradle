@@ -13,7 +13,16 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
 configurations {
+    gametestImplementation.extendsFrom implementation
+    gametestCompileOnly.extendsFrom compileOnly
     aeronauticsBundle
 }
 
@@ -34,17 +43,30 @@ neoForge {
         minecraftVersion = project.parchment_minecraft_version
     }
 
+    runs {
+        gameTestServer {
+            type = "gameTestServer"
+            sourceSet = sourceSets.gametest
+            gameDirectory = rootProject.file("runs/pym-gametest")
+            systemProperty 'neoforge.enabledGameTestNamespaces', pym_mod_id
+        }
+    }
+
     mods {
         "${pym_mod_id}" {
             sourceSet(sourceSets.main)
+            sourceSet(sourceSets.gametest)
         }
     }
+
+    addModdingDependenciesTo sourceSets.gametest
 }
 
 dependencies {
     implementation "maven.modrinth:T9PomCSv:NGuyFOeE"
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
     compileOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    gametestRuntimeOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
 
     compileOnly(annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:0.3.3"))
     implementation(jarJar("com.github.bawnorton.mixinsquared:mixinsquared-neoforge:0.3.3"))

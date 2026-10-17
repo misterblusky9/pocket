@@ -30,7 +30,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.EMPTY_BOX.get());
                         output.accept(ModItems.DISPLAY_BOTTLE.get());
                         output.accept(ModItems.BRASS_DISPLAY_CASE.get());
-                        output.accept(ModItems.ANDESITE_DISPLAY_CASE.get());
+                        output.accept(ModItems.BRASS_DISPLAY_PLATE.get());
 
                         output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.STATIC_SUBSPACE_COMPRESSOR.get());
@@ -43,6 +43,8 @@ public final class ModCreativeTabs {
 
                         output.accept(ModItems.BLUEPRINT_CASING.get());
                         output.accept(ModItems.COPYCAT_FACADE.get());
+
+                        output.accept(ModItems.SUBSPACE_RECYCLER.get());
                     })
                     .build()
     );

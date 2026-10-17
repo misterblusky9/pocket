@@ -1,4 +1,6 @@
 {
+  "pocket.message.bed_too_small": "This bed is too small!",
+  "pocket.message.anchor_too_small": "This respawn anchor is too small!",
   "block.pocket.golf_ball": "Golf Ball",
   "itemGroup.pocket": "Create: Pocket Sized",
   "item.pocket.creative_shrink_ray": "Creative Shrinkray",

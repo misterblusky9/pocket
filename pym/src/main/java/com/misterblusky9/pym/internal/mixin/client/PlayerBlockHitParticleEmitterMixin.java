@@ -17,10 +17,6 @@ public abstract class PlayerBlockHitParticleEmitterMixin {
     private void pym$particleSourceForBlockHit(
             BlockPos pos, Direction direction, Operation<Void> original
     ) {
-        if (Double.isFinite(ParticleEmitterSource.currentScale())) {
-            original.call(pos, direction);
-            return;
-        }
         try (ParticleEmitterSource.Scope ignored = ParticleEmitterSource.fromBlock(
                 Minecraft.getInstance().level, pos)) {
             original.call(pos, direction);
@@ -31,10 +27,6 @@ public abstract class PlayerBlockHitParticleEmitterMixin {
     private void pym$particleSourceForBlockDestruction(
             BlockPos pos, BlockState state, Operation<Void> original
     ) {
-        if (Double.isFinite(ParticleEmitterSource.currentScale())) {
-            original.call(pos, state);
-            return;
-        }
         ClientLevel level = Minecraft.getInstance().level;
         try (ParticleEmitterSource.Scope ignored = ParticleEmitterSource.fromBlock(level, pos)) {
             original.call(pos, state);

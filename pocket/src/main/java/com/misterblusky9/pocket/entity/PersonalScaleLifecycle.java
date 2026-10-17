@@ -23,12 +23,16 @@ public final class PersonalScaleLifecycle {
     public static void cloned(PlayerEvent.Clone event) {
         if (event.getOriginal() instanceof ServerPlayer from && event.getEntity() instanceof ServerPlayer to) {
             PersonalLock.copy(from, to);
+            ScaledRespawn.cloneScale(from, to, event.isWasDeath());
         }
     }
 
     @SubscribeEvent
     public static void respawned(PlayerEvent.PlayerRespawnEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) PersonalLock.sync(player);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            if (!event.isEndConquered()) ScaledRespawn.finishRespawn(player);
+            PersonalLock.sync(player);
+        }
     }
 
     @SubscribeEvent

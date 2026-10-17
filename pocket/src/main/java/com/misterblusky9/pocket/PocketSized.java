@@ -7,6 +7,7 @@ import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
 import com.misterblusky9.pocket.create.PocketContraptionTypes;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
 import com.misterblusky9.pocket.entity.ModEntities;
+import com.misterblusky9.pocket.entity.ScaledRespawn;
 import com.misterblusky9.pocket.item.HeldInteractionPriority;
 import com.misterblusky9.pocket.item.ModCreativeTabs;
 import com.misterblusky9.pocket.item.ModItems;
@@ -35,6 +36,10 @@ public final class PocketSized {
         modBus.addListener(PocketContraptionTypes::register);
 
         PocketPymIntegration.register();
+
+        // Sable decodes saved loading tickets during world startup. Register the
+        // temporary respawn ticket before any server level can load.
+        ScaledRespawn.registerRespawnTicket();
 
         ModBlocks.BLOCKS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
