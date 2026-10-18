@@ -537,7 +537,7 @@ public final class ScaledRespawn {
         }
 
         if (scaledCraft) {
-            Vec3 stand = findStandingRoom(level, pos, size, BED.equals(kind));
+            Vec3 stand = findStandingRoom(level, pos, size, roomScale, BED.equals(kind));
             if (stand != null) {
                 Vec3 world = Pym.frames().toWorld(craft, stand);
                 // Audit ordinary world blocks separately from Sable's local
@@ -670,15 +670,14 @@ public final class ScaledRespawn {
         return "clear of vanilla world blocks";
     }
 
-    private static Vec3 findStandingRoom(ServerLevel level, BlockPos pos,
-                                         double desiredScale, boolean bed) {
+    static Vec3 findStandingRoom(ServerLevel level, BlockPos pos,
+                                 double desiredScale, double roomScale, boolean bed) {
         BlockState state = level.getBlockState(pos);
         BlockPos start = pos;
         if (bed && state.hasProperty(BedBlock.PART)
                 && state.getValue(BedBlock.PART) == net.minecraft.world.level.block.state.properties.BedPart.HEAD) {
             start = pos.relative(state.getValue(BedBlock.FACING).getOpposite());
         }
-        double roomScale = bedSize(level, pos);
         double relative = desiredScale / roomScale;
         double width = 0.6D * relative;
         double height = 1.8D * relative;
@@ -725,7 +724,7 @@ public final class ScaledRespawn {
         return level.noCollision(box) ? local : null;
     }
 
-    private static boolean validBed(ServerLevel level, BlockPos pos, BlockState state) {
+    static boolean validBed(ServerLevel level, BlockPos pos, BlockState state) {
         if (!(state.getBlock() instanceof BedBlock)) return true;
         BlockPos other = pos.relative(BedBlock.getConnectedDirection(state));
         BlockState partner = level.getBlockState(other);
@@ -780,8 +779,11 @@ public final class ScaledRespawn {
         if (!ScaleBounds.isValid(next)) next = 1.0D;
         to.getPersistentData().putDouble(NEXT, next);
         PersonalScale.remember(to, next);
-        PocketTrace.scale("Scaled respawn: CLONE carrying size={} oldSavedPos={} newSavedPos={} oldTracking={} newTracking={}",
-                next, from.getRespawnPosition(), to.getRespawnPosition(),
+        // Clone fires inside restoreFrom, before moveTo and addRespawnedPlayer:
+        // the replacement enters the level already sized for the room.
+        boolean applied = Pym.entities().setScale(to, next, 0);
+        PocketTrace.scale("Scaled respawn: CLONE size={} applied={} oldSavedPos={} newSavedPos={} oldTracking={} newTracking={}",
+                next, applied, from.getRespawnPosition(), to.getRespawnPosition(),
                 ((ServerPlayerRespawnExtension) from).sable$getRespawnPoint(),
                 ((ServerPlayerRespawnExtension) to).sable$getRespawnPoint());
     }
@@ -792,11 +794,16 @@ public final class ScaledRespawn {
         CompoundTag data = player.getPersistentData();
         double scale = data.contains(NEXT, Tag.TAG_ANY_NUMERIC) ? data.getDouble(NEXT) : 1.0D;
         if (!ScaleBounds.isValid(scale)) scale = 1.0D;
-        PersonalScale.remember(player, scale);
-        Pym.entities().setScale(player, scale, 0);
+        // Fallback only: cloneScale already sized this player before it joined.
+        double actual = Pym.entities().scaleOf(player);
+        if (!ScaleBounds.same(actual, scale)) {
+            PocketTrace.logger().warn("[PocketScale] Late respawn scale correction: player={} actual={} expected={}",
+                    player.getUUID(), actual, scale);
+            Pym.entities().setScale(player, scale, 0);
+        }
         data.remove(NEXT);
         if (Pym.debugging()) RESPAWN_WATCH.put(player.getUUID(), 3);
-        PocketTrace.scale("Scaled respawn: applied requested={} actual={} success={}",
-                scale, Pym.entities().scaleOf(player), ScaleBounds.same(scale, Pym.entities().scaleOf(player)));
+        PocketTrace.scale("Scaled respawn: finished requested={} actual={}",
+                scale, Pym.entities().scaleOf(player));
     }
 }
