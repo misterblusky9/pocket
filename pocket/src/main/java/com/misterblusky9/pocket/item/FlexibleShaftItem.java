@@ -2,12 +2,14 @@ package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.block.FlexibleCouplingBlock;
 import com.misterblusky9.pocket.block.FlexibleCouplingBlockEntity;
-import com.misterblusky9.pocket.block.FlexibleLinkScale;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.SubLevel;
+import java.util.List;
 import java.util.UUID;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
@@ -15,6 +17,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -25,6 +28,17 @@ public class FlexibleShaftItem extends Item {
 
     public FlexibleShaftItem(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public void appendHoverText(
+            ItemStack stack,
+            TooltipContext context,
+            List<Component> tooltip,
+            TooltipFlag flag
+    ) {
+        tooltip.add(Component.translatable("item.pocket.flexible_shaft.tooltip.hint")
+                .withStyle(ChatFormatting.WHITE));
     }
 
     @Override
@@ -55,9 +69,6 @@ public class FlexibleShaftItem extends Item {
             return InteractionResult.SUCCESS;
         }
         stack.remove(ModDataComponents.FLEXIBLE_SHAFT_FIRST.get());
-        if (!FlexibleLinkScale.sameScale(level, first, pos)) {
-            return InteractionResult.FAIL;
-        }
         if (!level.isClientSide && attach(level, first, pos)) {
             if (player != null) {
                 player.awardStat(Stats.ITEM_USED.get(this));
@@ -76,8 +87,7 @@ public class FlexibleShaftItem extends Item {
     }
 
     private static boolean attach(Level level, BlockPos first, BlockPos second) {
-        if (first.equals(second) || !isValidAttachment(level, first) || !inRange(level, first, second.getCenter())
-                || !FlexibleLinkScale.sameScale(level, first, second)) {
+        if (first.equals(second) || !isValidAttachment(level, first) || !inRange(level, first, second.getCenter())) {
             return false;
         }
         FlexibleCouplingBlockEntity controller = (FlexibleCouplingBlockEntity) level.getBlockEntity(first);

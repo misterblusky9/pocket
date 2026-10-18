@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.client;
 
-import com.misterblusky9.pocket.block.FlexibleLinkScale;
 import com.misterblusky9.pocket.item.FlexibleShaftItem;
 import com.misterblusky9.pocket.item.ModItems;
 import dev.ryanhcode.sable.Sable;
@@ -49,8 +48,7 @@ public class FlexibleShaftItemHandler implements InteractCallback {
         Vec3 firstPoint = firstBlock.getCenter();
         boolean inRange = FlexibleShaftItem.inRange(level, firstBlock, hit.getLocation());
         boolean valid = FlexibleShaftItem.isValidAttachment(level, hitBlock)
-                && !hitBlock.equals(firstBlock) && inRange
-                && FlexibleLinkScale.sameScale(level, firstBlock, hitBlock);
+                && !hitBlock.equals(firstBlock) && inRange;
 
         Vec3 target = valid ? hitBlock.getCenter() : hit.getLocation();
         Color color = new Color(valid

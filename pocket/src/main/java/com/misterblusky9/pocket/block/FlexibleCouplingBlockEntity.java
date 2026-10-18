@@ -1,23 +1,13 @@
 package com.misterblusky9.pocket.block;
 
 import com.misterblusky9.pocket.item.ModItems;
-import com.misterblusky9.pym.api.InternalForces;
-import com.misterblusky9.pym.api.Pym;
 import com.simibubi.create.content.kinetics.base.IRotate;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import dev.ryanhcode.sable.Sable;
-import dev.ryanhcode.sable.api.block.BlockEntitySubLevelActor;
-import dev.ryanhcode.sable.api.physics.force.ForceTotal;
-import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
 import dev.ryanhcode.sable.api.schematic.SubLevelSchematicSerializationContext;
-import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
-import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.JOMLConversion;
-import dev.ryanhcode.sable.companion.math.Pose3d;
-import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
-import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import dev.simulated_team.simulated.util.SimLevelUtil;
 import java.util.List;
 import java.util.UUID;
@@ -27,7 +17,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Vec3i;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
@@ -38,17 +27,9 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
-import org.joml.Vector3dc;
 
-public class FlexibleCouplingBlockEntity extends KineticBlockEntity implements BlockEntitySubLevelActor {
-    private static final Vector3d frictionForce = new Vector3d();
-    private static final Vector3d frictionTorque = new Vector3d();
-    private static final Vector3d localLinearVelocity = new Vector3d();
-    private static final Vector3d localAngularVelocity = new Vector3d();
-    private static final Vector3d expectedVelocity = new Vector3d();
-    private static final Vector3d localDampingPointForce = new Vector3d();
-    private static final double RIGIDITY = 4.0;
-    private static final double TIME_TO_SNAP = 0.25;
+public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
+    private static final int OVERSTRETCH_TICKS_TO_SNAP = 5;
     private static final double SNAP_STRETCH = 1.5;
     private static final double SNAP_SLACK = 0.5;
     public static final double MIN_LENGTH = 1.0;
@@ -62,9 +43,7 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity implements B
     @Nullable
     private UUID partnerSubLevel;
     private float ticksWithoutPartner = 0.0F;
-    private ForceTotal forceTotal;
-    private ForceTotal partnerForceTotal;
-    private double snappingTime;
+    private int overstretchTicks;
 
     public FlexibleCouplingBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -97,15 +76,10 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity implements B
         }
         double newDesiredLength = Math.clamp(desiredLength + delta, MIN_LENGTH, MAX_LENGTH);
         newDesiredLength = Math.round(newDesiredLength / 0.25) * 0.25;
-        double linkScale = Pym.scale().linkFactor(
-                Sable.HELPER.getContaining(level, worldPosition), Sable.HELPER.getContaining(level, partnerPos));
-        double currentLength = Sable.HELPER.distanceSquaredWithSubLevels(
-                level, worldPosition.getCenter(), partnerPos.getCenter()) / (linkScale * linkScale) + 1.0;
-        if (delta < 0.0 && currentLength > newDesiredLength * newDesiredLength * 4.0) {
+        if (delta < 0.0 && partnerPos != null &&
+                Sable.HELPER.distanceSquaredWithSubLevels(level, worldPosition.getCenter(),
+                        partnerPos.getCenter()) > Math.pow(snappingDistance(newDesiredLength), 2.0)) {
             return "too_stretched";
-        }
-        if (delta > 0.0 && currentLength < newDesiredLength * newDesiredLength / 4.0) {
-            return "too_compressed";
         }
         desiredLength = newDesiredLength;
         setChanged();
@@ -133,197 +107,34 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity implements B
         if (partnerPos == null) {
             return;
         }
-        if (snappingTime > TIME_TO_SNAP) {
-            FlexibleCouplingBlockEntity partner = getPartner();
-            dropShaft();
-            unlink();
-            if (partner != null) {
-                partner.unlink();
-            }
+        if (!SimLevelUtil.isAreaActuallyLoaded(getLevel(), partnerPos, 1)) {
+            overstretchTicks = 0;
             return;
         }
-        if (FlexibleLinkScale.crossesBoundary(this)) {
-            FlexibleCouplingBlockEntity partner = getPartner();
-            dropShaft();
-            unlink();
-            if (partner != null) {
-                partner.unlink();
-            }
-            return;
-        }
-        if (SimLevelUtil.isAreaActuallyLoaded(getLevel(), partnerPos, 1)) {
-            if (getPartner() == null) {
-                if (++ticksWithoutPartner > 20) {
-                    unlink();
-                }
-            } else {
-                ticksWithoutPartner = 0;
-            }
-        }
-    }
-
-    @Override
-    public void sable$physicsTick(ServerSubLevel subLevel, RigidBodyHandle handle, double timeStep) {
         FlexibleCouplingBlockEntity partner = getPartner();
-        if (partnerPos == null
-                || !SimLevelUtil.isAreaActuallyLoaded(getLevel(), partnerPos, 1)
-                || partner == null
-                || ticksWithoutPartner != 0.0F) {
+        if (partner == null) {
+            overstretchTicks = 0;
+            if (++ticksWithoutPartner > 20) {
+                unlink();
+            }
             return;
         }
-        ServerSubLevelContainer container = SubLevelContainer.getContainer(subLevel.getLevel());
-        SubLevelPhysicsSystem system = container.physicsSystem();
-        system.updatePose(subLevel);
-        ServerSubLevel partnerSubLevel = this.partnerSubLevel != null
-                ? (ServerSubLevel) container.getSubLevel(this.partnerSubLevel) : null;
-        if (this.partnerSubLevel != null && partnerSubLevel == null) {
+        ticksWithoutPartner = 0;
+        if (!isController) {
             return;
         }
-        if (partnerSubLevel != null && !isController) {
-            return;
-        }
-        if (partnerSubLevel == subLevel) {
-            return;
-        }
-        if (partnerSubLevel != null) {
-            system.updatePose(partnerSubLevel);
-        }
-
-        BlockState state = getBlockState();
-        Vector3dc center = getCenter();
-        Vector3dc partnerCenter = partner.getCenter();
-        Vector3d velo1 = Sable.HELPER.getVelocity(level, center, new Vector3d());
-        Vector3d velo2 = Sable.HELPER.getVelocity(level, partnerCenter, new Vector3d());
-        Vector3d positionA = subLevel.logicalPose().transformPosition(center, new Vector3d());
-        Vector3d positionB = partnerSubLevel != null
-                ? partnerSubLevel.logicalPose().transformPosition(partner.getCenter())
-                : partner.getCenter();
-        Vector3d relativeVelo = velo1.sub(velo2);
-        Vector3d dampingPointForce = new Vector3d(relativeVelo);
-        dampingPointForce.mul(-4.5);
-        double linkScale = Pym.scale().linkFactor(subLevel, partnerSubLevel);
-        double desiredLength = ((isController ? this.desiredLength : partner.desiredLength) - 0.75) * linkScale;
-        if (positionA.distanceSquared(positionB) > Mth.square(getSnappingDistance() * linkScale)) {
-            snappingTime += timeStep;
+        double distanceSquared = Sable.HELPER.distanceSquaredWithSubLevels(
+                level, worldPosition.getCenter(), partnerPos.getCenter());
+        double maxDistance = getSnappingDistance();
+        if (Double.isFinite(distanceSquared) && distanceSquared > maxDistance * maxDistance) {
+            if (++overstretchTicks >= OVERSTRETCH_TICKS_TO_SNAP) {
+                dropShaft();
+                unlink();
+                partner.unlink();
+            }
         } else {
-            snappingTime = 0.0;
+            overstretchTicks = 0;
         }
-
-        Vector3d globalNormalA = JOMLConversion.atLowerCornerOf(state.getValue(FlexibleCouplingBlock.FACING).getNormal());
-        Vector3d globalNormalB = JOMLConversion.atLowerCornerOf(
-                partner.getBlockState().getValue(FlexibleCouplingBlock.FACING).getNormal());
-        subLevel.logicalPose().transformNormal(globalNormalA);
-        if (partnerSubLevel != null) {
-            partnerSubLevel.logicalPose().transformNormal(globalNormalB);
-        }
-
-        Vector3d torque = globalNormalA.cross(globalNormalB.negate(), new Vector3d()).mul(20.0).mul(timeStep);
-        Vector3d mediumNormal = globalNormalA.normalize(new Vector3d())
-                .lerp(globalNormalB.normalize(new Vector3d()), 0.5);
-        Vector3dc middle = new Vector3d(positionA.x, positionA.y, positionA.z).lerp(positionB, 0.5);
-        Vector3d desireA = middle.fma(-desiredLength / 2.0, mediumNormal, new Vector3d());
-        Vector3d alignmentForce = desireA.sub(positionA.x, positionA.y, positionA.z);
-        Vector3d hookesPointForce = alignmentForce.mul(145.0);
-        Vector3d angVelo1 = new Vector3d();
-        Vector3d angVelo2 = new Vector3d();
-        handle.getAngularVelocity(angVelo1);
-        if (partnerSubLevel != null) {
-            RigidBodyHandle.of(partnerSubLevel).getAngularVelocity(angVelo2);
-        }
-
-        Vector3d relativeAngVelo = angVelo1.sub(angVelo2);
-        Vector3d dampingTorque = new Vector3d();
-        if (mediumNormal.lengthSquared() > 0.0) {
-            mediumNormal.normalize();
-            double dot = mediumNormal.dot(relativeAngVelo);
-            relativeAngVelo.set(mediumNormal).mul(dot);
-            dampingTorque.fma(-2.0, relativeAngVelo);
-        }
-        hookesPointForce.mul(RIGIDITY);
-        torque.mul(RIGIDITY);
-        dampingTorque.mul(RIGIDITY);
-        dampingPointForce.mul(RIGIDITY);
-        if (forceTotal == null || partnerForceTotal == null) {
-            forceTotal = new ForceTotal();
-            partnerForceTotal = new ForceTotal();
-        }
-
-        applyLocalDamping(subLevel, handle, forceTotal, center, dampingPointForce, dampingTorque, timeStep);
-        forceTotal.applyImpulseAtPoint(subLevel, center,
-                subLevel.logicalPose().transformNormalInverse(new Vector3d(hookesPointForce)).mul(timeStep));
-        forceTotal.applyLinearAndAngularImpulse(JOMLConversion.ZERO,
-                subLevel.logicalPose().transformNormalInverse(torque, new Vector3d()));
-        try (InternalForces ignored = Pym.internalForces(subLevel)) {
-            handle.applyForcesAndReset(forceTotal);
-        }
-        if (partnerSubLevel != null) {
-            RigidBodyHandle partnerHandle = RigidBodyHandle.of(partnerSubLevel);
-            applyLocalDamping(partnerSubLevel, partnerHandle, partnerForceTotal, partnerCenter,
-                    dampingPointForce.negate(), dampingTorque.negate(), timeStep);
-            partnerForceTotal.applyImpulseAtPoint(partnerSubLevel, partnerCenter,
-                    partnerSubLevel.logicalPose().transformNormalInverse(hookesPointForce).mul(-timeStep));
-            partnerForceTotal.applyLinearAndAngularImpulse(JOMLConversion.ZERO,
-                    partnerSubLevel.logicalPose().transformNormalInverse(torque.negate()));
-            try (InternalForces ignored = Pym.internalForces(partnerSubLevel)) {
-                partnerHandle.applyForcesAndReset(partnerForceTotal);
-            }
-        }
-    }
-
-    private void applyLocalDamping(ServerSubLevel subLevel, RigidBodyHandle handle,
-                                   ForceTotal forceTotal, Vector3dc worldSpringPos,
-                                   Vector3dc dampingPointForce, Vector3dc dampingTorque,
-                                   double timeStep) {
-        Pose3d pose = subLevel.logicalPose();
-        handle.getAngularVelocity(localAngularVelocity);
-        handle.getLinearVelocity(localLinearVelocity);
-        pose.orientation().transformInverse(localAngularVelocity);
-        pose.orientation().transformInverse(localLinearVelocity);
-        Vector3dc centerOfMass = subLevel.getMassTracker().getCenterOfMass();
-        pose.orientation().transformInverse(dampingPointForce, localDampingPointForce);
-        Vector3d angularDamping = new Vector3d();
-        angularDamping.add(dampingTorque);
-        pose.orientation().transformInverse(angularDamping);
-        angularDamping.add(worldSpringPos.sub(centerOfMass, new Vector3d()).cross(localDampingPointForce));
-        Vector3d linearDamping = new Vector3d();
-        linearDamping.add(localDampingPointForce);
-        frictionForce.set(linearDamping);
-        frictionTorque.set(angularDamping);
-        expectedVelocity.set(frictionForce);
-        expectedVelocity.mul(subLevel.getMassTracker().getInverseMass());
-        expectedVelocity.mul(timeStep);
-        double forceScale = getClampingFactor(localLinearVelocity, expectedVelocity);
-        expectedVelocity.set(frictionTorque);
-        subLevel.getMassTracker().getInverseInertiaTensor().transform(expectedVelocity);
-        expectedVelocity.mul(timeStep);
-        double torqueScale = getClampingFactor(localAngularVelocity, expectedVelocity);
-        frictionForce.mul(forceScale * timeStep);
-        frictionTorque.mul(torqueScale * timeStep);
-        forceTotal.applyLinearAndAngularImpulse(frictionForce, frictionTorque);
-    }
-
-    private double getClampingFactor(Vector3dc currentVelocity, Vector3dc expectedVelocityChange) {
-        double k = -currentVelocity.dot(expectedVelocityChange);
-        double v = currentVelocity.lengthSquared();
-        if (k < 0.0) {
-            return 0.0;
-        }
-        if (10.0 * k < v) {
-            return 1.0;
-        }
-        return v < 1.0E-10 ? v / (k + 1.0E-10) : v * (1.0 - Math.exp(-k / v)) / k;
-    }
-
-    @Nullable
-    @Override
-    public Iterable<SubLevel> sable$getConnectionDependencies() {
-        if (partnerSubLevel != null) {
-            SubLevel subLevel = SubLevelContainer.getContainer(level).getSubLevel(partnerSubLevel);
-            if (subLevel != null) {
-                return List.of(subLevel);
-            }
-        }
-        return List.of();
     }
 
     @Override
@@ -474,8 +285,8 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity implements B
         partnerSubLevel = subLevel;
         isController = controller;
         desiredLength = length;
-        snappingTime = 0.0;
         ticksWithoutPartner = 0.0F;
+        overstretchTicks = 0;
         setChanged();
         notifyUpdate();
         attachKinetics();
@@ -489,11 +300,19 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity implements B
         partnerPos = null;
         partnerSubLevel = null;
         isController = false;
-        snappingTime = 0.0;
+        overstretchTicks = 0;
         ticksWithoutPartner = 0.0F;
         setChanged();
         notifyUpdate();
         attachKinetics();
+    }
+
+    public double getSnappingDistance() {
+        return snappingDistance(desiredLength);
+    }
+
+    private static double snappingDistance(double length) {
+        return length * SNAP_STRETCH + SNAP_SLACK;
     }
 
     public void dropShaft() {
@@ -508,10 +327,6 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity implements B
 
     public void setController(boolean controller) {
         isController = controller;
-    }
-
-    public double getSnappingDistance() {
-        return desiredLength * SNAP_STRETCH + SNAP_SLACK;
     }
 
     @Override

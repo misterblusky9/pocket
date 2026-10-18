@@ -63,5 +63,6 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.CompressionSessions::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.EntityCompressionSessions::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.item.ScaleToolModifier::onLoggedOut);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.item.PocketCommands::register);
     }
 }

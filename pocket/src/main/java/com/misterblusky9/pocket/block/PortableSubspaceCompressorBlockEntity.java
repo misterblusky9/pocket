@@ -6,7 +6,6 @@ import com.misterblusky9.pym.api.PlotContents;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 
-import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compression.CompressionSessions;
 import com.misterblusky9.pocket.network.CompressionSyncPayload;
 import com.misterblusky9.pocket.scale.CompressionStage;

@@ -1,25 +1,31 @@
 package com.misterblusky9.pym.internal.mixin.client;
 
 import com.misterblusky9.pym.internal.client.CameraSubLevelScale;
+import com.misterblusky9.pym.internal.client.ProjectionNearPlanePolicy;
+import com.misterblusky9.pym.internal.debug.PymTrace;
 import net.minecraft.client.renderer.GameRenderer;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.Constant;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 @Mixin(GameRenderer.class)
 public abstract class SubLevelNearPlaneScaleMixin {
-    @Unique
-    private static final float pym$MIN_NEAR_PLANE = 0.0005F;
-
-    @ModifyConstant(
-            method = "getProjectionMatrix",
-            constant = @Constant(floatValue = 0.05F)
+    @ModifyArg(
+            method = "getProjectionMatrix(D)Lorg/joml/Matrix4f;",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lorg/joml/Matrix4f;perspective(FFFF)Lorg/joml/Matrix4f;"
+            ),
+            index = 2
     )
-    private float pym$scaleProjectionNearPlane(float vanillaNearPlane) {
-        double scale = CameraSubLevelScale.current(CameraSubLevelScale.partialTick());
-        if (scale >= 1.0D) return vanillaNearPlane;
-
-        return Math.max(pym$MIN_NEAR_PLANE, (float) (vanillaNearPlane * scale));
+    private float pym$composeCameraNearPlane(float nearFromOtherMods) {
+        double subLevelScale = CameraSubLevelScale.current(CameraSubLevelScale.partialTick());
+        float composedNear = ProjectionNearPlanePolicy.compose(nearFromOtherMods, subLevelScale);
+        PymTrace.render(
+                "camera-near-plane",
+                "cameraProjection nearFromOtherMods={} subLevelScale={} resultingNear={}",
+                nearFromOtherMods, subLevelScale, composedNear
+        );
+        return composedNear;
     }
 }

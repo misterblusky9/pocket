@@ -4,12 +4,10 @@ import com.misterblusky9.pym.api.PlotContents;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 
-import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
-import com.misterblusky9.pocket.scale.CompressionStage;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;

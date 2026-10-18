@@ -271,12 +271,13 @@ public final class RapierBridge {
         if (subLevel == null || subLevel.getLevel() == null) return;
         MassData raw = subLevel.getMassTracker();
         if (raw == null) return;
+        Vector3dc center = raw.getCenterOfMass();
+        if (center == null) return;
         try {
             long scene = sceneHandle(subLevel.getLevel());
             int id = bodyId(subLevel);
             if (scene == NO_SCENE || id == NO_BODY) return;
-            Vector3dc center = raw.getCenterOfMass();
-            if (updateCenterOfMass && center != null) {
+            if (updateCenterOfMass) {
                 SET_CENTER_OF_MASS.invoke(null, scene, id, center.x(), center.y(), center.z());
             }
             SET_MASS_PROPERTIES_FROM.invoke(

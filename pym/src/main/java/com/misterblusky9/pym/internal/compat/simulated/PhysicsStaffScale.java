@@ -2,7 +2,6 @@ package com.misterblusky9.pym.internal.compat.simulated;
 
 import com.misterblusky9.pym.api.Pym;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
-import dev.ryanhcode.sable.companion.math.BoundingBox3dc;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.SimulatedClient;
 import dev.simulated_team.simulated.content.physics_staff.PhysicsStaffClientHandler;
@@ -14,12 +13,6 @@ import java.util.List;
 import java.util.UUID;
 
 public final class PhysicsStaffScale {
-    private static final double PYM$HOLD_CLEARANCE = 0.25D;
-
-    private static final double PYM$ABSOLUTE_MIN_HOLD = 0.1D;
-
-    private static final double PYM$HALF_DIAGONAL = 0.8660254037844386D;
-
     private static SubLevel pickupTarget;
 
     public static void beginPickup(SubLevel subLevel) {
@@ -42,19 +35,10 @@ public final class PhysicsStaffScale {
     }
 
     public static double minHoldDistance(double vanillaMin, double max) {
-        double player = playerScale();
+        double frame = playerScale();
         SubLevel target = dragTarget();
-        if (target == null) {
-            return Math.min(max, vanillaMin * player);
-        }
-
-        double largest = extent(target);
-        if (!(largest > 0.0D)) {
-            return Math.min(max, vanillaMin * player);
-        }
-
-        double radius = largest * PYM$HALF_DIAGONAL;
-        return Math.min(max, Math.max(PYM$ABSOLUTE_MIN_HOLD * player, radius + PYM$HOLD_CLEARANCE * player));
+        if (target != null) frame = Math.max(frame, coarsestScale(target));
+        return Math.min(max, vanillaMin * frame);
     }
 
     private static double playerScale() {
@@ -85,23 +69,6 @@ public final class PhysicsStaffScale {
         double coarsest = 0.0D;
         for (SubLevel member : group(target)) coarsest = Math.max(coarsest, Pym.scale().of(member));
         return coarsest > 0.0D ? coarsest : Pym.scale().of(target);
-    }
-
-    private static double extent(SubLevel target) {
-        double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY, minZ = Double.POSITIVE_INFINITY;
-        double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY, maxZ = Double.NEGATIVE_INFINITY;
-        for (SubLevel member : group(target)) {
-            BoundingBox3dc box = member.boundingBox();
-            if (box == null) continue;
-            minX = Math.min(minX, box.minX());
-            minY = Math.min(minY, box.minY());
-            minZ = Math.min(minZ, box.minZ());
-            maxX = Math.max(maxX, box.maxX());
-            maxY = Math.max(maxY, box.maxY());
-            maxZ = Math.max(maxZ, box.maxZ());
-        }
-        if (minX > maxX) return 0.0D;
-        return Math.max(maxX - minX, Math.max(maxY - minY, maxZ - minZ));
     }
 
     private static List<SubLevel> group(SubLevel target) {

@@ -326,7 +326,7 @@ public final class CompressionSessions {
         if (!beam.sealed()) {
             if (!session.autoRelease && !session.illuminated) return true;
             if (!beam.acquire(holder)) {
-                holder.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
+                holder.displayClientMessage(Component.translatable("pocket.message.no_power"), true);
                 return false;
             }
             if (beam.sealed()) session.illuminated = true;

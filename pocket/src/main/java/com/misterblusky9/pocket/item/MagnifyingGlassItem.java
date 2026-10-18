@@ -34,8 +34,6 @@ public class MagnifyingGlassItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        // A magnifier in the main hand must toggle even when the offhand is occupied.
-        // When in the offhand behind a usable mainhand item, the dedicated keybind toggles it.
         if (!level.isClientSide) return InteractionResultHolder.consume(stack);
         MagnifyingGlassZoom.use(player);
         return InteractionResultHolder.fail(stack);
@@ -59,7 +57,6 @@ public class MagnifyingGlassItem extends Item {
         broadcastHands(player);
     }
 
-    // In-place component edits slip past Lithium's equipment tracking; push them to watchers.
     private static void broadcastHands(LivingEntity entity) {
         if (!(entity.level() instanceof ServerLevel level)) return;
         level.getChunkSource().broadcast(entity, new ClientboundSetEquipmentPacket(entity.getId(), List.of(

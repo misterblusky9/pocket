@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.client;
 
-import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.StaticSubspaceCompressorBlock;
 import com.misterblusky9.pocket.block.StaticSubspaceCompressorBlockEntity;

@@ -68,7 +68,7 @@ public final class PymConfig {
         client.push("rendering");
         DETAIL_CUTOFF = client
                 .comment(
-                        "Skip particles and shadows on a sublevel once the viewer is this many times its scale.",
+                        "Skip shadows on a sublevel once the viewer is this many times its scale.",
                         "16 means a 1x player stops drawing them on crafts at 1/16 and smaller."
                 )
                 .defineInRange("detailCutoffRatio", RenderDetail.DEFAULT_RATIO, 2.0D, 1024.0D);

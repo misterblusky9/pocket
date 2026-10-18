@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.scale;
 
-import com.misterblusky9.pocket.block.FlexibleLinkScale;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWeldSync;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldAnchorCoupling;
@@ -30,7 +29,6 @@ public final class PocketPymIntegration {
         Pym.extensions().coupling(new WeldAnchorCoupling());
         Pym.extensions().register(new PocketParticipation());
         Pym.extensions().register(new PortableCompressorLockPolicy());
-        Pym.extensions().links(FlexibleLinkScale::linkedTo);
         Pym.extensions().register(new CreateSeatResizeFollower());
         Pym.extensions().register(new TrackingResizeFollower());
         Pym.extensions().massCoupling(CrossScaleWelds::snapshot);

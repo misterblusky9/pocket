@@ -136,14 +136,14 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
         int elapsed = getUseDuration(stack, entity) - remainingUseTicks;
         boolean growing = isGrowing(stack);
 
-        if (CompressionGunTank.amount(stack) <= 0) {
-            player.displayClientMessage(Component.translatable("pocket.message.levitite_depleted"), true);
+        if (!CompressionGunTank.canFire(player, stack)) {
+            player.displayClientMessage(Component.translatable("pocket.message.no_power"), true);
             beam(player, false, growing);
             return;
         }
 
         if (!CompressionGunTank.runEngine(player, stack, player.getUsedItemHand(), elapsed)) {
-            player.displayClientMessage(Component.translatable("pocket.message.no_air_pressure"), true);
+            player.displayClientMessage(Component.translatable("pocket.message.no_power"), true);
             shutDown(player);
             return;
         }

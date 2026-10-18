@@ -6,6 +6,7 @@ import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
+import dev.ryanhcode.sable.mixinhelpers.CanFallAtleastHelper;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
@@ -25,7 +26,9 @@ public abstract class PlayerPoseFitScaleMixin {
         double skin = pym$restingSkin(self);
         if (skin <= 0.0D) return false;
         AABB box = self.getDimensions(pose).makeBoundingBox(self.position()).deflate(1.0E-7D);
-        return self.level().noCollision(self, box.setMinY(box.minY + skin));
+        AABB raisedBox = box.setMinY(box.minY + skin);
+        return self.level().noCollision(self, raisedBox)
+                && CanFallAtleastHelper.canFallAtleastWithSubLevels(self.level(), raisedBox) == null;
     }
 
     @Unique

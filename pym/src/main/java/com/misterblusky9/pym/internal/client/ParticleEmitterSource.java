@@ -30,7 +30,7 @@ public final class ParticleEmitterSource {
         if (!(level instanceof ClientLevel) || position == null) return push(1.0D);
         SubLevel subLevel = Sable.HELPER.getContaining(level, position);
         return push(subLevel instanceof ClientSubLevel clientSubLevel
-                && !clientSubLevel.isRemoved() ? scale(clientSubLevel) : 1.0D);
+                && !clientSubLevel.isRemoved() ? scaleOf(clientSubLevel) : 1.0D);
     }
 
     public static Scope push(double emitterScale) {
@@ -43,7 +43,7 @@ public final class ParticleEmitterSource {
         return new Scope();
     }
 
-    private static double scale(ClientSubLevel subLevel) {
+    public static double scaleOf(ClientSubLevel subLevel) {
         double trackedScale = ScaleState.getClientScale(subLevel);
         if (ScaleBounds.isValid(trackedScale)
                 && (ScaleState.hasClientSnapshot(subLevel.getUniqueId())

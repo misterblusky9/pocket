@@ -72,6 +72,7 @@
   "block.pocket.blueprint_casing": "Плитка креслення",
   "pocket.message.levitite_depleted": "Левітитовий сплав вичерпано",
   "pocket.message.no_air_pressure": "Немає тиску повітря",
+  "pocket.message.no_power": "Немає левітиту або запасу міцності",
   "pocket.message.hard_limit": "Жорстке обмеження Pocket Sized: %s блоків",
   "pocket.message.hard_limit_ratio": "Жорстке обмеження Pocket Sized: %s/%s блоків",
   "pocket.message.moon_not_full": "Слова MisterBluSky відлунювали... \"Для всього є свій час і місце! Але не зараз.\"",

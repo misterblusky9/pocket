@@ -43,6 +43,19 @@ public interface ParticleMotionAccessor {
     @Accessor("z")
     double pym$getZ();
 
+    @Accessor("xo")
+    double pym$getXo();
+    @Accessor("xo")
+    void pym$setXo(double value);
+    @Accessor("yo")
+    double pym$getYo();
+    @Accessor("yo")
+    void pym$setYo(double value);
+    @Accessor("zo")
+    double pym$getZo();
+    @Accessor("zo")
+    void pym$setZo(double value);
+
     @Accessor("level")
     ClientLevel pym$getLevel();
 
