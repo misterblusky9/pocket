@@ -4,7 +4,6 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.block.FlexibleCouplingBlock;
 import com.misterblusky9.pocket.block.FlexibleCouplingBlockEntity;
 import com.misterblusky9.pocket.block.ModBlockEntities;
-import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.client.TaperedLinkProfile;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -81,20 +80,28 @@ public class FlexibleCouplingRenderer extends SmartBlockEntityRenderer<FlexibleC
         event.registerBlockEntityRenderer(ModBlockEntities.FLEXIBLE_COUPLING.get(), FlexibleCouplingRenderer::new);
     }
 
-    private static int getStressColor(FlexibleCouplingBlockEntity be, float partialTicks,
-                                      Vector3d otherCenter, Vector3dc center, Minecraft minecraft,
-                                      double localScale) {
-        double distance = otherCenter.distance(center);
-        double snapDistance = be.getSnappingDistance() * localScale;
-        double flashingStartExtension = Mth.lerp(0.7, (be.getRenderLength(partialTicks) - 0.75) * localScale, snapDistance);
-        float stressAlpha = 0.0F;
-        if (distance > flashingStartExtension) {
-            double renderTime = minecraft.player.tickCount + partialTicks;
-            stressAlpha = Mth.clamp((float) ((distance - flashingStartExtension)
-                    / (snapDistance - flashingStartExtension)), 0.0F, 1.0F) * 0.3F;
-            stressAlpha *= Mth.lerp(0.25F, (float) Math.sin(renderTime / 3.0) * 0.5F + 0.5F, 1.0F);
+    private static double renderedScale(ClientSubLevel subLevel) {
+        if (subLevel == null || subLevel.renderPose() == null) {
+            return 1.0D;
         }
-        return SimColors.STRESSED_RED & 0xFFFFFF | (int) (stressAlpha * 255.0F) << 24;
+        var scale = subLevel.renderPose().scale();
+        double x = scale.x();
+        return Double.isFinite(x) && x > 0.0D ? x : 1.0D;
+    }
+
+    private static int getStressColor(FlexibleCouplingBlockEntity be, float partialTicks,
+                                      double distance, double inverseOwnerScale, Minecraft minecraft) {
+        double snapDistance = be.getSnappingDistance() * inverseOwnerScale;
+        double resting = Math.max(0.0D, be.getRenderLength(partialTicks) - 0.75D) * inverseOwnerScale;
+        double warningStart = Mth.lerp(0.7D, resting, snapDistance);
+        float stressAlpha = 0.0F;
+        if (distance > warningStart && snapDistance > warningStart) {
+            stressAlpha = Mth.clamp((float) ((distance - warningStart)
+                    / (snapDistance - warningStart)), 0.0F, 1.0F) * 0.3F;
+            double time = minecraft.level.getGameTime() + partialTicks;
+            stressAlpha *= Mth.lerp(0.25F, (float) Math.sin(time / 3.0D) * 0.5F + 0.5F, 1.0F);
+        }
+        return SimColors.STRESSED_RED & 0x00FFFFFF | (int) (stressAlpha * 255.0F) << 24;
     }
 
     @Override
@@ -145,16 +152,31 @@ public class FlexibleCouplingRenderer extends SmartBlockEntityRenderer<FlexibleC
             renderPose.transformPositionInverse(otherCenter);
         }
         normalB.normalize();
-        double localScale = Pym.scale().linkFactorLocal(subLevel, otherSubLevel);
-
+        // Resolve actual *rendered* sizes at both ends. Pym's between() is globally disabled,
+        // so construct a local taper only for this shaft; do not switch on global link tapering.
+        double ownerScale = renderedScale(subLevel);
+        double partnerScale = renderedScale(otherSubLevel);
+        double inverseOwnerScale = 1.0D / ownerScale;
+        // Texture repetitions describe the physical shaft, not the block coordinates of
+        // whichever end was clicked first. Keep them invariant under owner-scale changes.
+        // The taper uses normalized progress (UV / textureLength), so it still reaches
+        // the correct radius at either endpoint when the owner/partner are swapped.
+        double textureLength = Math.max(1.0E-6D,
+                be.getRenderLength(partialTicks) - 0.75D);
         taper = otherSubLevelID == null || otherSubLevel != null
-                ? TaperedLinkProfile.between(subLevel, otherSubLevel,
-                        Math.max(1.0E-6D, (be.getRenderLength(partialTicks) - 0.75D) * localScale))
+                ? TaperedLinkProfile.of(1.0D, partnerScale / ownerScale, textureLength)
                 : TaperedLinkProfile.UNIFORM;
 
-        int color = getStressColor(be, partialTicks, otherCenter, center, minecraft, localScale);
+        // This is visual overstretch feedback, NOT spring tension or physical stress.
+        int color = getStressColor(be, partialTicks, otherCenter.distance(center),
+                inverseOwnerScale, minecraft);
+        double localDistance = center.distance(otherCenter);
+        // Shape and subdivision count must also be measured in physical world blocks.
+        // Otherwise the same shaft curves and tessellates differently from the tiny end.
         List<SplinePoint> splinePoints = generateSpline(JOMLConversion.ZERO,
-                otherCenter.sub(center, new Vector3d()), normalA, normalB, center.distance(otherCenter) / 5.0 + 0.25);
+                otherCenter.sub(center, new Vector3d()), normalA, normalB,
+                localDistance / 5.0D + 0.25D * inverseOwnerScale,
+                localDistance * ownerScale);
         int totalPoints = splinePoints.size();
         Vector3d pointNormal = new Vector3d();
         Vector3d startUpDir = JOMLConversion.toJOML(getUpDirection(be, otherCenter.sub(center, new Vector3d())));
@@ -185,7 +207,7 @@ public class FlexibleCouplingRenderer extends SmartBlockEntityRenderer<FlexibleC
         double d = OrientedBoundingBox3d.UP.dot(new Vector3d(orientation.x(), orientation.y(), orientation.z()));
         double deg = 2.0 * Math.atan2(-d, orientation.w());
         double twist = Math.floor((deg + Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2) - deg;
-        float uvScale = (float) ((be.getRenderLength(partialTicks) - 0.75) * localScale / totalSpringLength);
+        float uvScale = (float) (textureLength / totalSpringLength);
         matrix.set(startUpDir, pointNormal, startUpDir.cross(pointNormal, new Vector3d()));
 
         double spin = angle * facing.getAxisDirection().getStep();
@@ -242,12 +264,12 @@ public class FlexibleCouplingRenderer extends SmartBlockEntityRenderer<FlexibleC
     }
 
     private List<SplinePoint> generateSpline(Vector3dc pointA, Vector3dc pointB, Vector3dc normalA,
-                                             Vector3dc normalB, double controlPointLength) {
+                                             Vector3dc normalB, double controlPointLength,
+                                             double worldDistance) {
         List<SplinePoint> list = new ObjectArrayList<>();
         pointA.fma(controlPointLength, normalA, controlPointA);
         pointB.fma(controlPointLength, normalB, controlPointB);
-        double len = pointA.distance(pointB);
-        int initialPointCount = Mth.clamp(Mth.ceil(len), 5, 8);
+        int initialPointCount = Mth.clamp(Mth.ceil(worldDistance), 5, 8);
 
         for (int i = 0; i <= initialPointCount; i++) {
             double t = (double) i / initialPointCount;
@@ -321,6 +343,19 @@ public class FlexibleCouplingRenderer extends SmartBlockEntityRenderer<FlexibleC
             return up;
         }
         return new Quaterniond().fromAxisAngleRad(axis.x(), axis.y(), axis.z(), angle).transform(up);
+    }
+
+    @Override
+    public boolean shouldRender(FlexibleCouplingBlockEntity blockEntity, Vec3 cameraPos) {
+        // Sable provides cameraPos in the containing sublevel's local coordinates.
+        // The vanilla 64-block check would therefore clip a 1/8x owner at ~8 world
+        // blocks, even though the same shaft remains visible when linked from 1x.
+        // Convert the world-space visibility radius to those local coordinates.
+        double ownerScale = renderedScale(Sable.HELPER.getContainingClient(blockEntity));
+        double reach = blockEntity.isController() && blockEntity.isLinked()
+                ? blockEntity.getSnappingDistance() : 0.0D;
+        double viewDistanceLocal = (64.0D + reach) / ownerScale;
+        return Vec3.atCenterOf(blockEntity.getBlockPos()).closerThan(cameraPos, viewDistanceLocal);
     }
 
     @Override

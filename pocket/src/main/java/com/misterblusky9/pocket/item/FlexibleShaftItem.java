@@ -2,7 +2,6 @@ package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.block.FlexibleCouplingBlock;
 import com.misterblusky9.pocket.block.FlexibleCouplingBlockEntity;
-import com.misterblusky9.pocket.block.FlexibleLinkScale;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import java.util.UUID;
@@ -55,9 +54,6 @@ public class FlexibleShaftItem extends Item {
             return InteractionResult.SUCCESS;
         }
         stack.remove(ModDataComponents.FLEXIBLE_SHAFT_FIRST.get());
-        if (!FlexibleLinkScale.sameScale(level, first, pos)) {
-            return InteractionResult.FAIL;
-        }
         if (!level.isClientSide && attach(level, first, pos)) {
             if (player != null) {
                 player.awardStat(Stats.ITEM_USED.get(this));
@@ -76,8 +72,7 @@ public class FlexibleShaftItem extends Item {
     }
 
     private static boolean attach(Level level, BlockPos first, BlockPos second) {
-        if (first.equals(second) || !isValidAttachment(level, first) || !inRange(level, first, second.getCenter())
-                || !FlexibleLinkScale.sameScale(level, first, second)) {
+        if (first.equals(second) || !isValidAttachment(level, first) || !inRange(level, first, second.getCenter())) {
             return false;
         }
         FlexibleCouplingBlockEntity controller = (FlexibleCouplingBlockEntity) level.getBlockEntity(first);
