@@ -103,6 +103,7 @@ public final class ScaleSelectionScreen extends Screen {
     private static final double PREVIEW_CENTRE_GAP = 1.0D;
 
     private static final Supplier<Block> PREVIEW_GROUND_BLOCK = () -> Blocks.GRASS_BLOCK;
+    private static final Supplier<Block> PREVIEW_SUBSOIL_BLOCK = () -> Blocks.DIRT;
 
     private static final int TITLE_TEXT = 0x54214F;
     private static final int LABEL_TEXT = 0x787878;
@@ -496,13 +497,14 @@ public final class ScaleSelectionScreen extends Screen {
     ) {
         double blockPixels = Math.max(1.0D, pixelsPerBlock);
         TextureAtlasSprite side = sideSprite(PREVIEW_GROUND_BLOCK.get().defaultBlockState());
+        TextureAtlasSprite subsoil = sideSprite(PREVIEW_SUBSOIL_BLOCK.get().defaultBlockState());
         int first = (int) Math.floor((x0 - anchorX) / blockPixels);
         int last = (int) Math.ceil((x1 - anchorX) / blockPixels);
 
         for (int i = first; i <= last; i++) {
             double tileX = anchorX + i * blockPixels;
             for (double tileY = groundY; tileY < groundY + groundInset; tileY += blockPixels) {
-                blitSprite(graphics, side, tileX, tileY, 0.0F, blockPixels);
+                blitSprite(graphics, tileY == groundY ? side : subsoil, tileX, tileY, 0.0F, blockPixels);
             }
         }
     }
