@@ -26,8 +26,8 @@ public final class CompressionGunTank {
     private static final ResourceLocation LEVITITE_BLEND =
             ResourceLocation.fromNamespaceAndPath("aeronautics", "levitite_blend");
 
-    // Legacy engine wear rate, now used ONLY as an empty-tank backup.
-    private static final int BACKUP_WEAR_INTERVAL_TICKS = 48;
+    // Empty-tank backup wear: 59 usable durability x 7 ticks = ~20 s of firing.
+    private static final int BACKUP_WEAR_INTERVAL_TICKS = 7;
 
     public static final DeferredRegister.DataComponents COMPONENTS =
             DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, PocketSized.MOD_ID);
@@ -118,7 +118,6 @@ public final class CompressionGunTank {
         if (!hasDurability(stack)) return false;
         if (elapsed <= 0 || elapsed % BACKUP_WEAR_INTERVAL_TICKS != 0) return true;
 
-        // Empty-tank backup retains the legacy rate: one damage every 48 use ticks.
         stack.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         return true;
     }

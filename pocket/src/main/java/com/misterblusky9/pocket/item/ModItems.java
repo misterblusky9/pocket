@@ -49,12 +49,12 @@ public final class ModItems {
 
     public static final DeferredItem<CompressionGunItem> COMPRESSION_GUN = ITEMS.register(
             "compression_gun",
-            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512), false)
+            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(60), false)
     );
 
     public static final DeferredItem<CompressionGunItem> PEARLESCENT_COMPRESSION_GUN = ITEMS.register(
             "pearlescent_compression_gun",
-            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(512).rarity(Rarity.UNCOMMON), true)
+            () -> new CompressionGunItem(new Item.Properties().stacksTo(1).durability(60).rarity(Rarity.UNCOMMON), true)
     );
 
     public static final DeferredItem<BlockItem> PORTABLE_SUBSPACE_COMPRESSOR = ITEMS.register(
