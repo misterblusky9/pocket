@@ -5,6 +5,8 @@ import com.misterblusky9.pym.api.ResizeResult;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.physics.constraint.ConstraintJointAxis;
+import dev.ryanhcode.sable.api.physics.constraint.FreeConstraintHandle;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.BlockPos;
@@ -38,6 +40,28 @@ public final class DisassemblyScaleAlignment {
 
         request(subLevel, assembler.getBlockPos());
         return false;
+    }
+
+    public static boolean growing(BlockEntity assembler) {
+        ServerSubLevel subLevel = containing(assembler);
+        return subLevel != null && Pym.scale().of(subLevel) < ScaleBounds.FULL - ScaleBounds.EPSILON;
+    }
+
+    // alignment motors pin the craft; slack them so it grows like a normal resize
+    public static void slackMotors(FreeConstraintHandle constraint) {
+        if (constraint == null || !constraint.isValid()) return;
+        for (ConstraintJointAxis axis : ConstraintJointAxis.ALL) constraint.setMotor(axis, 0.0D, 0.0D, 0.0D, false, 0.0D);
+    }
+
+    // Simulated's startDisassembling values; tickDisassembling retargets linear each tick
+    public static void restoreMotors(FreeConstraintHandle constraint) {
+        if (constraint == null || !constraint.isValid()) return;
+        constraint.setMotor(ConstraintJointAxis.ANGULAR_X, 0.0D, 13000.0D, 1000.0D, false, 0.0D);
+        constraint.setMotor(ConstraintJointAxis.ANGULAR_Z, 0.0D, 13000.0D, 1000.0D, false, 0.0D);
+        constraint.setMotor(ConstraintJointAxis.ANGULAR_Y, 0.0D, 13000.0D, 1000.0D, false, 0.0D);
+        constraint.setMotor(ConstraintJointAxis.LINEAR_X, 0.0D, 1.0E-6D, 50.0D, false, 0.0D);
+        constraint.setMotor(ConstraintJointAxis.LINEAR_Y, 0.0D, 1.0E-6D, 50.0D, false, 0.0D);
+        constraint.setMotor(ConstraintJointAxis.LINEAR_Z, 0.0D, 1.0E-6D, 50.0D, false, 0.0D);
     }
 
     public static void end(UUID subLevelId) {
