@@ -5,6 +5,7 @@ import com.misterblusky9.pocket.block.ModBlocks;
 import com.simibubi.create.content.equipment.armor.AllArmorMaterials;
 import com.simibubi.create.content.equipment.armor.BacktankItem;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
@@ -41,6 +42,11 @@ public final class ModItems {
 
     public static final DeferredItem<EmptyBoxItem> ANDESITE_DISPLAY_PLATE = ITEMS.register(
             "andesite_display_plate", () -> new EmptyBoxItem(new Item.Properties())
+    );
+
+    public static final DeferredItem<LiveCaseItem> LIVE_CASE = ITEMS.register(
+            "live_case", () -> new LiveCaseItem(new Item.Properties().stacksTo(1)
+                    .component(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true))
     );
 
     public static final DeferredItem<CreativeShrinkRayItem> CREATIVE_SHRINK_RAY = ITEMS.register(
@@ -132,6 +138,15 @@ public final class ModItems {
     public static final DeferredItem<BlockItem> COPYCAT_FACADE = ITEMS.register(
             "copycat_facade",
             () -> new BlockItem(ModBlocks.COPYCAT_FACADE.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<BlockItem> ATELIER = ITEMS.register(
+            "atelier",
+            () -> new BlockItem(ModBlocks.ATELIER.get(), new Item.Properties())
+    );
+
+    public static final DeferredItem<HattersStandItem> HATTERS_STAND = ITEMS.register(
+            "hatters_stand", () -> new HattersStandItem(new Item.Properties().stacksTo(16))
     );
 
     public static final DeferredItem<BacktankItem.BacktankBlockItem> SUBSPACE_HARNESS_PLACEABLE = ITEMS.register(

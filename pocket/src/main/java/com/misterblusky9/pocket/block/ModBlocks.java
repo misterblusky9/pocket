@@ -110,6 +110,16 @@ public final class ModBlocks {
                     () -> new SubspaceHarnessBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.COPPER_BLOCK))
             );
 
+    public static final DeferredHolder<Block, AtelierBlock> ATELIER =
+            BLOCKS.register(
+                    "atelier",
+                    () -> new AtelierBlock(
+                            BlockBehaviour.Properties.ofFullCopy(Blocks.LECTERN)
+                                    .mapColor(MapColor.PODZOL)
+                                    .forceSolidOn()
+                    )
+            );
+
     public static final DeferredHolder<Block, BlueprintEncasedShaftBlock> BLUEPRINT_ENCASED_SHAFT =
             BLOCKS.register("blueprint_encased_shaft",
                     () -> new BlueprintEncasedShaftBlock(

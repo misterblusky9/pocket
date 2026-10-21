@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.mixin.create;
 
+import com.misterblusky9.pocket.item.LiveCaseItem;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.pocket.CannonDeploymentQueue;
 import com.misterblusky9.pocket.pocket.CannonExpansionMode;
@@ -36,6 +37,11 @@ public abstract class PotatoCannonImmediatePocketMixin {
         return original.and(stack -> !PocketCaseItem.isSealed(stack));
     }
 
+    @ModifyReturnValue(method = "getAllSupportedProjectiles", at = @At("RETURN"), remap = false)
+    private Predicate<ItemStack> pocket$emptyLiveCasesAreNotAmmo(final Predicate<ItemStack> original) {
+        return original.and(stack -> !(stack.getItem() instanceof LiveCaseItem) || LiveCaseItem.isCannonPayload(stack));
+    }
+
     @Redirect(
             method = "use",
             at = @At(
@@ -50,7 +56,13 @@ public abstract class PotatoCannonImmediatePocketMixin {
             return rawLevel.addFreshEntity(entity);
         }
 
-        ItemStack payload = projectile.getItem();
+        final ItemStack payload = projectile.getItem();
+        if (LiveCaseItem.isCannonPayload(payload)) {
+            final Vec3 motion = projectile.getDeltaMovement();
+            final Vec3 forward = motion.lengthSqr() > 1.0E-8D ? motion.normalize() : Vec3.ZERO;
+            return LiveCaseItem.launchFromCannon(level, payload, projectile.position().add(forward.scale(0.45D)),
+                    motion, projectile.getOwner(), pocket$firingMode(projectile.getOwner()));
+        }
         if (!PocketCaseItem.isCannonPayload(payload)) {
             return rawLevel.addFreshEntity(entity);
         }

@@ -3,6 +3,7 @@ package com.misterblusky9.pocket;
 import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
+import com.misterblusky9.pocket.block.ModMenus;
 import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
 import com.misterblusky9.pocket.create.PocketContraptionTypes;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
@@ -43,6 +44,7 @@ public final class PocketSized {
 
         ModBlocks.BLOCKS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
+        ModMenus.MENUS.register(modBus);
         modBus.addListener(SubspaceRecyclerBlockEntity::registerCapabilities);
         ModItems.ITEMS.register(modBus);
         com.misterblusky9.pocket.item.ModDataComponents.COMPONENTS.register(modBus);
@@ -63,6 +65,7 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onEntityInteractSpecific);
         NeoForge.EVENT_BUS.addListener(PocketedSubLevelEvents::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(CannonDeploymentQueue::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.item.LiveCaseHolds::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.FacadeAlignment::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.FacadeAlignment::onServerStopped);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.compression.CompressionSessions::onServerTick);

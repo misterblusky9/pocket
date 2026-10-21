@@ -44,6 +44,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
@@ -130,6 +131,19 @@ public class PocketCaseItem extends PackageItem {
         super(properties, STYLE);
         PackageStyles.ALL_BOXES.remove(this);
         PackageStyles.STANDARD_BOXES.remove(this);
+    }
+
+    @Override
+    public EquipmentSlot getEquipmentSlot(ItemStack stack) {
+        return isFilled(stack) ? EquipmentSlot.HEAD : null;
+    }
+
+    @Override
+    public boolean canEquip(ItemStack stack, EquipmentSlot slot, LivingEntity entity) {
+        return isFilled(stack) && (slot == EquipmentSlot.HEAD
+                || slot == EquipmentSlot.CHEST
+                || slot == EquipmentSlot.LEGS
+                || slot == EquipmentSlot.FEET);
     }
 
     @Override
@@ -756,35 +770,48 @@ public class PocketCaseItem extends PackageItem {
         );
         if (restored == null) return null;
 
-        dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle handle =
-                dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle.of(restored);
-        if (handle != null) {
-            double perSecond = 20.0D * speedFactor * MUZZLE_EFFICIENCY;
+        launchFromMuzzle(level, restored, List.of(restored), projectilePosition, projectileMotion, speedFactor, mode);
+        return restored;
+    }
+
+    static void launchFromMuzzle(
+            final ServerLevel level,
+            final ServerSubLevel subLevel,
+            final java.util.Collection<ServerSubLevel> carried,
+            final Vec3 muzzle,
+            final Vec3 motion,
+            final double speedFactor,
+            final com.misterblusky9.pocket.pocket.CannonExpansionMode mode
+    ) {
+        final double perSecond = 20.0D * speedFactor * MUZZLE_EFFICIENCY;
+        for (final ServerSubLevel body : carried) {
+            final dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle handle =
+                    dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle.of(body);
+            if (handle == null) continue;
             handle.addLinearAndAngularVelocity(
                     new Vector3d(
-                            projectileMotion.x * perSecond,
-                            projectileMotion.y * perSecond,
-                            projectileMotion.z * perSecond
+                            motion.x * perSecond,
+                            motion.y * perSecond,
+                            motion.z * perSecond
                     ),
                     new Vector3d()
             );
         }
 
-        boolean inFlight = projectileMotion.lengthSqr() > 1.0E-8D;
+        final boolean inFlight = motion.lengthSqr() > 1.0E-8D;
 
         boolean onImpact = mode == com.misterblusky9.pocket.pocket.CannonExpansionMode.IMPACT;
         CannonReleaseSource.arm(
                 level,
-                restored,
-                projectilePosition,
+                subLevel,
+                muzzle,
                 inFlight ? CANNON_BLOOM_DISTANCE : 0.0D,
                 inFlight ? (onImpact ? IMPACT_TIMEOUT_TICKS : CANNON_BLOOM_TIMEOUT_TICKS) : 1,
                 mode
         );
-        return restored;
     }
 
-    private static double shotSpeedFactor(double mass) {
+    static double shotSpeedFactor(final double mass) {
         if (!Double.isFinite(mass) || mass <= 0.0D) return 1.0D;
         double factor = Math.sqrt(REFERENCE_SHOT_MASS / mass);
         return Math.max(MIN_SHOT_SPEED_FACTOR, Math.min(MAX_SHOT_SPEED_FACTOR, factor));

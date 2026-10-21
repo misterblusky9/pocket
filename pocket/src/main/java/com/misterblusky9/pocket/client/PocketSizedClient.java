@@ -51,6 +51,11 @@ public final class PocketSizedClient {
         modBus.addListener(BlueprintEncasingClient::registerRenderers);
         modBus.addListener(BlueprintEncasingClient::registerVisuals);
         modBus.addListener(PocketPackageModels::register);
+        modBus.addListener(WornPocketLayer::register);
+        modBus.addListener(HattersStandRenderer::register);
+        modBus.addListener(HattersStandRenderer::registerLayer);
+        modBus.addListener((net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) ->
+                event.register(com.misterblusky9.pocket.block.ModMenus.ATELIER.get(), AtelierScreen::new));
         modBus.addListener(PocketItemTooltips::register);
         modBus.addListener(PocketItemProperties::register);
         modBus.addListener(TheMoonPackageRenderer::register);
