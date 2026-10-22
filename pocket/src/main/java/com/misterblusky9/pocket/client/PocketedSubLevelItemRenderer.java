@@ -88,7 +88,6 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             int packedLight,
             int packedOverlay
     ) {
-        if (displayContext == ItemDisplayContext.HEAD) return;
         PocketContainer container = PocketContainer.of(stack);
         BakedModel boxModel = container == PocketContainer.CARDBOARD_BOX
                 ? model.getOriginalModel()
@@ -110,28 +109,6 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             MultiBufferSource bufferSource,
             int packedLight,
             int packedOverlay
-    ) {
-        renderCraft(stack, poseStack, bufferSource, packedLight, packedOverlay, 0.0F);
-    }
-
-    public static void renderCraftOnHead(
-            ItemStack stack,
-            PoseStack poseStack,
-            MultiBufferSource bufferSource,
-            int packedLight,
-            int packedOverlay,
-            float wornSize
-    ) {
-        renderCraft(stack, poseStack, bufferSource, packedLight, packedOverlay, wornSize);
-    }
-
-    private static void renderCraft(
-            ItemStack stack,
-            PoseStack poseStack,
-            MultiBufferSource bufferSource,
-            int packedLight,
-            int packedOverlay,
-            float wornSize
     ) {
         UUID token = PocketCaseItem.token(stack);
         PocketRenderSnapshot snapshot = token == null ? null : CACHE.get(token);
@@ -158,7 +135,7 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         int[] shift = FacadeTiling.reduce(PocketCaseItem.facadeOffset(stack), scale);
         for (int axis = 0; axis < 3; axis++) anchor[axis] += shift[axis];
         CopycatFacadeFrames.inPreview(scale, anchor,
-                () -> drawCraft(stack, drawn, poseStack, bufferSource, packedLight, packedOverlay, wornSize));
+                () -> drawCraft(stack, drawn, poseStack, bufferSource, packedLight, packedOverlay));
     }
 
     private static void drawCraft(
@@ -167,32 +144,26 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             PoseStack poseStack,
             MultiBufferSource bufferSource,
             int packedLight,
-            int packedOverlay,
-            float wornSize
+            int packedOverlay
     ) {
         poseStack.pushPose();
 
+        PocketContainer container = PocketContainer.of(stack);
+        poseStack.translate(container.centreX(), container.floorY(), container.centreZ());
+
         int quarterTurns = PocketCaseItem.modelQuarterTurns(stack);
-        if (wornSize > 0.0F) {
-            float scale = (float) PocketCaseItem.pocketedScale(stack) * wornSize;
-            poseStack.translate(0.0D, snapshot.sizeY() * scale - 9.0D / 16.0D, 0.0D);
-            poseStack.scale(-scale, -scale, scale);
-            poseStack.mulPose(Axis.YP.rotationDegrees(-180.0F - 90.0F * quarterTurns));
-            poseStack.translate(-snapshot.sizeX() * 0.5D, 0.0D, -snapshot.sizeZ() * 0.5D);
-        } else {
-            PocketContainer container = PocketContainer.of(stack);
-            poseStack.translate(container.centreX(), container.floorY(), container.centreZ());
-            boolean sideways = (quarterTurns & 1) == 1;
-            int footprintX = sideways ? snapshot.sizeZ() : snapshot.sizeX();
-            int footprintZ = sideways ? snapshot.sizeX() : snapshot.sizeZ();
-            float fit = (float) Math.min(
-                    Math.min(COMPRESSED_SCALE, container.clearHeight() / Math.max(1, snapshot.sizeY())),
-                    Math.min(container.clearWidthX() / Math.max(1, footprintX),
-                            container.clearWidthZ() / Math.max(1, footprintZ)));
-            poseStack.scale(fit, fit, fit);
-            if (quarterTurns != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F * quarterTurns));
-            poseStack.translate(-snapshot.sizeX() * 0.5D, 0.0D, -snapshot.sizeZ() * 0.5D);
-        }
+        boolean sideways = (quarterTurns & 1) == 1;
+        int footprintX = sideways ? snapshot.sizeZ() : snapshot.sizeX();
+        int footprintZ = sideways ? snapshot.sizeX() : snapshot.sizeZ();
+        float fit = (float) Math.min(
+                Math.min(COMPRESSED_SCALE, container.clearHeight() / Math.max(1, snapshot.sizeY())),
+                Math.min(container.clearWidthX() / Math.max(1, footprintX),
+                        container.clearWidthZ() / Math.max(1, footprintZ)));
+        poseStack.scale(fit, fit, fit);
+
+        if (quarterTurns != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F * quarterTurns));
+
+        poseStack.translate(-snapshot.sizeX() * 0.5D, 0.0D, -snapshot.sizeZ() * 0.5D);
 
         TextureAtlasSprite white = Minecraft.getInstance()
                 .getModelManager()

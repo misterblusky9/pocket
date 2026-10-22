@@ -32,7 +32,6 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.DISPLAY_BOTTLE.get());
                         output.accept(ModItems.BRASS_DISPLAY_CASE.get());
                         output.accept(ModItems.BRASS_DISPLAY_PLATE.get());
-                        output.accept(ModItems.LIVE_CASE.get());
 
                         output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.STATIC_SUBSPACE_COMPRESSOR.get());
@@ -47,8 +46,6 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.COPYCAT_FACADE.get());
 
                         output.accept(ModItems.SUBSPACE_RECYCLER.get());
-                        output.accept(ModItems.ATELIER.get());
-                        output.accept(ModItems.HATTERS_STAND.get());
                     })
                     .build()
     );

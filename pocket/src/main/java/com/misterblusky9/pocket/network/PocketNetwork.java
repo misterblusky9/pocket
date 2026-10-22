@@ -154,13 +154,6 @@ public final class PocketNetwork {
                 })
         );
         registrar.playToClient(
-                LiveCaseHeldPayload.TYPE,
-                LiveCaseHeldPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(
-                        () -> com.misterblusky9.pocket.item.LiveCaseHolds.accept(payload.held())
-                )
-        );
-        registrar.playToClient(
                 FacadeAlignmentSyncPayload.TYPE,
                 FacadeAlignmentSyncPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(

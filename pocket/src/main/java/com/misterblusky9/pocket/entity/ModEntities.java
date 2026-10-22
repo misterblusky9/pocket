@@ -24,20 +24,8 @@ public final class ModEntities {
                             .build(PocketSized.MOD_ID + ":the_moon_package")
             );
 
-    public static final DeferredHolder<EntityType<?>, EntityType<HattersStand>> HATTERS_STAND =
-            ENTITIES.register(
-                    "hatters_stand",
-                    () -> EntityType.Builder
-                            .<HattersStand>of(HattersStand::new, MobCategory.MISC)
-                            .sized(0.5F, 0.5F)
-                            .eyeHeight(0.25F)
-                            .clientTrackingRange(10)
-                            .build(PocketSized.MOD_ID + ":hatters_stand")
-            );
-
     public static void registerAttributes(EntityAttributeCreationEvent event) {
         event.put(THE_MOON_PACKAGE.get(), PackageEntity.createPackageAttributes().build());
-        event.put(HATTERS_STAND.get(), HattersStand.createAttributes().build());
     }
 
     private ModEntities() {}

@@ -39,7 +39,6 @@
     "create.WrappedBlockAndTintGetterAccessor",
     "create.ContraptionInteractionPriorityMixin",
     "client.GoggleCompressorStatusMixin",
-    "client.LiveCaseWorldRenderMixin",
     "client.CreativeTabContainsScaleToolMixin",
     "client.MinecraftShrinkRayPickMixin",
     "client.ShrinkRayEntityOutlineMixin",
