@@ -30,13 +30,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-/** Pocket knife on a blueprint casing: slice the whole sublevel along the clicked face. */
 final class BlueprintCasingSplit {
     static boolean isCasing(Level level, BlockPos pos) {
         return level.getBlockState(pos).is(ModBlocks.BLUEPRINT_CASING.get());
     }
 
-    /** The casing's side stays as the original sublevel; the far side becomes a new one. */
     static void cut(ServerLevel level, ServerSubLevel source, BlockPos clicked, Direction face,
                     Player player, ItemStack knife, InteractionHand hand) {
         if (player == null || source.isRemoved() || source.getPlot() == null || face == null
@@ -80,10 +78,6 @@ final class BlueprintCasingSplit {
                 SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.1F);
     }
 
-    /**
-     * Fills {@code moved} with every block on the far side of the plane (the side the
-     * face points toward); true when the casing's own side also has blocks.
-     */
     private static boolean gather(ServerSubLevel source, Direction.Axis axis, int plane,
                                   boolean farIsUpper, List<BlockPos> moved) {
         BoundingBox3ic bounds = source.getPlot().getBoundingBox();

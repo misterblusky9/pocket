@@ -4,8 +4,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.misterblusky9.pym.api.event.PhysicsSceneClosingEvent;
 import com.misterblusky9.pym.internal.debug.PymTrace;
+import com.misterblusky9.pym.internal.physics.ColliderMaterial;
 import com.misterblusky9.pym.internal.physics.CoupledMass;
 import com.misterblusky9.pym.internal.physics.PlotShapeCache;
+import com.misterblusky9.pym.internal.physics.SableColliderShapes;
 import com.misterblusky9.pym.internal.physics.RapierSceneLifetime;
 import com.misterblusky9.pym.internal.physics.ColliderCoordinator;
 import com.misterblusky9.pym.internal.physics.ScaledColliderRebuildQueue;
@@ -154,9 +156,10 @@ public abstract class RapierPhysicsPipelineMixin {
     ) {
         if (oldState == newState) return false;
 
-        VoxelShape oldShape = oldState.getCollisionShape(this.level, pos);
-        VoxelShape newShape = newState.getCollisionShape(this.level, pos);
+        VoxelShape oldShape = SableColliderShapes.of(this.level, oldState);
+        VoxelShape newShape = SableColliderShapes.of(this.level, newState);
         if (oldShape.isEmpty() && newShape.isEmpty()) return false;
+        if (ColliderMaterial.id(oldState) != ColliderMaterial.id(newState)) return true;
 
         return Shapes.joinIsNotEmpty(oldShape, newShape, BooleanOp.NOT_SAME);
     }

@@ -1,13 +1,11 @@
 package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.particle.ModParticles;
 import com.mojang.datafixers.util.Pair;
 import com.simibubi.create.AllSoundEvents;
 import com.simibubi.create.content.logistics.box.PackageEntity;
-import dev.simulated_team.simulated.content.blocks.merging_glue.MergingGlueBlock;
-import dev.simulated_team.simulated.index.SimBlocks;
 import dev.simulated_team.simulated.index.SimItems;
-import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
@@ -22,8 +20,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.LevelEvent;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.EventPriority;
@@ -152,11 +148,9 @@ public final class PocketedSubLevelSealHandler {
                 level.sendParticles(ParticleTypes.FALLING_HONEY,
                         centre.x, centre.y, centre.z, 8, dx, dy, dz, 0.0D);
             }
-            case HOT_GLUE -> level.levelEvent(
-                    LevelEvent.PARTICLES_DESTROY_BLOCK,
-                    pocketed.blockPosition(),
-                    Block.getId(SimBlocks.MERGING_GLUE.getDefaultState()
-                            .setValue(MergingGlueBlock.FACING, Direction.UP)));
+            case HOT_GLUE -> level.sendParticles(
+                    ModParticles.HOT_GLUE.get(),
+                    centre.x, centre.y, centre.z, 24, dx, dy, dz, 0.1D);
         }
     }
 }

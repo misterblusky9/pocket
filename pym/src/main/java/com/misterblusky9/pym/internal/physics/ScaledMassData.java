@@ -7,7 +7,7 @@ import org.joml.Matrix3dc;
 import org.joml.Vector3dc;
 
 public final class ScaledMassData implements MassData {
-    private static final double MIN_SOLVER_MASS = 0.05D;
+    private static final double MIN_SOLVER_MASS = 5.0E-6D;
 
     private final MassData delegate;
 

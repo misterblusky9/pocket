@@ -9,16 +9,12 @@ import dev.ryanhcode.sable.api.physics.constraint.FreeConstraintConfiguration;
 import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import dev.simulated_team.simulated.content.blocks.merging_glue.MergingGlueBlock;
-import dev.simulated_team.simulated.index.SimBlocks;
+import com.misterblusky9.pocket.particle.ModParticles;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.LevelEvent;
-import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
@@ -259,12 +255,15 @@ public final class WeldRuntime {
             BlockPos support,
             net.minecraft.core.Direction facing
     ) {
-        BlockState state = SimBlocks.MERGING_GLUE.getDefaultState()
-                .setValue(MergingGlueBlock.FACING, facing);
-        level.levelEvent(
-                LevelEvent.PARTICLES_DESTROY_BLOCK,
-                support.relative(facing),
-                Block.getId(state));
+        double spreadX = facing.getStepX() == 0 ? 0.3D : 0.02D;
+        double spreadY = facing.getStepY() == 0 ? 0.3D : 0.02D;
+        double spreadZ = facing.getStepZ() == 0 ? 0.3D : 0.02D;
+        level.sendParticles(
+                ModParticles.HOT_GLUE.get(),
+                support.getX() + 0.5D + facing.getStepX() * 0.53D,
+                support.getY() + 0.5D + facing.getStepY() * 0.53D,
+                support.getZ() + 0.5D + facing.getStepZ() * 0.53D,
+                16, spreadX, spreadY, spreadZ, 0.1D);
     }
 
     private static void releaseAll(Map<?, PhysicsConstraintHandle> handles) {

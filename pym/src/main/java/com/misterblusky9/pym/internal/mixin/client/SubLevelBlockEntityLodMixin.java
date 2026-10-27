@@ -19,7 +19,6 @@ public abstract class SubLevelBlockEntityLodMixin {
     private Iterable<ClientSubLevel> pym$cullOffscreenSubLevels(
             Iterable<ClientSubLevel> subLevels
     ) {
-        // A portrait's on-screen position has nothing to do with where the craft is in the world.
         return pym$filter(subLevels, subLevel -> PortraitScope.isDrawing(subLevel) || RenderFrame.mayBeVisible(subLevel));
     }
 

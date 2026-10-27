@@ -1,10 +1,12 @@
 package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
+import com.misterblusky9.pocket.item.PersonalCompressors;
 import com.misterblusky9.pocket.item.ScaleSelectingItem;
 import com.misterblusky9.pocket.item.SelfResizeDeviceItem;
 import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.compression.PersonalLock;
+import com.misterblusky9.pocket.network.PersonalCompressorScalePayload;
 import com.misterblusky9.pocket.network.PersonalLockPayload;
 import com.misterblusky9.pocket.network.ShrinkRayScalePayload;
 import com.misterblusky9.pocket.network.ShrinkRaySettingsPayload;
@@ -40,6 +42,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -112,7 +115,7 @@ public final class ScaleSelectionScreen extends Screen {
     private static final int PEHKUI_TEXT = 0x214854;
 
     private PocketGuiTexture background = PocketGuiTexture.SHRINKRAY;
-    private final InteractionHand hand;
+    private final @Nullable InteractionHand hand;
     private final List<IconButton> targetingButtons = new ArrayList<>(3);
 
     private ScaleBounds range = ScaleBounds.SAFE;
@@ -143,7 +146,7 @@ public final class ScaleSelectionScreen extends Screen {
     private boolean pvpToggleVisible;
     private boolean unlocked;
 
-    public ScaleSelectionScreen(InteractionHand hand) {
+    public ScaleSelectionScreen(@Nullable InteractionHand hand) {
         super(Component.translatable("pocket.screen.scale_selection"));
         this.hand = hand;
     }
@@ -893,6 +896,8 @@ public final class ScaleSelectionScreen extends Screen {
 
             if (stack.getItem() instanceof CreativeShrinkRayItem) {
                 PacketDistributor.sendToServer(new ShrinkRaySettingsPayload(this.hand, this.value, this.targeting.ordinal()));
+            } else if (this.hand == null) {
+                PacketDistributor.sendToServer(new PersonalCompressorScalePayload(this.value));
             } else {
                 PacketDistributor.sendToServer(new ShrinkRayScalePayload(this.hand, this.value));
             }
@@ -906,6 +911,7 @@ public final class ScaleSelectionScreen extends Screen {
     private ItemStack held() {
         LocalPlayer player = Minecraft.getInstance().player;
         if (player == null) return null;
+        if (this.hand == null) return PersonalCompressors.find(player);
         ItemStack stack = player.getItemInHand(this.hand);
         return stack.getItem() instanceof ScaleSelectingItem ? stack : null;
     }

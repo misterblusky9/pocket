@@ -45,9 +45,14 @@ public final class ColliderCompiler {
         }
     }
 
+    private static final class CellBuilder {
+        private final List<ColliderShapeKey.Face> faces = new ArrayList<>();
+        private final ColliderMaterial.Tally materials = new ColliderMaterial.Tally();
+    }
+
     private static final class SectionBuilder {
         private final SectionKey key;
-        private final Map<Integer, List<ColliderShapeKey.Face>> cells = new HashMap<>();
+        private final Map<Integer, CellBuilder> cells = new HashMap<>();
 
         private SectionBuilder(SectionKey key) {
             this.key = key;
@@ -55,12 +60,17 @@ public final class ColliderCompiler {
 
         private void add(
                 int x, int y, int z,
-                ColliderShapeKey.Face face
+                ColliderShapeKey.Face face,
+                short material
         ) {
             int localIndex = Math.floorMod(x, 16)
                     + (Math.floorMod(z, 16) << 4)
                     + (Math.floorMod(y, 16) << 8);
-            this.cells.computeIfAbsent(localIndex, ignored -> new ArrayList<>()).add(face);
+            CellBuilder cell = this.cells.computeIfAbsent(localIndex, ignored -> new CellBuilder());
+            cell.faces.add(face);
+            cell.materials.add(material, (face.maxXd() - face.minXd())
+                    * (face.maxYd() - face.minYd())
+                    * (face.maxZd() - face.minZd()));
         }
     }
 
@@ -166,7 +176,9 @@ public final class ColliderCompiler {
             mode = CompiledCollider.Mode.DETAILED;
             boxCount = shape.boxes().size();
             fingerprint.add(boxCount);
-            for (PlotShape.Box box : shape.boxes()) {
+            for (int i = 0; i < boxCount; i++) {
+                PlotShape.Box box = shape.boxes().get(i);
+                fingerprint.add(shape.material(i));
                 addInterval(fingerprint,
                         ScaleFrame.contract(pivot.x(), box.minX(), scale),
                         ScaleFrame.contract(pivot.x(), box.maxX(), scale));
@@ -283,10 +295,10 @@ public final class ColliderCompiler {
         if (affected.isEmpty()) return sections;
 
         Map<SectionKey, SectionBuilder> grouped = new HashMap<>();
-        ColliderGeometry.visitDetailedSections(shape, pivot, scale, affected, (x, y, z, face) -> {
+        ColliderGeometry.visitDetailedSections(shape, pivot, scale, affected, (x, y, z, face, material) -> {
             SectionKey key = new SectionKey(
                     Math.floorDiv(x, 16), Math.floorDiv(y, 16), Math.floorDiv(z, 16));
-            grouped.computeIfAbsent(key, SectionBuilder::new).add(x, y, z, face);
+            grouped.computeIfAbsent(key, SectionBuilder::new).add(x, y, z, face, material);
         });
 
         for (SectionKey key : affected) {
@@ -295,7 +307,8 @@ public final class ColliderCompiler {
                 sections.remove(key);
                 continue;
             }
-            CompiledCollider.Section compiled = compileGroupedSection(key, builder.cells, scale);
+            CompiledCollider.Section compiled = compileGroupedSection(
+                    key, builder.cells, scale, pivot, shape.source());
             if (compiled == null || compiled.isEmpty()) sections.remove(key);
             else sections.put(key, compiled);
         }
@@ -308,12 +321,12 @@ public final class ColliderCompiler {
             double scale
     ) {
         Map<SectionKey, SectionBuilder> grouped = new HashMap<>();
-        ColliderGeometry.visitDetailed(shape, pivot, scale, (x, y, z, face) -> {
+        ColliderGeometry.visitDetailed(shape, pivot, scale, (x, y, z, face, material) -> {
             SectionKey section = new SectionKey(
                     Math.floorDiv(x, 16), Math.floorDiv(y, 16), Math.floorDiv(z, 16));
-            grouped.computeIfAbsent(section, SectionBuilder::new).add(x, y, z, face);
+            grouped.computeIfAbsent(section, SectionBuilder::new).add(x, y, z, face, material);
         });
-        return compileGroupedSections(grouped, scale);
+        return compileGroupedSections(grouped, scale, pivot, shape.source());
     }
 
     private static Map<SectionKey, CompiledCollider.Section> compilePrism(
@@ -335,19 +348,22 @@ public final class ColliderCompiler {
                 (x, y, z, face) -> {
                     SectionKey section = new SectionKey(
                             Math.floorDiv(x, 16), Math.floorDiv(y, 16), Math.floorDiv(z, 16));
-                    grouped.computeIfAbsent(section, SectionBuilder::new).add(x, y, z, face);
+                    grouped.computeIfAbsent(section, SectionBuilder::new)
+                            .add(x, y, z, face, ColliderMaterial.DEFAULT_ID);
                 });
-        return compileGroupedSections(grouped, scale);
+        return compileGroupedSections(grouped, scale, pivot, null);
     }
 
     private static Map<SectionKey, CompiledCollider.Section> compileGroupedSections(
             Map<SectionKey, SectionBuilder> grouped,
-            double scale
+            double scale,
+            Vector3dc pivot,
+            PlotSource source
     ) {
         Map<SectionKey, CompiledCollider.Section> result = new HashMap<>();
         for (Map.Entry<SectionKey, SectionBuilder> entry : grouped.entrySet()) {
             CompiledCollider.Section section = compileGroupedSection(
-                    entry.getKey(), entry.getValue().cells, scale);
+                    entry.getKey(), entry.getValue().cells, scale, pivot, source);
             if (section != null && !section.isEmpty()) result.put(entry.getKey(), section);
         }
         return Map.copyOf(result);
@@ -355,11 +371,13 @@ public final class ColliderCompiler {
 
     private static CompiledCollider.Section compileGroupedSection(
             SectionKey key,
-            Map<Integer, List<ColliderShapeKey.Face>> grouped,
-            double scale
+            Map<Integer, CellBuilder> grouped,
+            double scale,
+            Vector3dc pivot,
+            PlotSource source
     ) {
         List<CompiledCollider.Cell> cells = new ArrayList<>(grouped.size());
-        for (Map.Entry<Integer, List<ColliderShapeKey.Face>> entry : grouped.entrySet()) {
+        for (Map.Entry<Integer, CellBuilder> entry : grouped.entrySet()) {
             int localIndex = entry.getKey();
             int localX = localIndex & 15;
             int localZ = (localIndex >>> 4) & 15;
@@ -368,7 +386,7 @@ public final class ColliderCompiler {
             int cellY = (key.y() << 4) + localY;
             int cellZ = (key.z() << 4) + localZ;
 
-            List<ColliderShapeKey.Face> faces = ColliderGeometry.reduceExact(entry.getValue());
+            List<ColliderShapeKey.Face> faces = ColliderGeometry.reduceExact(entry.getValue().faces);
             boolean approximate = false;
             if (faces.size() > ColliderDetail.MAX_CELL_BOXES) {
                 approximate = true;
@@ -381,12 +399,30 @@ public final class ColliderCompiler {
                 }
                 faces = ColliderGeometry.capCell(faces, scale, ColliderDetail.MAX_CELL_BOXES);
             }
-            ColliderShapeKey shape = ColliderShapeKey.of(faces);
+            ColliderShapeKey shape = ColliderShapeKey.of(
+                    faces, ColliderMaterial.byId(cellMaterial(entry.getValue(), cellX, cellY, cellZ, scale, pivot, source)));
             if (shape.faces().isEmpty()) continue;
             cells.add(new CompiledCollider.Cell(
                     cellX, cellY, cellZ, localIndex, shape, approximate));
         }
         return new CompiledCollider.Section(key, cells);
+    }
+
+    private static short cellMaterial(
+            CellBuilder cell,
+            int cellX, int cellY, int cellZ,
+            double scale,
+            Vector3dc pivot,
+            PlotSource source
+    ) {
+        if (!cell.materials.mixed() || source == null || pivot == null) return cell.materials.winner();
+        return source.surfaceMaterial(
+                expand(pivot.x(), cellX, scale), expand(pivot.y(), cellY, scale), expand(pivot.z(), cellZ, scale),
+                expand(pivot.x(), cellX + 1.0D, scale), expand(pivot.y(), cellY + 1.0D, scale), expand(pivot.z(), cellZ + 1.0D, scale));
+    }
+
+    private static double expand(double pivot, double value, double scale) {
+        return pivot + (value - pivot) / scale;
     }
 
     private static java.util.Set<SectionKey> affectedSections(

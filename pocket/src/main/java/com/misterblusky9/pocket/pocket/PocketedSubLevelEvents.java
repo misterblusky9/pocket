@@ -5,6 +5,7 @@ import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.debug.PocketTrace;
@@ -73,7 +74,12 @@ public final class PocketedSubLevelEvents {
         pocket(serverLevel, player, subLevel, held);
     }
 
+    private static boolean creativePocketsAnything(Player player) {
+        return player != null && player.isCreative() && DeviceRanges.creativePocketsAnything();
+    }
+
     public static boolean fitsPocket(Player player, double scale) {
+        if (creativePocketsAnything(player)) return true;
         double size = player == null ? ScaleBounds.FULL : Pym.entities().scaleOf(player);
         double relative = ScaleBounds.isValid(size) ? size : ScaleBounds.FULL;
         return scale <= (PocketCaseItem.POCKETABLE_SCALE + PICKUP_SCALE_TOLERANCE) * relative;
@@ -134,7 +140,10 @@ public final class PocketedSubLevelEvents {
                 new ItemStack(ModItems.POCKETED_SUBLEVEL.get()), token, level,
                 displayName, snapshot, canonicalMetrics.blocks(), canonicalMetrics.blockEntities(), mass);
         PocketCaseItem.setPackedBy(result, player.getGameProfile().getName());
-        PocketCaseItem.setPocketedScale(result, Pym.scale().settled(subLevel));
+        double settled = Pym.scale().settled(subLevel);
+        PocketCaseItem.setPocketedScale(result, creativePocketsAnything(player)
+                ? Math.min(settled, PocketCaseItem.POCKETABLE_SCALE)
+                : settled);
         PocketCaseItem.setFacadeOffset(result, com.misterblusky9.pocket.block.FacadeAlignment.of(subLevel));
         PocketCaseItem.recallCaseTurns(subLevel, result);
 

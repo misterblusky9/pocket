@@ -79,6 +79,8 @@ public final class ScalePhysicsTransitions {
             ColliderCoordinator.applyScaledLocalBounds(subLevel);
         }
 
+        if (scaleChanged) RapierBridge.syncMassProperties(subLevel, currentScale, false);
+
         if (structureBoundsChanged && ownsScaledCollider(subLevel)) {
             syncExternalStats(subLevel);
             ScaledColliderRebuildQueue.mark(subLevel);

@@ -10,7 +10,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Must run before Sable's HEAD injection, which handles sublevel respawns. */
 @Mixin(value = ServerPlayer.class, priority = 1100)
 public abstract class ScaledSpawnSetMixin {
     @Inject(method = "setRespawnPosition", at = @At("HEAD"), cancellable = true)

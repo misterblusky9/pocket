@@ -50,6 +50,20 @@ public abstract class WheelMountForceContextMixin {
         return localVelocity;
     }
 
+    @ModifyExpressionValue(
+            method = "computeMaxExtensionToTerrain",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Ldev/ryanhcode/sable/companion/math/Pose3dc;"
+                            + "transformNormalInverse(Lorg/joml/Vector3d;)Lorg/joml/Vector3d;"
+            ),
+            remap = false,
+            require = 0
+    )
+    private Vector3d pym$unitTerrainHitNormal(Vector3d hitNormal) {
+        return hitNormal.lengthSquared() > 1.0E-12D ? hitNormal.normalize() : hitNormal;
+    }
+
     @WrapOperation(
             method = "applyBatchedForces",
             at = @At(
@@ -87,6 +101,6 @@ public abstract class WheelMountForceContextMixin {
         if (!ScaleBounds.isValid(scale) || Math.abs(scale - 1.0D) <= ScaleBounds.EPSILON) return;
 
         forceTotal.getLocalForce().mul(scale);
-        forceTotal.getLocalTorque().mul(scale);
+        forceTotal.getLocalTorque().mul(Math.min(scale, 1.0D));
     }
 }

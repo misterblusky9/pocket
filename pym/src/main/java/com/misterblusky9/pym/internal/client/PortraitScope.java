@@ -6,12 +6,6 @@ import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import org.joml.Matrix4fc;
 
-/**
- * While a portrait is drawing, the sublevel being drawn reports a stand-in render pose:
- * no rotation, unit scale, positioned so its content centre sits at the origin. Sable's
- * own chunk renderer then lays the real section buffers out around the origin, and the
- * caller's model-view decides where that origin lands on screen.
- */
 public final class PortraitScope {
     private static final Pose3d POSE = new Pose3d();
 
@@ -26,7 +20,6 @@ public final class PortraitScope {
         return POSE;
     }
 
-    /** How much the caller's model-view shrinks or grows the portrait, used to keep normals unit length. */
     public static double visualScale() {
         return visualScale;
     }

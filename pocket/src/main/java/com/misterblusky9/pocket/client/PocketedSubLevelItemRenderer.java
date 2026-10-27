@@ -24,6 +24,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FastColor;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.level.BlockAndTintGetter;
@@ -43,9 +44,12 @@ import net.neoforged.neoforge.client.model.data.ModelData;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -55,6 +59,8 @@ import java.util.UUID;
 
 public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelRenderer {
     private static final int CACHE_LIMIT = 96;
+    private static final int MESH_CACHE_LIMIT = 32;
+    private static final int COARSE_RESOLUTION_MIN = 6;
 
     private static final float SHADE_TOP = 1.00F;
     private static final float SHADE_BOTTOM = 0.55F;
@@ -68,6 +74,13 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         }
     };
 
+    private static final Map<MeshKey, CraftMesh> MESHES = new LinkedHashMap<>(64, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<MeshKey, CraftMesh> eldest) {
+            return size() > MESH_CACHE_LIMIT;
+        }
+    };
+
     private static final double COMPRESSED_SCALE = 1.0D / 16.0D;
 
     private static final float WHEEL_MIN_RADIUS = 0.35F;
@@ -76,6 +89,32 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     private static final float WHEEL_RED = 0.13F;
     private static final float WHEEL_GREEN = 0.13F;
     private static final float WHEEL_BLUE = 0.145F;
+
+    private enum Detail {
+        FAST(3_000, 6_000, 6, 6),
+        FANCY(6_000, 12_000, 32, 44),
+        FABULOUS(12_000, 24_000, 44, 62);
+
+        private final int budget;
+        private final int plateBudget;
+        private final int resolution;
+        private final int plateResolution;
+
+        Detail(int budget, int plateBudget, int resolution, int plateResolution) {
+            this.budget = budget;
+            this.plateBudget = plateBudget;
+            this.resolution = resolution;
+            this.plateResolution = plateResolution;
+        }
+
+        private static Detail current() {
+            return switch (Minecraft.getInstance().options.graphicsMode().get()) {
+                case FAST -> FAST;
+                case FANCY -> FANCY;
+                case FABULOUS -> FABULOUS;
+            };
+        }
+    }
 
     @Override
     protected void render(
@@ -134,13 +173,28 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         int[] anchor = drawn.gridAnchor();
         int[] shift = FacadeTiling.reduce(PocketCaseItem.facadeOffset(stack), scale);
         for (int axis = 0; axis < 3; axis++) anchor[axis] += shift[axis];
-        CopycatFacadeFrames.inPreview(scale, anchor,
-                () -> drawCraft(stack, drawn, poseStack, bufferSource, packedLight, packedOverlay));
+        PocketContainer container = PocketContainer.of(stack);
+        boolean plate = container == PocketContainer.BRASS_DISPLAY_PLATE
+                || container == PocketContainer.ANDESITE_DISPLAY_PLATE;
+        MeshKey key = new MeshKey(drawn, Detail.current(), plate, scale, anchor[0], anchor[1], anchor[2]);
+
+        CraftMesh mesh = MESHES.get(key);
+        if (mesh == null) {
+            CraftMesh[] built = new CraftMesh[1];
+            CopycatFacadeFrames.inPreview(scale, anchor,
+                    () -> built[0] = buildMesh(drawn, gridFor(drawn, key.detail(), plate)));
+            mesh = built[0];
+            MESHES.put(key, mesh);
+        }
+
+        drawCraft(stack, container, drawn, mesh, poseStack, bufferSource, packedLight, packedOverlay);
     }
 
     private static void drawCraft(
             ItemStack stack,
+            PocketContainer container,
             PocketRenderSnapshot snapshot,
+            CraftMesh mesh,
             PoseStack poseStack,
             MultiBufferSource bufferSource,
             int packedLight,
@@ -148,7 +202,6 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     ) {
         poseStack.pushPose();
 
-        PocketContainer container = PocketContainer.of(stack);
         poseStack.translate(container.centreX(), container.floorY(), container.centreZ());
 
         int quarterTurns = PocketCaseItem.modelQuarterTurns(stack);
@@ -165,17 +218,81 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
 
         poseStack.translate(-snapshot.sizeX() * 0.5D, 0.0D, -snapshot.sizeZ() * 0.5D);
 
+        if (mesh.sizeX() != snapshot.sizeX() || mesh.sizeY() != snapshot.sizeY() || mesh.sizeZ() != snapshot.sizeZ()) {
+            poseStack.scale(
+                    snapshot.sizeX() / (float) mesh.sizeX(),
+                    snapshot.sizeY() / (float) mesh.sizeY(),
+                    snapshot.sizeZ() / (float) mesh.sizeZ());
+        }
+
+        emit(mesh, bufferSource, poseStack.last(), packedLight, packedOverlay);
+
+        poseStack.popPose();
+    }
+
+    private static Grid gridFor(PocketRenderSnapshot snapshot, Detail detail, boolean plate) {
+        int budget = plate ? detail.plateBudget : detail.budget;
+        int resolution = plate ? detail.plateResolution : detail.resolution;
+        int maxDim = Math.max(snapshot.sizeX(), Math.max(snapshot.sizeY(), snapshot.sizeZ()));
+        Grid asIs = new Grid(
+                snapshot.sizeX(), snapshot.sizeY(), snapshot.sizeZ(),
+                snapshot.blocks(), snapshot.hasExactBlockGrid());
+
+        if (snapshot.blockCount() <= budget) return asIs;
+
+        for (; ; resolution = resolution * 3 / 4) {
+            if (resolution < maxDim) {
+                Grid coarse = coarsen(snapshot, maxDim, resolution);
+                if (coarse.blocks().length / PocketRenderSnapshot.STRIDE <= budget
+                        || resolution <= COARSE_RESOLUTION_MIN) {
+                    return coarse;
+                }
+            } else if (resolution <= COARSE_RESOLUTION_MIN) {
+                return asIs;
+            }
+        }
+    }
+
+    private static Grid coarsen(PocketRenderSnapshot snapshot, int maxDim, int resolution) {
+        int sizeX = snapshot.sizeX();
+        int sizeY = snapshot.sizeY();
+        int sizeZ = snapshot.sizeZ();
+        int gridX = axisCells(sizeX, maxDim, resolution);
+        int gridY = axisCells(sizeY, maxDim, resolution);
+        int gridZ = axisCells(sizeZ, maxDim, resolution);
+
+        int[] data = snapshot.blocks();
+        int stride = PocketRenderSnapshot.STRIDE;
+        int[] cells = new int[data.length];
+        int length = 0;
+        IntSet taken = new IntOpenHashSet();
+        for (int i = 0; i + stride - 1 < data.length; i += stride) {
+            int packed = data[i];
+            int cx = Math.min(gridX - 1, (int) (((long) xOf(packed) * gridX) / sizeX));
+            int cy = Math.min(gridY - 1, (int) (((long) yOf(packed) * gridY) / sizeY));
+            int cz = Math.min(gridZ - 1, (int) (((long) zOf(packed) * gridZ) / sizeZ));
+            int cell = ShellVoxels.packPosition(cx, cy, cz);
+            if (!taken.add(cell)) continue;
+            cells[length++] = cell;
+            cells[length++] = data[i + 1];
+            cells[length++] = data[i + 2];
+        }
+        return new Grid(gridX, gridY, gridZ, Arrays.copyOf(cells, length), false);
+    }
+
+    private static int axisCells(int size, int maxDim, int resolution) {
+        return Math.max(1, (int) Math.ceil(size * (double) resolution / maxDim));
+    }
+
+    private static CraftMesh buildMesh(PocketRenderSnapshot snapshot, Grid grid) {
         TextureAtlasSprite white = Minecraft.getInstance()
                 .getModelManager()
                 .getAtlas(InventoryMenu.BLOCK_ATLAS)
                 .getSprite(ResourceLocation.withDefaultNamespace("block/white_concrete"));
 
-        Matrix4f matrix = poseStack.last().pose();
-        PoseStack.Pose pose = poseStack.last();
-
-        int[] data = snapshot.blocks();
+        int[] data = grid.blocks();
         int stride = PocketRenderSnapshot.STRIDE;
-        boolean exactGeometry = snapshot.hasExactBlockGrid();
+        boolean exactGeometry = grid.exact();
 
         SnapshotBlockAndTintGetter previewLevel = exactGeometry
                 ? new SnapshotBlockAndTintGetter(data, stride, snapshot.copycats())
@@ -198,6 +315,7 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         }
 
         Map<Long, FaceAppearance> appearances = new HashMap<>();
+        MeshBuilder builder = new MeshBuilder();
 
         for (int i = 0; i + stride - 1 < data.length; i += stride) {
             int packed = data[i];
@@ -226,35 +344,52 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             }
 
             if (info.modelGeometry() && mesh != null && !mesh.isEmpty()) {
-                modelBlock(
-                        bufferSource, poseStack, mesh,
-                        x, y, z, colour, fullOccluders, packedLight, packedOverlay
-                );
+                modelBlock(builder, mesh, x, y, z, colour, fullOccluders);
             } else {
-                cube(
-                        bufferSource.getBuffer(RenderType.solid()), matrix, pose,
-                        x, y, z, colour,
-                        stateId, white, appearances, fullOccluders, packedLight, packedOverlay
-                );
+                cube(builder.layer(RenderType.solid()), x, y, z, colour, stateId, white, appearances, fullOccluders);
             }
         }
 
-        wheels(
-                bufferSource.getBuffer(RenderType.solid()), matrix, pose,
-                snapshot, white, packedLight, packedOverlay
-        );
+        if (exactGeometry) wheels(builder.layer(RenderType.solid()), snapshot, white);
 
-        poseStack.popPose();
+        return builder.build(grid);
+    }
+
+    private static void emit(
+            CraftMesh mesh,
+            MultiBufferSource bufferSource,
+            PoseStack.Pose pose,
+            int packedLight,
+            int packedOverlay
+    ) {
+        Matrix4f matrix = pose.pose();
+        Matrix3f normalMatrix = pose.normal();
+        Vector3f position = new Vector3f();
+        Vector3f normal = new Vector3f();
+        int blockLight = packedLight & 0xFFFF;
+        int skyLight = (packedLight >>> 16) & 0xFFFF;
+
+        for (MeshLayer layer : mesh.layers()) {
+            VertexConsumer consumer = bufferSource.getBuffer(layer.renderType());
+            float[] floats = layer.floats();
+            int[] ints = layer.ints();
+            for (int v = 0, f = 0, n = 0; v < layer.vertices(); v++, f += MeshBuilder.FLOATS, n += MeshBuilder.INTS) {
+                matrix.transformPosition(floats[f], floats[f + 1], floats[f + 2], position);
+                normalMatrix.transform(floats[f + 5], floats[f + 6], floats[f + 7], normal).normalize();
+                int baked = ints[n + 1];
+                int light = Math.max(blockLight, baked & 0xFFFF) | (Math.max(skyLight, (baked >>> 16) & 0xFFFF) << 16);
+                consumer.addVertex(
+                        position.x, position.y, position.z, ints[n],
+                        floats[f + 3], floats[f + 4], packedOverlay, light,
+                        normal.x, normal.y, normal.z);
+            }
+        }
     }
 
     private static void wheels(
-            VertexConsumer quads,
-            Matrix4f matrix,
-            PoseStack.Pose pose,
+            LayerBuilder layer,
             PocketRenderSnapshot snapshot,
-            TextureAtlasSprite sprite,
-            int packedLight,
-            int packedOverlay
+            TextureAtlasSprite sprite
     ) {
         for (PocketWheelPreview.Wheel wheel : PocketWheelPreview.decode(snapshot.wheels())) {
             float centreX = wheel.x();
@@ -270,23 +405,18 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             float extentZ = axle == Direction.Axis.Z ? thickness : radius;
 
             box(
-                    quads, matrix, pose, sprite,
+                    layer, sprite,
                     centreX - extentX, centreY - extentY, centreZ - extentZ,
-                    centreX + extentX, centreY + extentY, centreZ + extentZ,
-                    packedLight, packedOverlay
+                    centreX + extentX, centreY + extentY, centreZ + extentZ
             );
         }
     }
 
     private static void box(
-            VertexConsumer quads,
-            Matrix4f matrix,
-            PoseStack.Pose pose,
+            LayerBuilder layer,
             TextureAtlasSprite sprite,
             float x0, float y0, float z0,
-            float x1, float y1, float z1,
-            int packedLight,
-            int packedOverlay
+            float x1, float y1, float z1
     ) {
         float u0 = sprite.getU0();
         float u1 = sprite.getU1();
@@ -296,17 +426,17 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         float g = WHEEL_GREEN;
         float b = WHEEL_BLUE;
 
-        face(quads, matrix, pose, r, g, b, SHADE_TOP, packedLight, packedOverlay, u0, u1, v0, v1,
+        face(layer, r, g, b, SHADE_TOP, u0, u1, v0, v1,
                 0.0F, 1.0F, 0.0F, x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0);
-        face(quads, matrix, pose, r, g, b, SHADE_BOTTOM, packedLight, packedOverlay, u0, u1, v0, v1,
+        face(layer, r, g, b, SHADE_BOTTOM, u0, u1, v0, v1,
                 0.0F, -1.0F, 0.0F, x0, y0, z1, x0, y0, z0, x1, y0, z0, x1, y0, z1);
-        face(quads, matrix, pose, r, g, b, SHADE_NORTH_SOUTH, packedLight, packedOverlay, u0, u1, v0, v1,
+        face(layer, r, g, b, SHADE_NORTH_SOUTH, u0, u1, v0, v1,
                 0.0F, 0.0F, -1.0F, x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0);
-        face(quads, matrix, pose, r, g, b, SHADE_NORTH_SOUTH, packedLight, packedOverlay, u0, u1, v0, v1,
+        face(layer, r, g, b, SHADE_NORTH_SOUTH, u0, u1, v0, v1,
                 0.0F, 0.0F, 1.0F, x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1);
-        face(quads, matrix, pose, r, g, b, SHADE_EAST_WEST, packedLight, packedOverlay, u0, u1, v0, v1,
+        face(layer, r, g, b, SHADE_EAST_WEST, u0, u1, v0, v1,
                 -1.0F, 0.0F, 0.0F, x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1);
-        face(quads, matrix, pose, r, g, b, SHADE_EAST_WEST, packedLight, packedOverlay, u0, u1, v0, v1,
+        face(layer, r, g, b, SHADE_EAST_WEST, u0, u1, v0, v1,
                 1.0F, 0.0F, 0.0F, x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0);
     }
 
@@ -437,26 +567,19 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     }
 
     private static void modelBlock(
-            MultiBufferSource bufferSource,
-            PoseStack poseStack,
+            MeshBuilder builder,
             ModelMesh mesh,
             int x,
             int y,
             int z,
             int colour,
-            IntSet fullOccluders,
-            int packedLight,
-            int packedOverlay
+            IntSet fullOccluders
     ) {
-        poseStack.pushPose();
-        poseStack.translate(x, y, z);
-        PoseStack.Pose pose = poseStack.last();
-
         for (ModelLayer layer : mesh.layers()) {
-            VertexConsumer consumer = bufferSource.getBuffer(layer.renderType());
+            LayerBuilder target = builder.layer(layer.renderType());
 
             for (BakedQuad quad : layer.unculled()) {
-                modelQuad(consumer, pose, quad, colour, packedLight, packedOverlay);
+                modelQuad(target, quad, x, y, z, colour);
             }
 
             for (Direction direction : Direction.values()) {
@@ -472,32 +595,52 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
                 List<BakedQuad> faceQuads = layer.faces().get(direction);
                 if (faceQuads == null) continue;
                 for (BakedQuad quad : faceQuads) {
-                    modelQuad(consumer, pose, quad, colour, packedLight, packedOverlay);
+                    modelQuad(target, quad, x, y, z, colour);
                 }
             }
         }
-
-        poseStack.popPose();
     }
 
     private static void modelQuad(
-            VertexConsumer consumer,
-            PoseStack.Pose pose,
+            LayerBuilder layer,
             BakedQuad quad,
-            int colour,
-            int packedLight,
-            int packedOverlay
+            int x,
+            int y,
+            int z,
+            int colour
     ) {
         float shade = quad.isShade() ? shadeFor(quad.getDirection()) : 1.0F;
         float red = (quad.isTinted() ? ((colour >> 16) & 0xFF) / 255.0F : 1.0F) * shade;
         float green = (quad.isTinted() ? ((colour >> 8) & 0xFF) / 255.0F : 1.0F) * shade;
         float blue = (quad.isTinted() ? (colour & 0xFF) / 255.0F : 1.0F) * shade;
+        int argb = argb(red, green, blue);
 
-        consumer.putBulkData(
-                pose, quad,
-                red, green, blue, 1.0F,
-                packedLight, packedOverlay
-        );
+        int[] vertices = quad.getVertices();
+        float nx = quad.getDirection().getStepX();
+        float ny = quad.getDirection().getStepY();
+        float nz = quad.getDirection().getStepZ();
+        for (int v = 0; v + 7 < vertices.length; v += 8) {
+            int packedNormal = vertices[v + 7];
+            byte bx = (byte) packedNormal;
+            byte by = (byte) (packedNormal >> 8);
+            byte bz = (byte) (packedNormal >> 16);
+            if (bx != 0 || by != 0 || bz != 0) {
+                nx = bx / 127.0F;
+                ny = by / 127.0F;
+                nz = bz / 127.0F;
+            }
+            layer.vertex(
+                    Float.intBitsToFloat(vertices[v]) + x,
+                    Float.intBitsToFloat(vertices[v + 1]) + y,
+                    Float.intBitsToFloat(vertices[v + 2]) + z,
+                    Float.intBitsToFloat(vertices[v + 4]),
+                    Float.intBitsToFloat(vertices[v + 5]),
+                    nx, ny, nz, argb, vertices[v + 6]);
+        }
+    }
+
+    private static int argb(float red, float green, float blue) {
+        return FastColor.ARGB32.color(255, (int) (red * 255.0F), (int) (green * 255.0F), (int) (blue * 255.0F));
     }
 
     private static float shadeFor(Direction direction) {
@@ -551,9 +694,7 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     }
 
     private static void cube(
-            VertexConsumer quads,
-            Matrix4f matrix,
-            PoseStack.Pose pose,
+            LayerBuilder layer,
             int x,
             int y,
             int z,
@@ -561,9 +702,7 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             int stateId,
             TextureAtlasSprite fallback,
             Map<Long, FaceAppearance> appearances,
-            IntSet fullOccluders,
-            int packedLight,
-            int packedOverlay
+            IntSet fullOccluders
     ) {
         float x0 = x;
         float y0 = y;
@@ -573,40 +712,36 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         float z1 = z + 1.0F;
 
         if (!containsAt(fullOccluders, x, y + 1, z)) {
-            texturedFace(quads, matrix, pose, colour, appearanceFor(stateId, Direction.UP, fallback, appearances), SHADE_TOP, packedLight, packedOverlay, 0.0F, 1.0F, 0.0F,
+            texturedFace(layer, colour, appearanceFor(stateId, Direction.UP, fallback, appearances), SHADE_TOP, 0.0F, 1.0F, 0.0F,
                     x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0);
         }
         if (!containsAt(fullOccluders, x, y - 1, z)) {
-            texturedFace(quads, matrix, pose, colour, appearanceFor(stateId, Direction.DOWN, fallback, appearances), SHADE_BOTTOM, packedLight, packedOverlay, 0.0F, -1.0F, 0.0F,
+            texturedFace(layer, colour, appearanceFor(stateId, Direction.DOWN, fallback, appearances), SHADE_BOTTOM, 0.0F, -1.0F, 0.0F,
                     x0, y0, z1, x0, y0, z0, x1, y0, z0, x1, y0, z1);
         }
         if (!containsAt(fullOccluders, x, y, z - 1)) {
-            texturedFace(quads, matrix, pose, colour, appearanceFor(stateId, Direction.NORTH, fallback, appearances), SHADE_NORTH_SOUTH, packedLight, packedOverlay, 0.0F, 0.0F, -1.0F,
+            texturedFace(layer, colour, appearanceFor(stateId, Direction.NORTH, fallback, appearances), SHADE_NORTH_SOUTH, 0.0F, 0.0F, -1.0F,
                     x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0);
         }
         if (!containsAt(fullOccluders, x, y, z + 1)) {
-            texturedFace(quads, matrix, pose, colour, appearanceFor(stateId, Direction.SOUTH, fallback, appearances), SHADE_NORTH_SOUTH, packedLight, packedOverlay, 0.0F, 0.0F, 1.0F,
+            texturedFace(layer, colour, appearanceFor(stateId, Direction.SOUTH, fallback, appearances), SHADE_NORTH_SOUTH, 0.0F, 0.0F, 1.0F,
                     x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1);
         }
         if (!containsAt(fullOccluders, x - 1, y, z)) {
-            texturedFace(quads, matrix, pose, colour, appearanceFor(stateId, Direction.WEST, fallback, appearances), SHADE_EAST_WEST, packedLight, packedOverlay, -1.0F, 0.0F, 0.0F,
+            texturedFace(layer, colour, appearanceFor(stateId, Direction.WEST, fallback, appearances), SHADE_EAST_WEST, -1.0F, 0.0F, 0.0F,
                     x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1);
         }
         if (!containsAt(fullOccluders, x + 1, y, z)) {
-            texturedFace(quads, matrix, pose, colour, appearanceFor(stateId, Direction.EAST, fallback, appearances), SHADE_EAST_WEST, packedLight, packedOverlay, 1.0F, 0.0F, 0.0F,
+            texturedFace(layer, colour, appearanceFor(stateId, Direction.EAST, fallback, appearances), SHADE_EAST_WEST, 1.0F, 0.0F, 0.0F,
                     x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0);
         }
     }
 
     private static void texturedFace(
-            VertexConsumer quads,
-            Matrix4f matrix,
-            PoseStack.Pose pose,
+            LayerBuilder layer,
             int colour,
             FaceAppearance appearance,
             float shade,
-            int packedLight,
-            int packedOverlay,
             float nx, float ny, float nz,
             float ax, float ay, float az,
             float bx, float by, float bz,
@@ -617,21 +752,17 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         float green = appearance.tint() ? ((colour >> 8) & 0xFF) / 255.0F : 1.0F;
         float blue = appearance.tint() ? (colour & 0xFF) / 255.0F : 1.0F;
         TextureAtlasSprite sprite = appearance.sprite();
-        face(quads, matrix, pose, red, green, blue, shade, packedLight, packedOverlay,
+        face(layer, red, green, blue, shade,
                 sprite.getU0(), sprite.getU1(), sprite.getV0(), sprite.getV1(), nx, ny, nz,
                 ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz);
     }
 
     private static void face(
-            VertexConsumer quads,
-            Matrix4f matrix,
-            PoseStack.Pose pose,
+            LayerBuilder layer,
             float red,
             float green,
             float blue,
             float shade,
-            int packedLight,
-            int packedOverlay,
             float u0, float u1,
             float v0, float v1,
             float nx, float ny, float nz,
@@ -640,40 +771,68 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             float cx, float cy, float cz,
             float dx, float dy, float dz
     ) {
-        float r = red * shade;
-        float g = green * shade;
-        float b = blue * shade;
+        int argb = argb(red * shade, green * shade, blue * shade);
 
-        vertex(quads, matrix, pose, ax, ay, az, r, g, b, packedLight, packedOverlay, u0, v0, nx, ny, nz);
-        vertex(quads, matrix, pose, bx, by, bz, r, g, b, packedLight, packedOverlay, u0, v1, nx, ny, nz);
-        vertex(quads, matrix, pose, cx, cy, cz, r, g, b, packedLight, packedOverlay, u1, v1, nx, ny, nz);
-        vertex(quads, matrix, pose, dx, dy, dz, r, g, b, packedLight, packedOverlay, u1, v0, nx, ny, nz);
+        layer.vertex(ax, ay, az, u0, v0, nx, ny, nz, argb, 0);
+        layer.vertex(bx, by, bz, u0, v1, nx, ny, nz, argb, 0);
+        layer.vertex(cx, cy, cz, u1, v1, nx, ny, nz, argb, 0);
+        layer.vertex(dx, dy, dz, u1, v0, nx, ny, nz, argb, 0);
     }
 
-    private static void vertex(
-            VertexConsumer quads,
-            Matrix4f matrix,
-            PoseStack.Pose pose,
-            float x,
-            float y,
-            float z,
-            float red,
-            float green,
-            float blue,
-            int packedLight,
-            int packedOverlay,
-            float u,
-            float v,
-            float nx,
-            float ny,
-            float nz
-    ) {
-        quads.addVertex(matrix, x, y, z)
-                .setColor(red, green, blue, 1.0F)
-                .setUv(u, v)
-                .setOverlay(packedOverlay)
-                .setLight(packedLight)
-                .setNormal(pose, nx, ny, nz);
+    private static final class MeshBuilder {
+        private static final int FLOATS = 8;
+        private static final int INTS = 2;
+
+        private final Map<RenderType, LayerBuilder> layers = new LinkedHashMap<>();
+
+        private LayerBuilder layer(RenderType renderType) {
+            return this.layers.computeIfAbsent(renderType, type -> new LayerBuilder());
+        }
+
+        private CraftMesh build(Grid grid) {
+            List<MeshLayer> built = new ArrayList<>(this.layers.size());
+            this.layers.forEach((renderType, layer) -> {
+                if (layer.vertices == 0) return;
+                built.add(new MeshLayer(
+                        renderType,
+                        Arrays.copyOf(layer.floats, layer.vertices * FLOATS),
+                        Arrays.copyOf(layer.ints, layer.vertices * INTS),
+                        layer.vertices));
+            });
+            return new CraftMesh(grid.sizeX(), grid.sizeY(), grid.sizeZ(), List.copyOf(built));
+        }
+    }
+
+    private static final class LayerBuilder {
+        private float[] floats = new float[MeshBuilder.FLOATS * 1024];
+        private int[] ints = new int[MeshBuilder.INTS * 1024];
+        private int vertices;
+
+        private void vertex(
+                float x, float y, float z,
+                float u, float v,
+                float nx, float ny, float nz,
+                int argb,
+                int bakedLight
+        ) {
+            if ((this.vertices + 1) * MeshBuilder.FLOATS > this.floats.length) {
+                this.floats = Arrays.copyOf(this.floats, this.floats.length * 2);
+                this.ints = Arrays.copyOf(this.ints, this.ints.length * 2);
+            }
+            int f = this.vertices * MeshBuilder.FLOATS;
+            this.floats[f] = x;
+            this.floats[f + 1] = y;
+            this.floats[f + 2] = z;
+            this.floats[f + 3] = u;
+            this.floats[f + 4] = v;
+            this.floats[f + 5] = nx;
+            this.floats[f + 6] = ny;
+            this.floats[f + 7] = nz;
+            int n = this.vertices * MeshBuilder.INTS;
+            this.ints[n] = argb;
+            this.ints[n + 1] = bakedLight;
+            this.vertices++;
+        }
     }
 
     private static final class SnapshotBlockAndTintGetter implements BlockAndTintGetter {
@@ -794,6 +953,22 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             return this.delegate == null ? 0xFFFFFF : this.delegate.getBlockTint(pos, colorResolver);
         }
     }
+
+    private record MeshKey(
+            PocketRenderSnapshot snapshot,
+            Detail detail,
+            boolean plate,
+            double scale,
+            int anchorX,
+            int anchorY,
+            int anchorZ
+    ) {}
+
+    private record Grid(int sizeX, int sizeY, int sizeZ, int[] blocks, boolean exact) {}
+
+    private record CraftMesh(int sizeX, int sizeY, int sizeZ, List<MeshLayer> layers) {}
+
+    private record MeshLayer(RenderType renderType, float[] floats, int[] ints, int vertices) {}
 
     private record StateRenderInfo(
             boolean modelGeometry,

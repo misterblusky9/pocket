@@ -69,6 +69,17 @@ public final class PehkuiEntityScaling {
         }
     }
 
+    public static double motionScale(Entity entity) {
+        Backend current = backend;
+        if (current == null || entity == null) return 1.0D;
+        try {
+            return current.motionScale(entity);
+        } catch (RuntimeException | LinkageError exception) {
+            fail(current, exception);
+            return 1.0D;
+        }
+    }
+
     public static boolean setScale(Entity entity, double scale, int ticks) {
         Backend current = backend;
         if (current == null || entity == null || !ScaleBounds.isValid(scale)) return false;
@@ -118,6 +129,7 @@ public final class PehkuiEntityScaling {
         double scale(Entity entity, boolean target);
         double renderScale(Entity entity, float partialTick);
         double blockReachScale(Entity entity);
+        double motionScale(Entity entity);
         void setScale(Entity entity, double scale, int ticks);
         boolean changing(Entity entity);
         void settle(Entity entity);

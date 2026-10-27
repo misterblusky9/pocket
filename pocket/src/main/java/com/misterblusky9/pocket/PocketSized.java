@@ -37,8 +37,6 @@ public final class PocketSized {
 
         PocketPymIntegration.register();
 
-        // Sable decodes saved loading tickets during world startup. Register the
-        // temporary respawn ticket before any server level can load.
         ScaledRespawn.registerRespawnTicket();
 
         ModBlocks.BLOCKS.register(modBus);
@@ -49,6 +47,7 @@ public final class PocketSized {
         com.misterblusky9.pocket.item.CompressionGunTank.COMPONENTS.register(modBus);
         modBus.addListener(com.misterblusky9.pocket.item.CompressionGunTank::registerCapabilities);
         ModEntities.ENTITIES.register(modBus);
+        com.misterblusky9.pocket.particle.ModParticles.PARTICLE_TYPES.register(modBus);
         modBus.addListener(ModEntities::registerAttributes);
         ModCreativeTabs.TABS.register(modBus);
         com.misterblusky9.pocket.advancement.HauntedCompressionGunTrigger.TRIGGERS.register(modBus);

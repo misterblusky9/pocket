@@ -32,15 +32,6 @@ public final class PlotScanBounds {
         return BlockPos.betweenClosed(x0, y0, z0, x1, y1, z1);
     }
 
-    /**
-     * Clip Sable's swept entity collision search envelope to the actual
-     * sub-level plot before Sable evaluates its 500^3 volume safeguard.
-     *
-     * Plot bounds use *inclusive block coordinates*: +1 on the upper edge
-     * keeps the continuous-space AABB aligned with those block cells.
-     * Return false for an empty/disjoint plot, WITHOUT changing the box;
-     * Sable's later candidate redirect will independently return no blocks.
-     */
     public static boolean clipCollisionSearchToPlot(SubLevel subLevel, BoundingBox3d local) {
         BoundingBox3ic plot = plotBounds(subLevel);
         if (plot == null || plot.volume() <= 0.0D) return false;

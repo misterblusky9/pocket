@@ -7,13 +7,17 @@
   "mixins": [
     "LinkageBodyAccess",
     "UniversalJointForceMixin",
-    "HydraulicConstraintMixin"
+    "HydraulicConstraintMixin",
+    "UniversalJointLengthMixin",
+    "HydraulicLengthMixin",
+    "HydraulicImpulseCapMixin"
   ],
   "client": [
-    "UniversalJointSleeveMixin",
-    "HydraulicSleeveMixin",
-    "UniversalJointTaperMixin",
-    "HydraulicTaperMixin"
+    "UniversalJointRodScaleMixin",
+    "HydraulicRodScaleMixin",
+    "HydraulicRodCandidateMixin",
+    "HydraulicRodTargetingScaleMixin",
+    "ConnectionPreviewScaleMixin"
   ],
   "injectors": {
     "defaultRequire": 0

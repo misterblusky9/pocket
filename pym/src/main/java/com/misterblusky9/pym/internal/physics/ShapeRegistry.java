@@ -8,7 +8,8 @@ public final class ShapeRegistry {
     public static final int MAX_PACKABLE_HANDLE = 0xFFFE;
 
     private static final Map<ColliderShapeKey, Entry> INTERNED = new HashMap<>();
-    private static final ArrayDeque<Entry> FREE = new ArrayDeque<>();
+    private static final Map<ColliderMaterial, ArrayDeque<Entry>> FREE = new HashMap<>();
+    private static int freeShapes;
 
     private static long allocations;
     private static long activeHits;
@@ -44,8 +45,10 @@ public final class ShapeRegistry {
             return entry.handle;
         }
 
-        entry = FREE.pollFirst();
+        ArrayDeque<Entry> free = FREE.get(key.material());
+        entry = free == null ? null : free.pollFirst();
         if (entry != null) {
+            freeShapes--;
             RapierBridge.reprogramCollider(entry.handle, key);
             recycles++;
             inactiveHits++;
@@ -85,14 +88,15 @@ public final class ShapeRegistry {
         if (entry.references != 0) return;
 
         INTERNED.remove(key, entry);
-        FREE.addLast(entry);
+        FREE.computeIfAbsent(key.material(), ignored -> new ArrayDeque<>()).addLast(entry);
+        freeShapes++;
         activeShapes--;
     }
 
     public static synchronized String stats() {
         return "activeShapes=" + activeShapes
                 + " internedShapes=" + INTERNED.size()
-                + " inactiveShapes=" + FREE.size()
+                + " inactiveShapes=" + freeShapes
                 + " activeHits=" + activeHits
                 + " inactiveHits=" + inactiveHits
                 + " allocations=" + allocations

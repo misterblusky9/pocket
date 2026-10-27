@@ -19,17 +19,6 @@ import org.joml.Matrix4f;
 
 import java.util.List;
 
-/**
- * Draws a sublevel somewhere other than where it sits in the world, using the same
- * compiled section buffers, lighting and shading Sable uses for the world itself.
- *
- * <p>Portrait space: the origin is the centre of the sublevel's blocks and one unit is
- * one of its blocks at 1x. The model-view you pass maps portrait space into view space,
- * so a hand, a GUI slot or a display case is just a different matrix.
- *
- * <p>Call on the render thread, outside any other portrait, after the world has rendered.
- * Only terrain is drawn for now; block entities and Flywheel visuals are not.
- */
 public final class Portrait {
     public static boolean canDraw(final ClientSubLevel subLevel) {
         return subLevel != null
@@ -38,7 +27,6 @@ public final class Portrait {
                 && SubLevelRenderDispatcher.get() instanceof VanillaSubLevelRenderDispatcher;
     }
 
-    /** The largest edge of the sublevel's blocks, in blocks. Divide by it to fit a portrait into a box. */
     public static int span(final ClientSubLevel subLevel) {
         final BoundingBox3ic bounds = subLevel.getPlot().getBoundingBox();
         return Math.max(
@@ -46,7 +34,6 @@ public final class Portrait {
                 Math.max(bounds.maxY() - bounds.minY() + 1, bounds.maxZ() - bounds.minZ() + 1));
     }
 
-    /** Draws the sublevel centred on the pose stack's origin, its largest edge {@code size} units long. */
     public static boolean drawFitted(final ClientSubLevel subLevel, final PoseStack poseStack, final float size) {
         if (!canDraw(subLevel)) return false;
 

@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.entity;
 
-/** Scale arithmetic is intentionally independent of player lifecycle events. */
 public final class ScaledSpawnMath {
     public static final double MAX_PLAYER_TO_BED = 1.5D;
     private static final double EPSILON = 1.0E-6D;

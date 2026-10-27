@@ -2,8 +2,7 @@ package com.misterblusky9.pym.internal.mixin.physics;
 
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
-import com.misterblusky9.pym.internal.scale.Resizer;
-import com.misterblusky9.pym.internal.scale.ScaleState;
+import com.misterblusky9.pym.internal.scale.SplitInheritance;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,9 +19,7 @@ public abstract class ServerSubLevelSplitScaleMixin {
         ServerSubLevel child = (ServerSubLevel) (Object) this;
         if (child.isRemoved() || parent == null || parent.isRemoved() || originalPose == null) return;
 
-        double scale = ScaleState.getServerScale(parent);
-
+        double scale = SplitInheritance.adoptLive(child, parent);
         originalPose.scale().set(scale, scale, scale);
-        Resizer.adoptSplit(child, parent, scale);
     }
 }

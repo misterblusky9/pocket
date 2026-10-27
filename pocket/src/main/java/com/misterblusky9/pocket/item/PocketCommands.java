@@ -19,7 +19,6 @@ public final class PocketCommands {
                                         parse(StringArgumentType.getString(context, "scale")))))));
     }
 
-    /** Decimal ("0.0625") or fraction ("1/16"); NaN when unparseable. */
     private static double parse(String text) {
         try {
             int slash = text.indexOf('/');

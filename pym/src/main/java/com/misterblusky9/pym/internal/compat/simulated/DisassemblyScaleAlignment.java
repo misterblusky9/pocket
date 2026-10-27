@@ -47,13 +47,11 @@ public final class DisassemblyScaleAlignment {
         return subLevel != null && Pym.scale().of(subLevel) < ScaleBounds.FULL - ScaleBounds.EPSILON;
     }
 
-    // alignment motors pin the craft; slack them so it grows like a normal resize
     public static void slackMotors(FreeConstraintHandle constraint) {
         if (constraint == null || !constraint.isValid()) return;
         for (ConstraintJointAxis axis : ConstraintJointAxis.ALL) constraint.setMotor(axis, 0.0D, 0.0D, 0.0D, false, 0.0D);
     }
 
-    // Simulated's startDisassembling values; tickDisassembling retargets linear each tick
     public static void restoreMotors(FreeConstraintHandle constraint) {
         if (constraint == null || !constraint.isValid()) return;
         constraint.setMotor(ConstraintJointAxis.ANGULAR_X, 0.0D, 13000.0D, 1000.0D, false, 0.0D);

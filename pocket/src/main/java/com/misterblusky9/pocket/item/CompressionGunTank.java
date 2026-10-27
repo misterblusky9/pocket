@@ -26,7 +26,6 @@ public final class CompressionGunTank {
     private static final ResourceLocation LEVITITE_BLEND =
             ResourceLocation.fromNamespaceAndPath("aeronautics", "levitite_blend");
 
-    // Empty-tank backup wear: 59 usable durability x 7 ticks = ~20 s of firing.
     private static final int BACKUP_WEAR_INTERVAL_TICKS = 7;
 
     public static final DeferredRegister.DataComponents COMPONENTS =
@@ -91,13 +90,11 @@ public final class CompressionGunTank {
         return drained;
     }
 
-    /** Levitite is the primary fuel; tool durability is the fallback, never a concurrent cost. */
     public static boolean hasPower(Player player, ItemStack stack) {
         return player != null && (player.isCreative() || amount(stack) > 0 || hasDurability(stack));
     }
 
     public static boolean hasDurability(ItemStack stack) {
-        // Preserve the gun's existing 1-durability safety margin for backup operation.
         return stack.isDamageableItem() && stack.getMaxDamage() - stack.getDamageValue() > 1;
     }
 
@@ -122,10 +119,6 @@ public final class CompressionGunTank {
         return true;
     }
 
-    /**
-     * Legacy one-shot durability backup; intentionally cannot wear a fuelled item.
-     * Kept for callers that used this public helper before the levitite migration.
-     */
     public static boolean runEngineOnce(ServerPlayer player, ItemStack stack, InteractionHand hand) {
         if (player.isCreative() || amount(stack) > 0) return true;
         if (!hasDurability(stack)) return false;
@@ -133,7 +126,6 @@ public final class CompressionGunTank {
         return true;
     }
 
-    /** Legacy backup helper; see {@link #consumeForActivation} for levitite-first activation. */
     public static boolean runEngineOnce(ServerPlayer player, ItemStack stack, int durabilityCost) {
         if (player.isCreative() || amount(stack) > 0) return true;
         if (durabilityCost <= 0) return true;
@@ -142,11 +134,6 @@ public final class CompressionGunTank {
         return true;
     }
 
-    /**
-     * Exactly one resource pays per activation. Even the last partial dose of levitite
-     * is a levitite-only use; durability is charged only when the tank began empty.
-     * Rejected backup uses do not alter the item.
-     */
     public static boolean consumeForActivation(
             ServerPlayer player, ItemStack stack, int levititeCost, int fullDurabilityCost
     ) {
@@ -169,7 +156,6 @@ public final class CompressionGunTank {
     }
 
     public static void stopEngine(Player player) {
-        // Retained for binary/source compatibility; no per-player engine debt remains.
     }
 
     private static final class Handler extends FluidHandlerItemStack {

@@ -54,11 +54,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * A spawn size belongs to the bed/anchor, not to the player's last life.
- * Spawn metadata is stored on the player, so Sable remains the owner of its
- * moving-sublevel tracking point and vanilla remains the owner of ordinary spawns.
- */
 @EventBusSubscriber(modid = "pocket")
 public final class ScaledRespawn {
     private static final String SPAWN = "PocketScaledSpawn";
@@ -72,10 +67,6 @@ public final class ScaledRespawn {
     private static final String ANCHOR = "anchor";
     private static final double EPS = 1.0E-5D;
 
-    // Sable unloads an unobserved craft while the player is on the death screen.
-    // Its tracking point can survive that unload, but the bed blocks cannot be
-    // inspected until it is reloaded. Hold only the craft with the saved spawn,
-    // only from death through the first few ticks after respawn.
     private static final SubLevelLoadingTicketType<String> RESPAWN_HOLD_TICKET =
             SubLevelLoadingTicketType.create(ResourceLocation.fromNamespaceAndPath(
                     "pocket", "pending_respawn"), Codec.STRING);
@@ -94,9 +85,6 @@ public final class ScaledRespawn {
         }
     }
 
-    // Sable 2.0.0 uses getType()/getKey(); 2.0.6 uses record accessors.
-    // This bridge is loaded only by startup cleanup, not when the ticket type
-    // is registered during mod construction or during death/respawn.
     private static final class TicketAccessors {
         static final Method TYPE = find("type", "getType");
         static final Method KEY = find("key", "getKey");
@@ -116,12 +104,7 @@ public final class ScaledRespawn {
         }
     }
 
-    // Set-spawn is confirmed after the block has actually handled the click.
-    // Checking the saved position alone is not confirmation: it may have been
-    // this very bed before the player right-clicked it with a tool.
     private static final Map<UUID, PendingSpawn> PENDING = new HashMap<>();
-    // Three ticks of server-side observation after death respawn. Never alters
-    // the player's size, position, or the Sable attachment.
     private static final Map<UUID, Integer> RESPAWN_WATCH = new HashMap<>();
 
     private static final class PendingSpawn {
@@ -154,8 +137,6 @@ public final class ScaledRespawn {
         }
     }
 
-    // These are adjacent-space preferences, not world-coordinate offsets. Sable
-    // rotates and scales the entire room when we project the final location.
     private static final int[][] OFFSETS = {
             { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 },
             { 1, 1 }, { -1, 1 }, { 1, -1 }, { -1, -1 },
@@ -166,15 +147,9 @@ public final class ScaledRespawn {
 
     private ScaledRespawn() {}
 
-    /**
-     * Calling this during mod construction initializes this class, registering
-     * RESPAWN_HOLD_TICKET before Sable deserializes saved tickets.
-     */
     public static void registerRespawnTicket() {
-        // The static field initializer performs the registration.
     }
 
-    /** Keep a verified bed's craft loaded while its player is dead. */
     @SubscribeEvent
     public static void holdRespawnCraft(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -224,8 +199,6 @@ public final class ScaledRespawn {
         }
     }
 
-    // Sable serializes loading tickets. Remove any leftover temporary tickets
-    // after a crash/restart, rather than keeping a sublevel loaded forever.
     @SubscribeEvent
     public static void clearStaleRespawnHolds(ServerStartedEvent event) {
         if (TicketAccessors.TYPE == null || TicketAccessors.KEY == null) return;
@@ -241,8 +214,6 @@ public final class ScaledRespawn {
                         if (!RESPAWN_HOLD_TICKET.equals(type)) continue;
                         key = TicketAccessors.KEY.invoke(ticket);
                     } catch (ReflectiveOperationException | IllegalArgumentException e) {
-                        // Unknown ticket implementations must not cause us to
-                        // remove other mods' tickets or abort world startup.
                         PocketTrace.logger().warn("[PocketScale] Could not inspect Sable respawn ticket for startup cleanup", e);
                         continue;
                     }
@@ -263,19 +234,14 @@ public final class ScaledRespawn {
         for (UUID playerId : new ArrayList<>(RESPAWN_HOLDS.keySet())) releaseRespawnHold(playerId);
     }
 
-    /** The interaction hook runs before vanilla consumes fuel or attempts to sleep. */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void interacted(PlayerInteractEvent.RightClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        // A PSC (or another held priority tool) owns this click. The bed must
-        // not silently set spawn while the player is trying to resize.
         if (event.getUseBlock() == TriState.FALSE || HeldInteractionPriority.claimsBlock(
                 player, event.getItemStack(), event.getLevel(), event.getPos())) return;
         BlockState state = event.getLevel().getBlockState(event.getPos());
         String kind = kind(state);
         if (kind == null) return;
-        // Let beds explode normally in forbidden dimensions. Glowstone still
-        // charges anchors; the spawn-setting method is guarded separately.
         if (BED.equals(kind) && !event.getLevel().dimensionType().bedWorks()) return;
         if (ANCHOR.equals(kind) && !RespawnAnchorBlock.canSetSpawn(event.getLevel())) return;
         if (ANCHOR.equals(kind) && event.getItemStack().is(Blocks.GLOWSTONE.asItem())
@@ -296,7 +262,6 @@ public final class ScaledRespawn {
         event.setCanceled(true);
     }
 
-    /** Confirms the bed/anchor was used, not merely right-clicked. */
     @SubscribeEvent
     public static void confirmClickedSpawn(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -313,8 +278,6 @@ public final class ScaledRespawn {
                 || !matchesClickedSpawn(level, pending.clicked, actual, pending.kind)) return;
 
         UUID newPoint = ((ServerPlayerRespawnExtension) player).sable$getRespawnPoint();
-        // Sable changes the tracking-point UUID each time it actually sets a
-        // craft spawn. On a failed click, the old position may still match.
         boolean tracked = pending.craftId == null
                 || (newPoint != null && !newPoint.equals(pending.oldTrackingPoint));
         if (!tracked || (!pending.setRespawnCalled && pending.craftId == null)) {
@@ -372,7 +335,6 @@ public final class ScaledRespawn {
                 && clicked.relative(BedBlock.getConnectedDirection(clickedState)).equals(actual);
     }
 
-    /** Called before Sable's cancellable setRespawnPosition HEAD injection. */
     public static boolean settingSpawn(ServerPlayer player, ResourceKey<Level> dimension, BlockPos pos) {
         if (pos == null) {
             PENDING.remove(player.getUUID());
@@ -387,7 +349,6 @@ public final class ScaledRespawn {
         BlockState state = level.getBlockState(pos);
         String kind = kind(state);
         if (kind == null) {
-            // /spawnpoint and other forced/custom spawns are vanilla-owned.
             PENDING.remove(player.getUUID());
             player.getPersistentData().remove(SPAWN);
             return true;
@@ -401,13 +362,9 @@ public final class ScaledRespawn {
         if (pending != null && pending.dimension.equals(dimension)
                 && pending.kind.equals(kind)
                 && matchesClickedSpawn(level, pending.clicked, pos, kind)) {
-            // Confirm only after Sable has installed a new tracking point.
-            // This avoids retaining spawn ratios from interactions that failed.
             pending.setRespawnCalled = true;
             return true;
         }
-        // Commands and mod integrations can call this without a right-click.
-        // Keep their existing behavior without pretending a bed was used.
         double bedScale = bedSize(level, pos);
         double playerScale = Pym.entities().scaleOf(player);
         if (ScaleBounds.isValid(playerScale) && ScaleBounds.isValid(bedScale))
@@ -430,11 +387,6 @@ public final class ScaledRespawn {
                 kind, pos, playerSize / bedSize, sublevel == null ? "none" : sublevel.getUniqueId());
     }
 
-    /**
-     * Sable/vanilla resolve the saved spawn before this event. Don't turn their
-     * successful result into a missing-bed respawn just because our optional
-     * adjacent-floor search cannot find a better location.
-     */
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void selectRespawn(PlayerRespawnPositionEvent event) {
         if (event.isFromEndFight()) return;
@@ -452,9 +404,6 @@ public final class ScaledRespawn {
                 data.contains(SPAWN, Tag.TAG_COMPOUND) ? spawn : "none");
         if (!spawn.contains(DIM, Tag.TAG_STRING) || !spawn.contains(POS, Tag.TAG_LONG)
                 || !spawn.contains(RATIO, Tag.TAG_ANY_NUMERIC)) {
-            // A legacy Sable spawn has no recorded size ratio. Keeping a 1x
-            // player in a miniature room would be unsafe; ordinary beds and
-            // full-sized craft still use their existing spawn.
             PocketTrace.scale("Scaled respawn: no stored bed-to-player ratio for saved position {}",
                     old.getRespawnPosition());
             guardUnscaledCraftRespawn(event, old);
@@ -472,8 +421,6 @@ public final class ScaledRespawn {
         }
 
         boolean originallyMissing = event.getOriginalDimensionTransition().missingRespawnBlock();
-        // Only claim that a bed was destroyed if the block can actually be
-        // inspected. An unloaded Sable holding chunk is not a destroyed bed.
         if (!level.hasChunkAt(pos)) {
             PocketTrace.scale("Scaled respawn: saved bed at {} is not loaded", pos);
             guardUnscaledCraftRespawn(event, old);
@@ -492,8 +439,6 @@ public final class ScaledRespawn {
         SubLevel containing = craftAtBed(level, pos);
         var queued = ((ServerPlayerRespawnExtension) old).sable$getQueuedFreeze();
         UUID expected = spawn.hasUUID(CRAFT) ? spawn.getUUID(CRAFT) : null;
-        // Sable's queued anchor is authoritative if an older saved record
-        // lacks its optional craft UUID.
         if (expected == null && queued != null && containing != null
                 && queued.first().equals(containing.getUniqueId())) expected = queued.first();
         SubLevel craft = expected == null ? null : containing;
@@ -502,10 +447,6 @@ public final class ScaledRespawn {
                 pos, expected, containing == null ? "none" : containing.getUniqueId(),
                 queued == null ? "none" : queued.first(), originallyMissing, level.hasChunkAt(pos));
         if (scaledCraft && (craft == null || craft.isRemoved() || !expected.equals(craft.getUniqueId()))) {
-            // A tracked Sable sublevel can temporarily be unloaded during
-            // position resolution. Do not destroy its respawn point based on
-            // an inconclusive lookup. A genuinely missing spawn is already
-            // handled by vanilla/Sable and stays at the safe 1x fallback.
             PocketTrace.scale("Scaled respawn: sublevel for bed at {} unresolved", pos);
             guardUnscaledCraftRespawn(event, old);
             return;
@@ -515,7 +456,6 @@ public final class ScaledRespawn {
             missing(event, old);
             return;
         }
-        // Sable's tracking point skips vanilla's block validity checks.
         if (scaledCraft && ANCHOR.equals(kind) && state.getValue(RespawnAnchorBlock.CHARGE) <= 0) {
             PocketTrace.scale("Scaled respawn: anchor at {} is out of charges", pos);
             missing(event, old);
@@ -540,9 +480,6 @@ public final class ScaledRespawn {
             Vec3 stand = findStandingRoom(level, pos, size, roomScale, BED.equals(kind));
             if (stand != null) {
                 Vec3 world = Pym.frames().toWorld(craft, stand);
-                // Audit ordinary world blocks separately from Sable's local
-                // holding-chunk collision. This is observational only: no
-                // position is rejected on the basis of this result.
                 if (Pym.debugging()) {
                     String worldAudit = size > 16.0D ? "skipped (over 16x)"
                             : auditWorldTerrain(level, world, size);
@@ -556,48 +493,33 @@ public final class ScaledRespawn {
                         it.unimi.dsi.fastutil.Pair.of(craft.getUniqueId(), new Vector3d(stand.x, stand.y, stand.z)));
                 if (originallyMissing) event.setCopyOriginalSpawnPosition(true);
             } else {
-                // Sable's tracking point is at the centre of the bed block.
-                // Keeping it when no clear spot exists can suffocate the new
-                // player, even when the bed is larger than 1x.
                 PocketTrace.scale("Scaled respawn: PLACEMENT FAILED at {} roomScale={} desiredScale={} bedOnly={} block={} ; using world spawn",
                         pos, roomScale, size, BED.equals(kind), state.getBlock());
                 safeWorldFallback(event, old);
                 return;
             }
-            // Vanilla consumes charges for ordinary anchors. Sable's tracked
-            // shortcut does not, so consume only if we kept a valid spawn.
             if (ANCHOR.equals(kind) && !event.getDimensionTransition().missingRespawnBlock()) {
                 level.setBlock(pos, state.setValue(RespawnAnchorBlock.CHARGE,
                         state.getValue(RespawnAnchorBlock.CHARGE) - 1), 3);
             }
         }
-        // A normal bed/anchor keeps vanilla's spawn-location decision. A
-        // legitimately missing/blocked spawn retains vanilla's 1x fallback.
         if (!event.getDimensionTransition().missingRespawnBlock()) {
             data.putDouble(NEXT, size);
             PocketTrace.scale("Scaled respawn: selected size {} for new player", size);
         }
     }
 
-    /**
-     * A successfully resolved Sable tracking point can still be an unsafe 1x
-     * respawn if the size record is missing or cannot be verified. In that
-     * case, use world spawn for this death without deleting a potentially
-     * valid bed/anchor or Sable tracking point.
-     */
     private static void guardUnscaledCraftRespawn(PlayerRespawnPositionEvent event, ServerPlayer player) {
         var queued = ((ServerPlayerRespawnExtension) player).sable$getQueuedFreeze();
-        if (queued == null) return; // Vanilla spawn; no Sable craft attachment.
+        if (queued == null) return;
         if (event.getDimensionTransition().missingRespawnBlock()) {
             ((SableRespawnQueueMixin) player).pocket$setQueuedFreeze(null);
-            return; // Already going to the world spawn.
+            return;
         }
 
         ServerLevel level = player.server.getLevel(player.getRespawnDimension());
         BlockPos pos = player.getRespawnPosition();
         SubLevel craft = level == null || pos == null ? null : craftAtBed(level, pos);
-        // Only trust 1x in a craft we can identify *and* prove is at least 1x.
-        // If the room is unloaded, fail safely rather than assuming scale 1.
         if (craft != null && !craft.isRemoved() && craft.getUniqueId().equals(queued.first())) {
             double scale = Pym.scale().of(craft);
             if (ScaleBounds.isValid(scale) && scale >= 1.0D) return;
@@ -616,9 +538,6 @@ public final class ScaledRespawn {
                 event.getDimensionTransition().missingRespawnBlock());
         DimensionTransition safe = DimensionTransition.missingRespawnBlock(player.server.overworld(), player,
                 event.getDimensionTransition().postDimensionTransition());
-        // This is an uncertain scale/loaded-state fallback, not proof that the
-        // original bed was destroyed. Suppress the misleading missing-bed text
-        // and retain the original spawn so it can work after the craft loads.
         event.setDimensionTransition(new DimensionTransition(safe.newLevel(), safe.pos(), safe.speed(),
                 safe.yRot(), safe.xRot(), false, safe.postDimensionTransition()));
         event.setCopyOriginalSpawnPosition(true);
@@ -628,15 +547,11 @@ public final class ScaledRespawn {
     private static void missing(PlayerRespawnPositionEvent event, ServerPlayer player) {
         player.getPersistentData().remove(SPAWN);
         ((SableRespawnQueueMixin) player).pocket$setQueuedFreeze(null);
-        // Do not leave an unreachable saved tracking point behind after the
-        // original spawn block is gone. Sable otherwise keeps the UUID alive.
         UUID oldPoint = ((ServerPlayerRespawnExtension) player).sable$getRespawnPoint();
         ServerLevel savedLevel = player.server.getLevel(player.getRespawnDimension());
         if (oldPoint != null && savedLevel != null) {
             SubLevelTrackingPointSavedData.getOrLoad(savedLevel).removeTrackingPoint(oldPoint);
         }
-        // Use vanilla's safe world-spawn search, including the missing-bed
-        // message, rather than relying on a now-invalid Sable tracking point.
         ServerLevel overworld = player.server.overworld();
         DimensionTransition current = event.getDimensionTransition();
         event.setDimensionTransition(DimensionTransition.missingRespawnBlock(overworld, player,
@@ -644,12 +559,6 @@ public final class ScaledRespawn {
         event.setCopyOriginalSpawnPosition(false);
     }
 
-    /**
-     * Audit vanilla world terrain at the full restored size (not local size).
-     * Sable's holding blocks live elsewhere, so they are checked by the
-     * existing local search and deliberately excluded from this audit.
-     * Never used to choose a respawn location; logs are diagnostic only.
-     */
     private static String auditWorldTerrain(ServerLevel level, Vec3 world, double scale) {
         if (!ScaleBounds.isValid(scale)) return "invalid size";
         double radius = 0.3D * scale;
@@ -682,7 +591,6 @@ public final class ScaledRespawn {
         double width = 0.6D * relative;
         double height = 1.8D * relative;
         int[] rangeY = { 0, 1, -1 };
-        // Search adjacent floor cells; don't accept a centre-of-bed spawn.
         for (int y : rangeY) {
             for (int[] offset : OFFSETS) {
                 BlockPos ground = start.offset(offset[0], y, offset[1]);
@@ -693,15 +601,9 @@ public final class ScaledRespawn {
                         local.z - width / 2.0D, local.x + width / 2.0D,
                         local.y + height, local.z + width / 2.0D);
                 if (!level.noCollision(localBox)) continue;
-                // The local holding blocks are authoritative for clearance.
-                // A second noCollision check in transformed world coordinates
-                // can reject perfectly safe spaces inside scaled sublevels.
                 return local;
             }
         }
-        // A bed-only sublevel has no neighbouring floor blocks. Spawn safely
-        // on top of a bed half instead; never use Sable's default bed-centre
-        // point, which intersects the bed at any player scale.
         if (bed) {
             Vec3 top = onTopOfBlock(level, start, width, height);
             if (top != null) return top;
@@ -743,8 +645,6 @@ public final class ScaledRespawn {
         if (level == null || pos == null) return null;
         SubLevel craft = Sable.HELPER.getContaining(level, pos);
         if (craft != null && !craft.isRemoved()) return craft;
-        // A bed can cross a holding-chunk boundary. When one half is available
-        // but its partner's Sable lookup is not, resolve through the partner.
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BedBlock)) return null;
         BlockPos other = pos.relative(BedBlock.getConnectedDirection(state));
@@ -779,8 +679,6 @@ public final class ScaledRespawn {
         if (!ScaleBounds.isValid(next)) next = 1.0D;
         to.getPersistentData().putDouble(NEXT, next);
         PersonalScale.remember(to, next);
-        // Clone fires inside restoreFrom, before moveTo and addRespawnedPlayer:
-        // the replacement enters the level already sized for the room.
         boolean applied = Pym.entities().setScale(to, next, 0);
         PocketTrace.scale("Scaled respawn: CLONE size={} applied={} oldSavedPos={} newSavedPos={} oldTracking={} newTracking={}",
                 next, applied, from.getRespawnPosition(), to.getRespawnPosition(),
@@ -794,7 +692,6 @@ public final class ScaledRespawn {
         CompoundTag data = player.getPersistentData();
         double scale = data.contains(NEXT, Tag.TAG_ANY_NUMERIC) ? data.getDouble(NEXT) : 1.0D;
         if (!ScaleBounds.isValid(scale)) scale = 1.0D;
-        // Fallback only: cloneScale already sized this player before it joined.
         double actual = Pym.entities().scaleOf(player);
         if (!ScaleBounds.same(actual, scale)) {
             PocketTrace.logger().warn("[PocketScale] Late respawn scale correction: player={} actual={} expected={}",

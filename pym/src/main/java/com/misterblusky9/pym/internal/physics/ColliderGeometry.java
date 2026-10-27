@@ -20,16 +20,24 @@ public final class ColliderGeometry {
         void accept(int cellX, int cellY, int cellZ, ColliderShapeKey.Face face);
     }
 
+    @FunctionalInterface
+    public interface MaterialCellConsumer {
+        void accept(int cellX, int cellY, int cellZ, ColliderShapeKey.Face face, short material);
+    }
+
     public static void visitDetailed(
             PlotShape shape,
             Vector3dc pivot,
             double scale,
-            CellConsumer consumer
+            MaterialCellConsumer consumer
     ) {
         if (shape == null || pivot == null || consumer == null || !validScale(scale)) return;
-        for (PlotShape.Box box : shape.boxes()) {
+        List<PlotShape.Box> boxes = shape.boxes();
+        for (int i = 0; i < boxes.size(); i++) {
+            PlotShape.Box box = boxes.get(i);
+            short material = shape.material(i);
             appendFragments(
-                    consumer, scale,
+                    (x, y, z, face) -> consumer.accept(x, y, z, face, material), scale,
                     ScaleFrame.contract(pivot.x(), box.minX(), scale),
                     ScaleFrame.contract(pivot.y(), box.minY(), scale),
                     ScaleFrame.contract(pivot.z(), box.minZ(), scale),
@@ -44,12 +52,16 @@ public final class ColliderGeometry {
             Vector3dc pivot,
             double scale,
             Set<SectionKey> requested,
-            CellConsumer consumer
+            MaterialCellConsumer consumer
     ) {
         if (shape == null || pivot == null || requested == null || requested.isEmpty()
                 || consumer == null || !validScale(scale)) return;
 
-        for (PlotShape.Box source : shape.boxes()) {
+        List<PlotShape.Box> boxes = shape.boxes();
+        for (int i = 0; i < boxes.size(); i++) {
+            PlotShape.Box source = boxes.get(i);
+            short material = shape.material(i);
+            CellConsumer cells = (x, y, z, face) -> consumer.accept(x, y, z, face, material);
             double minX = ScaleFrame.contract(pivot.x(), source.minX(), scale);
             double minY = ScaleFrame.contract(pivot.y(), source.minY(), scale);
             double minZ = ScaleFrame.contract(pivot.z(), source.minZ(), scale);
@@ -77,7 +89,7 @@ public final class ColliderGeometry {
                         double sectionMinZ = sz * 16.0D;
                         double sectionMaxZ = sectionMinZ + 16.0D;
                         appendFragments(
-                                consumer, scale,
+                                cells, scale,
                                 Math.max(minX, sectionMinX),
                                 Math.max(minY, sectionMinY),
                                 Math.max(minZ, sectionMinZ),

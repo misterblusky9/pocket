@@ -22,11 +22,6 @@ import net.neoforged.neoforge.client.event.RenderHandEvent;
 
 import java.lang.ref.WeakReference;
 
-/**
- * Debug spike for {@link Portrait}: {@code /pymportrait} grabs the sublevel under the crosshair,
- * and while your main hand is empty it is drawn there, live, through Sable's own renderer.
- * Run it again while looking at nothing to let go.
- */
 public final class PortraitMirror {
     private static final double REACH = 64.0D;
     private static final float HELD_SIZE = 0.5F;

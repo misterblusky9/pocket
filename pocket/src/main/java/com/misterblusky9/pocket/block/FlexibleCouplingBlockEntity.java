@@ -29,7 +29,6 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 
 public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
-    // Disconnect after a quarter-second continuously beyond the configured reach.
     private static final int OVERSTRETCH_TICKS_TO_SNAP = 5;
     private static final double SNAP_STRETCH = 1.5;
     private static final double SNAP_SLACK = 0.5;
@@ -45,6 +44,8 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
     private UUID partnerSubLevel;
     private float ticksWithoutPartner = 0.0F;
     private int overstretchTicks;
+    private int redstoneInput;
+    private int redstoneOutput;
 
     public FlexibleCouplingBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -77,8 +78,6 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         }
         double newDesiredLength = Math.clamp(desiredLength + delta, MIN_LENGTH, MAX_LENGTH);
         newDesiredLength = Math.round(newDesiredLength / 0.25) * 0.25;
-        // Prevent tightening an already stretched shaft past its snap threshold.
-        // Distance and desiredLength are both in world blocks (including across sublevel scales).
         if (delta < 0.0 && partnerPos != null &&
                 Sable.HELPER.distanceSquaredWithSubLevels(level, worldPosition.getCenter(),
                         partnerPos.getCenter()) > Math.pow(snappingDistance(newDesiredLength), 2.0)) {
@@ -111,7 +110,6 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
             return;
         }
         if (!SimLevelUtil.isAreaActuallyLoaded(getLevel(), partnerPos, 1)) {
-            // Unloaded endpoints cannot be measured reliably. Do not count them as stretched.
             overstretchTicks = 0;
             return;
         }
@@ -125,7 +123,7 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         }
         ticksWithoutPartner = 0;
         if (!isController) {
-            return; // Only one side measures, breaks, and drops the shaft.
+            return;
         }
         double distanceSquared = Sable.HELPER.distanceSquaredWithSubLevels(
                 level, worldPosition.getCenter(), partnerPos.getCenter());
@@ -191,6 +189,10 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         super.write(tag, registries, clientPacket);
         tag.putBoolean("Controller", isController);
         tag.putDouble("DesiredLength", desiredLength);
+        if (!clientPacket) {
+            tag.putInt("RedstoneInput", redstoneInput);
+            tag.putInt("RedstoneOutput", redstoneOutput);
+        }
         if (partnerPos == null) {
             return;
         }
@@ -239,6 +241,10 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         partnerPos = null;
         partnerSubLevel = null;
         desiredLength = tag.getDouble("DesiredLength");
+        if (!clientPacket) {
+            redstoneInput = tag.getInt("RedstoneInput");
+            redstoneOutput = tag.getInt("RedstoneOutput");
+        }
         if (renderLength.getValue() == 0.0F) {
             renderLength.setValue(desiredLength);
         }
@@ -294,6 +300,7 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         setChanged();
         notifyUpdate();
         attachKinetics();
+        syncRedstone();
     }
 
     public void unlink() {
@@ -309,6 +316,52 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         setChanged();
         notifyUpdate();
         attachKinetics();
+        refreshRedstoneOutput();
+    }
+
+    public int getRedstoneOutput() {
+        return redstoneOutput;
+    }
+
+    public void updateRedstoneInput() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        int input = redstoneOutput > 0 ? 0 : level.getBestNeighborSignal(worldPosition);
+        if (input == redstoneInput) {
+            return;
+        }
+        redstoneInput = input;
+        setChanged();
+        FlexibleCouplingBlockEntity partner = getPartner();
+        if (partner != null) {
+            partner.refreshRedstoneOutput();
+        }
+    }
+
+    private void refreshRedstoneOutput() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        FlexibleCouplingBlockEntity partner = getPartner();
+        int output = partner != null && partner.isPartnerOf(this) && partner.redstoneOutput == 0
+                ? partner.redstoneInput : 0;
+        if (output == redstoneOutput) {
+            return;
+        }
+        redstoneOutput = output;
+        setChanged();
+        level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+        updateRedstoneInput();
+    }
+
+    private boolean isPartnerOf(FlexibleCouplingBlockEntity other) {
+        return worldPosition.equals(other.partnerPos) && other.getBlockPos().equals(partnerPos);
+    }
+
+    private void syncRedstone() {
+        updateRedstoneInput();
+        refreshRedstoneOutput();
     }
 
     public double getSnappingDistance() {
@@ -337,6 +390,7 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
     public void lazyTick() {
         super.lazyTick();
         invalidateRenderBoundingBox();
+        syncRedstone();
     }
 
     @Nullable

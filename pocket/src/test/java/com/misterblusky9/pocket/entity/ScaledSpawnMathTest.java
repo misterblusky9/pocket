@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.entity;
 
-/** Executable without Minecraft: javac -d build ... && java -cp build ... */
 public final class ScaledSpawnMathTest {
     public static void main(String[] args) {
         check(ScaledSpawnMath.fits(0.125, 0.125), "tiny player/tiny bed");

@@ -1,13 +1,17 @@
 package com.misterblusky9.pym.internal.compat.aeronautics_utility_objects.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.misterblusky9.pym.internal.compat.aeronautics_utility_objects.LinkageForceContext;
+import com.misterblusky9.pym.internal.compat.aeronautics_utility_objects.LinkageLengthScale;
 import com.misterblusky9.pym.internal.physics.GenericConstraintState;
 import dev.ryanhcode.sable.api.physics.constraint.ConstraintJointAxis;
 import dev.ryanhcode.sable.api.physics.constraint.GenericConstraintHandle;
 import dev.ryanhcode.sable.api.physics.force.ForceTotal;
 import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -22,9 +26,11 @@ public abstract class HydraulicConstraintMixin {
             remap = false
     )
     private void pym$scaleBothHydraulicEndpoints(
-            RigidBodyHandle handle, ForceTotal force, Operation<Void> original
+            RigidBodyHandle handle, ForceTotal force, Operation<Void> original,
+            @Local(argsOnly = true, ordinal = 0) ServerSubLevel own,
+            @Local(argsOnly = true, ordinal = 1) ServerSubLevel other
     ) {
-        LinkageForceContext.apply(handle, force, original);
+        LinkageForceContext.apply(handle, force, own, other, original);
     }
 
     @WrapOperation(
@@ -34,7 +40,7 @@ public abstract class HydraulicConstraintMixin {
                     + "ConstraintJointAxis;DD)V"),
             remap = false
     )
-    private void pym$keepWorldLengthLimits(
+    private void pym$metricLengthLimits(
             GenericConstraintHandle handle, ConstraintJointAxis axis,
             double min, double max, Operation<Void> original
     ) {
@@ -42,6 +48,7 @@ public abstract class HydraulicConstraintMixin {
                 && access.pym$genericState() != null) {
             access.pym$genericState().useMetricLinearLimits();
         }
-        original.call(handle, axis, min, max);
+        double scale = LinkageLengthScale.ofLink((BlockEntity) (Object) this);
+        original.call(handle, axis, min * scale, max * scale);
     }
 }

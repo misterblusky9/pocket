@@ -10,12 +10,12 @@ import com.misterblusky9.pocket.item.HeldInteractionPriority;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.network.CrossScaleWeldPayload;
 import com.misterblusky9.pocket.network.HotGluePunchPayload;
+import com.simibubi.create.AllKeys;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.content.items.merging_glue.MergingGlueItemHandler;
 import dev.simulated_team.simulated.util.SimColors;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -419,8 +419,8 @@ public final class HotGlueGunClient {
     }
 
     private static WeldGeometry.SnapMode mode() {
-        if (Screen.hasAltDown()) return WeldGeometry.SnapMode.FREE;
-        if (Screen.hasControlDown()) return WeldGeometry.SnapMode.MAGNET;
+        if (AllKeys.altDown()) return WeldGeometry.SnapMode.FREE;
+        if (AllKeys.ctrlDown()) return WeldGeometry.SnapMode.MAGNET;
         return WeldGeometry.SnapMode.SMART;
     }
 

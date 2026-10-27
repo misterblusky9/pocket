@@ -124,7 +124,9 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
     }
 
     public static boolean permits(ItemStack stack, Player player, double scale) {
-        return ScaleBounds.isValid(scale);
+        return ScaleBounds.isValid(scale)
+                && (limits(stack, player).contains(scale)
+                        || EntityCompressionTargeting.carriedNearby(player, RANGE, scale));
     }
 
     public static double selectedScale(ItemStack stack, Player player) {

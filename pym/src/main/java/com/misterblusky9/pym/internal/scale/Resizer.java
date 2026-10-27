@@ -11,7 +11,6 @@ import com.misterblusky9.pym.internal.entity.EntityScaleTracker;
 import com.misterblusky9.pym.internal.extension.PymExtensions;
 import com.misterblusky9.pym.internal.network.ScaleNetwork;
 import com.misterblusky9.pym.internal.physics.ConstraintRefresh;
-import com.misterblusky9.pym.internal.physics.PlotShapeCache;
 import com.misterblusky9.pym.internal.physics.ScalePhysicsTransitions;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -158,19 +157,6 @@ public final class Resizer {
         ScalePersistence.persist(subLevel);
         ScaleNetwork.sendScale(subLevel, canonical, canonical, true);
         return ResizeResult.accepted(canonical);
-    }
-
-    public static void adoptSplit(ServerSubLevel child, ServerSubLevel parent, double scale) {
-        double canonical = ScaleSnap.snap(scale);
-        ScaleState.settle(child, canonical);
-        ScaleMotion.setPoseScale(child, canonical);
-        child.updateLastPose();
-        ScalePersistence.persist(child);
-        ScaleState.clearServerBounds(child.getUniqueId());
-        PlotShapeCache.invalidate(parent);
-        PlotShapeCache.invalidate(child);
-        SubLevelParentage.record(child, parent);
-        ScaleNetwork.sendScale(child, canonical, canonical, true);
     }
 
     private static ResizeResult collect(

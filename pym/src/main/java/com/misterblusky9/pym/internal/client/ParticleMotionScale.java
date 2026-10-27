@@ -2,11 +2,6 @@ package com.misterblusky9.pym.internal.client;
 
 import net.minecraft.client.particle.Particle;
 
-/**
- * A tick is evaluated in vanilla-sized velocity units, then movement and the
- * resulting velocity are converted back to world units. No particle whitelist:
- * the particle's normal virtual move() is used for all implementations.
- */
 public final class ParticleMotionScale {
     private static final ThreadLocal<Active> ACTIVE = new ThreadLocal<>();
 

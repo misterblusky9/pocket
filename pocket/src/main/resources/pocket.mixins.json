@@ -56,7 +56,12 @@
     "create.HelmBearingContraptionInteractionClientMixin",
     "create.ZapperLaserBeamColourMixin",
     "create.ZapperBeamColourMixin",
-    "create.BacktankRendererPartialsMixin"
+    "create.BacktankRendererPartialsMixin",
+    "client.CreativeTabBannerRowMixin",
+    "client.CreativeScreenTabBannerMixin",
+    "client.ItemPickerMenuBannerScrollMixin",
+    "client.BannerSpriteContentsMixin",
+    "client.BannerSpriteTickerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
