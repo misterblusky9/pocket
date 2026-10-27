@@ -26,6 +26,8 @@ public abstract class PlayerPoseFitScaleMixin {
         double skin = pym$restingSkin(self);
         if (skin <= 0.0D) return false;
         AABB box = self.getDimensions(pose).makeBoundingBox(self.position()).deflate(1.0E-7D);
+        // The skin fallback must not bypass Sable's real sublevel headroom
+        // check. Vanilla Level.noCollision alone does not include those OBBs.
         AABB raisedBox = box.setMinY(box.minY + skin);
         return self.level().noCollision(self, raisedBox)
                 && CanFallAtleastHelper.canFallAtleastWithSubLevels(self.level(), raisedBox) == null;

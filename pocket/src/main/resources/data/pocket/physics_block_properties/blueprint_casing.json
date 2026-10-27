@@ -2,6 +2,6 @@
   "selector": "pocket:blueprint_casing",
 
   "properties": {
-    "sable:friction": 4.0
+    "sable:friction": 1.65
   }
 }

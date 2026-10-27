@@ -84,6 +84,7 @@ public final class BeamSession {
 
         ItemStack gun = player.getItemInHand(this.hand);
         if (!(gun.getItem() instanceof CompressionGunItem)) return false;
+        // Consume the last sliver of levitite before permitting durability backup.
         int drained = CompressionGunTank.drain(gun, whole);
         return drained == whole || CompressionGunTank.hasDurability(gun);
     }

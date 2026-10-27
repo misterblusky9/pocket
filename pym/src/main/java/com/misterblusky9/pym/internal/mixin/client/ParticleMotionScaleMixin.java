@@ -7,6 +7,12 @@ import net.minecraft.client.particle.Particle;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
+/**
+ * Applies the emitter scale to intrinsic displacement at the common Particle
+ * move boundary, before Sable performs collisions against world geometry.
+ * The normalization scope is ONLY active during Particle.tick(); Sable's
+ * inherited plot motion happens outside that scope and is not multiplied.
+ */
 @Mixin(value = Particle.class, priority = 1100)
 public abstract class ParticleMotionScaleMixin implements ParticleMotionScale.Carrier {
     @Unique private double pym$emissionScale = 1.0D;

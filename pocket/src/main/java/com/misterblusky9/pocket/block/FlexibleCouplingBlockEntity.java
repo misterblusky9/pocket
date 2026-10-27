@@ -29,6 +29,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
 
 public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
+    // Disconnect after a quarter-second continuously beyond the configured reach.
     private static final int OVERSTRETCH_TICKS_TO_SNAP = 5;
     private static final double SNAP_STRETCH = 1.5;
     private static final double SNAP_SLACK = 0.5;
@@ -76,6 +77,8 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         }
         double newDesiredLength = Math.clamp(desiredLength + delta, MIN_LENGTH, MAX_LENGTH);
         newDesiredLength = Math.round(newDesiredLength / 0.25) * 0.25;
+        // Prevent tightening an already stretched shaft past its snap threshold.
+        // Distance and desiredLength are both in world blocks (including across sublevel scales).
         if (delta < 0.0 && partnerPos != null &&
                 Sable.HELPER.distanceSquaredWithSubLevels(level, worldPosition.getCenter(),
                         partnerPos.getCenter()) > Math.pow(snappingDistance(newDesiredLength), 2.0)) {
@@ -108,6 +111,7 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
             return;
         }
         if (!SimLevelUtil.isAreaActuallyLoaded(getLevel(), partnerPos, 1)) {
+            // Unloaded endpoints cannot be measured reliably. Do not count them as stretched.
             overstretchTicks = 0;
             return;
         }
@@ -121,7 +125,7 @@ public class FlexibleCouplingBlockEntity extends KineticBlockEntity {
         }
         ticksWithoutPartner = 0;
         if (!isController) {
-            return;
+            return; // Only one side measures, breaks, and drops the shaft.
         }
         double distanceSquared = Sable.HELPER.distanceSquaredWithSubLevels(
                 level, worldPosition.getCenter(), partnerPos.getCenter());

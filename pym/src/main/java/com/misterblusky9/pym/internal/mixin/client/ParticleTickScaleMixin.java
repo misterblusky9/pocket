@@ -9,6 +9,13 @@ import net.minecraft.client.particle.ParticleEngine;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
+/**
+ * All particle subclasses get the same emitter-relative tick rules. Vanilla
+ * constants (gravity, random drift, upward acceleration) therefore operate in
+ * particle-sized units, with drag and lifetime unchanged. The move() hook
+ * projects intrinsic movement into world space before Sable handles collision.
+ * Sable's separate post-tick inherited-velocity step stays outside this scope.
+ */
 @Mixin(value = ParticleEngine.class, priority = 500)
 public abstract class ParticleTickScaleMixin {
     @WrapOperation(method = "tickParticle", at = @At(value = "INVOKE",

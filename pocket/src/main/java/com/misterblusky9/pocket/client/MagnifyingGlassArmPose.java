@@ -11,6 +11,7 @@ public final class MagnifyingGlassArmPose {
             HumanoidModel.ArmPose.class, false, (IArmPoseTransformer) (model, entity, arm) -> {
                 boolean right = arm == HumanoidArm.RIGHT;
                 ModelPart part = right ? model.rightArm : model.leftArm;
+                // Mirror the spyglass's head-relative arm pose rather than a horizontal aiming-gun pose.
                 part.yRot = model.head.yRot + (right ? -0.2617994F : 0.2617994F);
                 part.xRot = net.minecraft.util.Mth.clamp(model.head.xRot - 1.9198622F
                         - (entity.isCrouching() ? 0.2617994F : 0.0F), -2.4F, 3.3F);

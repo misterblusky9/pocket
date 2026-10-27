@@ -50,9 +50,9 @@ import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 
 public final class ScaleSelectionScreen extends Screen {
-    private static final double BOARD_MIN = 1.0D / 16.0D;
-    private static final double BOARD_MAX = 4.0D;
-    private static final double[] EXTENDED_STOPS = {1.0D / 32.0D, 8.0D, 16.0D};
+    private static final double BOARD_MIN = 1.0D / 32.0D;
+    private static final double BOARD_MAX = 8.0D;
+    private static final double[] EXTENDED_STOPS = {1.0D / 64.0D, 16.0D};
     private static final double[] FINE_STOPS = {
             1.0D / 10.0D, 1.0D / 5.0D, 1.0D / 3.0D, 2.0D / 3.0D, 3.0D / 4.0D,
             1.25D, 1.5D, 1.75D, 2.25D, 2.5D, 2.75D, 3.0D, 3.25D, 3.5D, 3.75D};
@@ -68,8 +68,8 @@ public final class ScaleSelectionScreen extends Screen {
     private static final int BAR_WIDTH = 125;
     private static final int BAR_HEIGHT = 8;
     private static final int CENTRE = BAR_WIDTH / 2;
-    private static final int BELOW_SPACING = 14;
-    private static final int ABOVE_SPACING = 20;
+    private static final int BELOW_SPACING = 10;
+    private static final int ABOVE_SPACING = 8;
     private static final int TARGETING_LABEL_LEFT = 89;
     private static final int TARGETING_LABEL_TOP = 76;
     private static final int TARGET_BUTTON_LEFT = 89;
@@ -103,6 +103,7 @@ public final class ScaleSelectionScreen extends Screen {
     private static final double PREVIEW_CENTRE_GAP = 1.0D;
 
     private static final Supplier<Block> PREVIEW_GROUND_BLOCK = () -> Blocks.GRASS_BLOCK;
+    private static final Supplier<Block> PREVIEW_SUBSOIL_BLOCK = () -> Blocks.DIRT;
 
     private static final int TITLE_TEXT = 0x54214F;
     private static final int LABEL_TEXT = 0x787878;
@@ -160,7 +161,7 @@ public final class ScaleSelectionScreen extends Screen {
         applyRange(tool.selectionRange(stack, player));
 
         this.initial = tool.selection(stack, player);
-        this.value = this.range.clamp(this.initial);
+        this.value = ScaleBounds.isValid(this.initial) ? this.initial : ScaleBounds.FULL;
         this.previewValue = this.value;
         this.shrinkRayMenu = stack.getItem() instanceof CreativeShrinkRayItem;
         this.playerPreview = stack.getItem() instanceof SelfResizeDeviceItem;
@@ -423,6 +424,7 @@ public final class ScaleSelectionScreen extends Screen {
                     Math.log(PREVIEW_TINY_CAMERA_AT_MIN) * previewTinyProgress(scale));
             pixelsPerBlock *= cameraZoom;
         }
+        if (scale < PREVIEW_MIN_SCALE) pixelsPerBlock *= PREVIEW_MIN_SCALE / scale;
 
         double maxTargetPixels = PREVIEW_HEIGHT
                 - PREVIEW_GROUND_INSET
@@ -495,13 +497,14 @@ public final class ScaleSelectionScreen extends Screen {
     ) {
         double blockPixels = Math.max(1.0D, pixelsPerBlock);
         TextureAtlasSprite side = sideSprite(PREVIEW_GROUND_BLOCK.get().defaultBlockState());
+        TextureAtlasSprite subsoil = sideSprite(PREVIEW_SUBSOIL_BLOCK.get().defaultBlockState());
         int first = (int) Math.floor((x0 - anchorX) / blockPixels);
         int last = (int) Math.ceil((x1 - anchorX) / blockPixels);
 
         for (int i = first; i <= last; i++) {
             double tileX = anchorX + i * blockPixels;
             for (double tileY = groundY; tileY < groundY + groundInset; tileY += blockPixels) {
-                blitSprite(graphics, side, tileX, tileY, 0.0F, blockPixels);
+                blitSprite(graphics, tileY == groundY ? side : subsoil, tileX, tileY, 0.0F, blockPixels);
             }
         }
     }
@@ -671,9 +674,13 @@ public final class ScaleSelectionScreen extends Screen {
             value(PocketValueSettingsTexture.MILESTONE).render(graphics, xOf(stop) - 3, barY);
         }
 
-        String text = HudScaleText.bare(this.value);
+        Component text = this.value > BOARD_MAX + ScaleBounds.EPSILON ? Component.literal(">").withStyle(ChatFormatting.BOLD)
+                : this.value < BOARD_MIN - ScaleBounds.EPSILON ? Component.literal("<").withStyle(ChatFormatting.BOLD)
+                : Component.literal(HudScaleText.bare(this.value));
         int width = (this.font.width(text) / 2) * 2 + 3;
-        int cursorX = Mth.clamp(xOf(this.value) - width / 2, barX, barX + BAR_WIDTH - width);
+        int cursorX = this.value > BOARD_MAX + ScaleBounds.EPSILON ? barX + BAR_WIDTH - width
+                : this.value < BOARD_MIN - ScaleBounds.EPSILON ? barX
+                : Mth.clamp(xOf(this.value) - width / 2, barX, barX + BAR_WIDTH - width);
         int cursorY = barY - 3;
         value(PocketValueSettingsTexture.CURSOR_LEFT).render(graphics, cursorX - 3, cursorY);
         UIRenderHelper.drawCropped(graphics, cursorX, cursorY, width, 14, 0, value(PocketValueSettingsTexture.CURSOR));
@@ -822,6 +829,7 @@ public final class ScaleSelectionScreen extends Screen {
     }
 
     private void commitField() {
+        if (this.field.getValue().equals(fieldText(this.value))) return;
         double parsed = parse(this.field.getValue());
         if (!Double.isNaN(parsed)) {
             set(ScaleBounds.isValid(parsed) ? this.range.clamp(parsed) : this.range.min(), false);
@@ -877,17 +885,17 @@ public final class ScaleSelectionScreen extends Screen {
         if (this.field != null && this.field.isFocused()) commitField();
 
         ScaleSelectingItem tool = (ScaleSelectingItem) stack.getItem();
-        if (!ScaleBounds.isValid(this.value) || !this.range.contains(this.value)) return;
+        if (ScaleBounds.isValid(this.value) && this.range.contains(this.value)) {
+            if (stack.getItem() instanceof CreativeShrinkRayItem) {
+                CreativeShrinkRayItem.setTargetingMode(stack, this.targeting, player);
+            }
+            tool.select(stack, this.value);
 
-        if (stack.getItem() instanceof CreativeShrinkRayItem) {
-            CreativeShrinkRayItem.setTargetingMode(stack, this.targeting, player);
-        }
-        tool.select(stack, this.value);
-
-        if (stack.getItem() instanceof CreativeShrinkRayItem) {
-            PacketDistributor.sendToServer(new ShrinkRaySettingsPayload(this.hand, this.value, this.targeting.ordinal()));
-        } else {
-            PacketDistributor.sendToServer(new ShrinkRayScalePayload(this.hand, this.value));
+            if (stack.getItem() instanceof CreativeShrinkRayItem) {
+                PacketDistributor.sendToServer(new ShrinkRaySettingsPayload(this.hand, this.value, this.targeting.ordinal()));
+            } else {
+                PacketDistributor.sendToServer(new ShrinkRayScalePayload(this.hand, this.value));
+            }
         }
         if (stack.getItem() instanceof SelfResizeDeviceItem && this.pvpToggleVisible) {
             PersonalLock.setClient(this.unlocked);

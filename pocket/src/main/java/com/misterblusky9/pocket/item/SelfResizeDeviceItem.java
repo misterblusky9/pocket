@@ -14,11 +14,12 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-public final class SelfResizeDeviceItem extends Item implements ScaleSelectingItem {
+public final class SelfResizeDeviceItem extends Item implements ScaleSelectingItem, PriorityInteractionItem {
     public static final int CAPACITY = 1000;
     public static final int LEVITITE_PER_USE = 100;
     public static final int DURABILITY_PER_USE = 4;
@@ -26,6 +27,13 @@ public final class SelfResizeDeviceItem extends Item implements ScaleSelectingIt
 
     public SelfResizeDeviceItem(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public boolean claimsBlock(Player player, ItemStack stack, Level level, BlockPos pos) {
+        // Sneaking intentionally bypasses PSC activation; respect normal block
+        // interactions in that mode.
+        return !player.isShiftKeyDown();
     }
 
     @Override

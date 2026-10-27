@@ -48,6 +48,7 @@
     "client.SubLevelCameraZoomScaleMixin",
     "client.SubLevelNearPlaneScaleMixin",
     "client.VanillaChunkedSubLevelRenderDataMixin",
+    "client.PortraitPoseMixin",
     "client.SingleBlockSubLevelScaleMixin",
     "client.SubLevelOutlineCameraMixin",
     "client.SubLevelRenderOffsetScaleMixin",

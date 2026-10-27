@@ -14,6 +14,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Sable 2.0.6 removes vanilla's fixed +0.1 constructor Y and reinserts it as
+ * WORLD-up 0.1 when the particle starts in a plot. Fix this at its origin,
+ * independent of particle class and before any provider/subclass modifies
+ * the resulting velocity. Must run after Sable's default-priority TAIL hook.
+ */
 @Mixin(value = Particle.class, priority = 500)
 public abstract class ParticleConstructorFrameMixin {
     @Shadow protected double xd;
@@ -24,6 +30,10 @@ public abstract class ParticleConstructorFrameMixin {
     private void pym$fixSubLevelConstructorImpulse(
             ClientLevel level, double x, double y, double z,
             double xd, double yd, double zd, CallbackInfo ci) {
+        // TerrainParticle uses Particle.setPower after construction (and Sable
+        // temporarily converts its velocity to world space during block-crack
+        // creation). Preserve the previously proven post-projection correction
+        // for that shared particle behavior instead of correcting it twice.
         if ((Object) this instanceof TerrainParticle) return;
         ClientSubLevel plot = Sable.HELPER.getContainingClient(new Vec3(x, y, z));
         if (plot == null || plot.isRemoved()) return;

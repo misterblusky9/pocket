@@ -271,6 +271,7 @@ public final class RapierBridge {
         if (subLevel == null || subLevel.getLevel() == null) return;
         MassData raw = subLevel.getMassTracker();
         if (raw == null) return;
+        // massless craft (e.g. all weightless blocks): Sable skips the mass update too
         Vector3dc center = raw.getCenterOfMass();
         if (center == null) return;
         try {

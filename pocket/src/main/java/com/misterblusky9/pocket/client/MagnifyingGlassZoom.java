@@ -42,19 +42,21 @@ public final class MagnifyingGlassZoom {
     private static boolean toggled;
     private static double target = MIN_DIAL;
     private static double dial = MIN_DIAL;
-    private static double raise;
-    private static double approach;
+    private static double raise; // 0 lowered, 1 centered at the face
+    private static double approach; // 0 centered, 1 lens at the eye
     private static long lastNanos;
     private static LocalPlayer sessionPlayer;
     private static net.minecraft.client.multiplayer.ClientLevel sessionLevel;
 
     public static double opticalZoom() {
         double candidate = Math.max(1.0D, dial / EYE_DIAL);
+        // Optical FOV begins only once the moving lens is almost against the eye.
         double start = smooth((float) Mth.clamp((approach - 0.90D) / 0.10D, 0.0D, 1.0D));
         return Math.exp(Math.log(candidate) * start);
     }
 
     private static float nearClipProgress() {
+        // Push the glass naturally beyond the camera near-plane as magnification takes over.
         float settled = smooth((float) Mth.clamp((approach - 0.975D) / 0.025D, 0.0D, 1.0D));
         float zooming = smooth((float) Mth.clamp((opticalZoom() - 1.0D) / 0.35D, 0.0D, 1.0D));
         return settled * zooming;
@@ -68,6 +70,7 @@ public final class MagnifyingGlassZoom {
         return approach;
     }
 
+    /** A stable source of first-person hand movement, shared by all optical devices later. */
     public static boolean applyHandTransform(PoseStack matrices, LocalPlayer player,
                                               HumanoidArm arm, ItemStack stack,
                                               float partialTick, float equip, float swing) {
@@ -77,6 +80,7 @@ public final class MagnifyingGlassZoom {
         float r = smooth((float) raise);
         float a = smooth((float) approach);
 
+        // The model's own first-person display places it; raising swaps models behind an equip-style dip.
         boolean raisedModel = raisedLocally(player, stack) || MagnifyingGlassItem.isRaised(stack);
         float dip = raisedModel ? 1.0F - r : r;
         PoseStack hand = new PoseStack();
@@ -84,6 +88,7 @@ public final class MagnifyingGlassZoom {
         hand.translate(0.0F, -0.6F * dip, 0.0F);
 
         if (a > 1.0E-4F) {
+            // Scale about the lens while carrying it from the authored pose to the eye.
             Vector3f lens = lensInHand(hand, player, arm, stack);
             float scale = 1.0F + 1.8F * a;
             float z = Mth.lerp(a, lens.z, EYE_LENS_Z) + 0.65F * nearClipProgress();
@@ -100,6 +105,7 @@ public final class MagnifyingGlassZoom {
 
     private static void vanillaHandTransform(PoseStack matrices, HumanoidArm arm,
                                              float equip, float swing) {
+        // ItemInHandRenderer's default branch, which returning true replaces.
         float side = arm == HumanoidArm.RIGHT ? 1.0F : -1.0F;
         float root = Mth.sqrt(swing);
         matrices.translate(side * -0.4F * Mth.sin(root * (float) Math.PI),
@@ -234,6 +240,7 @@ public final class MagnifyingGlassZoom {
     public static void onComputeFov(ViewportEvent.ComputeFov event) {
         animate();
         if (!event.usedConfiguredFov()) return;
+        // Complete physical approach before optical zoom begins. Retains vanilla FOV until then.
         double m = opticalZoom();
         if (m <= 1.00001D) return;
         double halfRadians = Math.toRadians(event.getFOV()) * 0.5D;
@@ -287,6 +294,8 @@ public final class MagnifyingGlassZoom {
     }
 
     public static void onRenderHand(RenderHandEvent event) {
+        // Stop drawing only the glass hand once the lens has crossed the camera near-plane.
+        // The other hand must remain rendered so that offhand inspection supports building.
         if (raise < 0.998D || nearClipProgress() < 0.999F) return;
         LocalPlayer player = Minecraft.getInstance().player;
         if (player == null) return;

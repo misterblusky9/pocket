@@ -87,6 +87,7 @@ final class CompressionGunMuzzleTracker {
         HumanoidArm usedArm = player.getUsedItemHand() == InteractionHand.MAIN_HAND
                 ? player.getMainArm()
                 : player.getMainArm() == HumanoidArm.RIGHT ? HumanoidArm.LEFT : HumanoidArm.RIGHT;
+        // Recoil
         double pull = 1.0D - CompressionGunRenderHandler.INSTANCE
                 .getAnimation(usedArm == HumanoidArm.RIGHT, partialTick) * RECOIL_PULL;
         double scale = Pym.entities().renderScale(player, partialTick);

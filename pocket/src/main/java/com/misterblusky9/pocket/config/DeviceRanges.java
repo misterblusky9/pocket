@@ -29,7 +29,7 @@ public final class DeviceRanges {
     public enum Device {
         CREATIVE_SHRINK_RAY("creativeShrinkRay", "Creative Shrinkray", new ScaleBounds(1.0D / 32.0D, ScaleBounds.SAFE.max())),
         COMPRESSION_GUN("compressionGun", "Compression guns", new ScaleBounds(1.0D / 32.0D, ScaleBounds.SAFE.max())),
-        PERSONAL_COMPRESSOR("personalCompressor", "Personal Subspace Compressor", new ScaleBounds(1.0D / 32.0D, 16.0D)),
+        PERSONAL_COMPRESSOR("personalCompressor", "Personal Subspace Compressor", new ScaleBounds(1.0D / 64.0D, 16.0D)),
         COMPRESSORS("compressors", "Static and Portable Subspace Compressors", ScaleBounds.SAFE);
 
         private final String key;
@@ -57,7 +57,7 @@ public final class DeviceRanges {
         builder.comment(
                 "The smallest and largest scale each device can reach.",
                 "Defaults are Pym's well-tested band, 1/16 (0.0625) to 8, except the Creative Shrinkray and compression guns which reach 1/32 (0.03125)",
-                "and the Personal Subspace Compressor which reaches 1/32 (0.03125) to 16.",
+                "and the Personal Subspace Compressor which reaches 1/64 (0.015625) to 16.",
                 "Wider values are allowed but less tested.").push("ranges");
         for (Device device : Device.values()) {
             builder.push(device.key);

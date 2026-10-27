@@ -1,6 +1,7 @@
 package com.misterblusky9.pym.internal.mixin.client;
 
 import com.misterblusky9.pym.api.client.RenderFrame;
+import com.misterblusky9.pym.internal.client.PortraitScope;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.render.dispatcher.VanillaSubLevelRenderDispatcher;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,7 +19,8 @@ public abstract class SubLevelBlockEntityLodMixin {
     private Iterable<ClientSubLevel> pym$cullOffscreenSubLevels(
             Iterable<ClientSubLevel> subLevels
     ) {
-        return pym$filter(subLevels, RenderFrame::mayBeVisible);
+        // A portrait's on-screen position has nothing to do with where the craft is in the world.
+        return pym$filter(subLevels, subLevel -> PortraitScope.isDrawing(subLevel) || RenderFrame.mayBeVisible(subLevel));
     }
 
     @ModifyVariable(method = "renderBlockEntities", at = @At("HEAD"), argsOnly = true, index = 1, remap = false)

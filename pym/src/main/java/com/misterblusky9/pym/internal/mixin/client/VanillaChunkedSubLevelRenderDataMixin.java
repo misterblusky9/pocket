@@ -6,6 +6,7 @@ import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.render.vanilla.VanillaChunkedSubLevelRenderData;
 import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.internal.client.PortraitScope;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.ShaderInstance;
@@ -130,28 +131,19 @@ public abstract class VanillaChunkedSubLevelRenderDataMixin {
                 traceBounds.maxY() - traceBounds.minY() + 1,
                 traceBounds.maxZ() - traceBounds.minZ() + 1);
 
+        if (PortraitScope.isDrawing(this.subLevel)) {
+            // The portrait's size lives in the caller's model-view rather than the pose, so the
+            // normal matrix comes out shrunk by it. Undo that; fog is already off for portraits.
+            pym$applyNormalScale(shader, modelView, PortraitScope.visualScale());
+            return;
+        }
+
         if (!pym$isActuallyScaled()) return;
 
         double scale = pym$uniformScale();
         if (scale <= 0.0D) return;
 
-        Uniform normalLighting = shader.getUniform("SableEnableNormalLighting");
-        if (normalLighting != null) {
-            normalLighting.set(1.0F);
-            normalLighting.upload();
-        }
-
-        Uniform normalMatrix = shader.getUniform("NormalMat");
-        if (normalMatrix != null) {
-            modelView.normal(this.pym$baseNormalMatrix);
-            this.pym$scaledNormalMatrix
-                    .set(this.pym$baseNormalMatrix)
-                    .scale((float) scale);
-
-            normalMatrix.set(this.pym$scaledNormalMatrix);
-            normalMatrix.upload();
-            this.pym$normalMatrixAdjusted = true;
-        }
+        pym$applyNormalScale(shader, modelView, scale);
 
         Uniform fogStart = shader.getUniform("FogStart");
         Uniform fogEnd = shader.getUniform("FogEnd");
@@ -197,6 +189,27 @@ public abstract class VanillaChunkedSubLevelRenderDataMixin {
                 fogEnd.upload();
             }
             this.pym$fogAdjusted = false;
+        }
+    }
+
+    @Unique
+    private void pym$applyNormalScale(final ShaderInstance shader, final Matrix4f modelView, final double scale) {
+        final Uniform normalLighting = shader.getUniform("SableEnableNormalLighting");
+        if (normalLighting != null) {
+            normalLighting.set(1.0F);
+            normalLighting.upload();
+        }
+
+        final Uniform normalMatrix = shader.getUniform("NormalMat");
+        if (normalMatrix != null) {
+            modelView.normal(this.pym$baseNormalMatrix);
+            this.pym$scaledNormalMatrix
+                    .set(this.pym$baseNormalMatrix)
+                    .scale((float) scale);
+
+            normalMatrix.set(this.pym$scaledNormalMatrix);
+            normalMatrix.upload();
+            this.pym$normalMatrixAdjusted = true;
         }
     }
 
