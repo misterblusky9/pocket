@@ -45,7 +45,6 @@ public abstract class PhysicsAssemblerDisassemblyScaleMixin {
         if (!full && this.pym$expansionTicks++ < DisassemblyScaleAlignment.EXPANSION_BUDGET_TICKS) {
             this.disassemblingTicks = 0;
             this.disassemblyReadyTicks = 0;
-            // growing: leave the craft to Pym's expansion clearance, no grid pull
             if (this.pym$slack) ci.cancel();
             return;
         }

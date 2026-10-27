@@ -51,6 +51,7 @@ public final class DeviceRanges {
     private static final Map<Device, ModConfigSpec.DoubleValue> MAX = new EnumMap<>(Device.class);
     private static final ModConfigSpec.EnumValue<PvpScalingMode> PVP_SCALING_MODE;
     private static final ModConfigSpec.BooleanValue ALLOW_PVP_SCALING_TOGGLE;
+    private static final ModConfigSpec.BooleanValue CREATIVE_POCKETS_ANYTHING;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -79,6 +80,12 @@ public final class DeviceRanges {
                 .define("allowPlayersToToggleInPsc", true);
         builder.pop();
 
+        builder.push("pocketing");
+        CREATIVE_POCKETS_ANYTHING = builder.comment(
+                "Whether creative players may pocket sublevels of any size. Pocketed scale is still stored at 1/16 (0.0625) at most.")
+                .define("creativePocketsAnything", false);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -92,6 +99,10 @@ public final class DeviceRanges {
 
     public static boolean allowPlayersToTogglePvpScaling() {
         return !SPEC.isLoaded() || ALLOW_PVP_SCALING_TOGGLE.get();
+    }
+
+    public static boolean creativePocketsAnything() {
+        return SPEC.isLoaded() && CREATIVE_POCKETS_ANYTHING.get();
     }
 
     public static ScaleBounds of(Device device) {

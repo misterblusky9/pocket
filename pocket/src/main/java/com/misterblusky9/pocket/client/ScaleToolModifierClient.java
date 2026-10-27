@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.item.ScaleToolModifier;
 import com.misterblusky9.pocket.network.ScaleToolModifierPayload;
+import com.simibubi.create.AllKeys;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.player.LocalPlayer;
@@ -22,7 +23,8 @@ public final class ScaleToolModifierClient {
         }
 
         boolean follow = minecraft.screen == null && Screen.hasControlDown();
-        boolean targetOnly = follow && ScaleToolModifier.holdsScaleTool(player);
+        boolean targetOnly = minecraft.screen == null && AllKeys.ctrlDown()
+                && ScaleToolModifier.holdsScaleTool(player);
         ScaleToolModifier.set(player, targetOnly, follow);
         if (targetOnly == sentTargetOnly && follow == sentFollow) return;
 

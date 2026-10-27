@@ -1,10 +1,7 @@
 package com.misterblusky9.pocket.scale;
 
-import com.misterblusky9.pocket.block.PortableSubspaceCompressorBlockEntity;
-import com.misterblusky9.pocket.block.StaticSubspaceCompressorBlockEntity;
 import com.misterblusky9.pocket.compression.PersonalLock;
 import com.misterblusky9.pocket.config.DeviceRanges;
-import com.misterblusky9.pocket.item.ScaleToolModifier;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.api.ScaleDriver;
@@ -51,13 +48,12 @@ final class TrackingResizeFollower implements ResizeFollower {
     private static boolean follows(Entity entity, ServerSubLevel subLevel, ScaleDriver driver) {
         if (entity == null || !entity.isAlive() || entity.isPassenger() || entity.isSpectator()) return false;
         if (entity instanceof Projectile) return false;
-        if (entity instanceof Player player) {
-            boolean compressor = driver instanceof StaticSubspaceCompressorBlockEntity
-                    || driver instanceof PortableSubspaceCompressorBlockEntity;
-            if ((!compressor && !ScaleToolModifier.follows(player))
-                    || PersonalLock.blocksResize(driver, player)) return false;
-        }
+        if (entity instanceof Player player && !command(driver) && PersonalLock.protects(player)) return false;
         if (Sable.HELPER.getTrackingSubLevel(entity) != subLevel) return false;
         return Pym.entities().supports(entity);
+    }
+
+    private static boolean command(ScaleDriver driver) {
+        return driver == null && ResizeActor.current() == null;
     }
 }

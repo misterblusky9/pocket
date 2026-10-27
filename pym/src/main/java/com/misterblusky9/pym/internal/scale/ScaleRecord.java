@@ -49,6 +49,18 @@ public final class ScaleRecord {
         this.dirty = true;
     }
 
+    void follow(ScaleRecord leader, Pivot pivot) {
+        this.current = leader.current;
+        this.target = leader.target;
+        this.start = leader.start;
+        this.elapsed = leader.elapsed;
+        this.duration = leader.duration;
+        this.pivot = pivot;
+        this.driver = null;
+        this.alone = leader.alone;
+        this.dirty = true;
+    }
+
     double step() {
         this.elapsed++;
         if (this.elapsed >= this.duration) return this.target;

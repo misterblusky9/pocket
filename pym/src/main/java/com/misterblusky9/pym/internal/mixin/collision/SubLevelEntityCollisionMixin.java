@@ -25,23 +25,8 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-
-
 @Mixin(value = SubLevelEntityCollision.class, remap = false)
 public abstract class SubLevelEntityCollisionMixin {
-    /**
-     * Sable 2.0.6 checks localBounds.volume() against 500^3 BEFORE it creates
-     * the block candidate iterable.  The candidate redirection below clips
-     * to the plot, but it cannot prevent that earlier guard from firing.
-     *
-     * Clipping this *local-space* search envelope before the guard preserves
-     * collisions with blocks in the plot while excluding the enormous amount
-     * of empty space created by inverse-transforming a world-sized entity
-     * against a tiny or rapidly moving sub-level.
-     *
-     * Keep Sable's guard for genuinely oversized *in-plot* search envelopes:
-     * never return a fake small volume when occupied space is actually large.
-     */
     @WrapOperation(
             method = "collide",
             at = @At(
@@ -57,22 +42,16 @@ public abstract class SubLevelEntityCollisionMixin {
             Operation<Double> original,
             @Local(name = "subLevel") SubLevel subLevel
     ) {
-        // Bad pose coordinates are not a legitimate collision search.  Let
-        // Sable's own guard reject them rather than passing NaN to BlockPos.
         if (!Double.isFinite(bounds.minX) || !Double.isFinite(bounds.minY)
                 || !Double.isFinite(bounds.minZ) || !Double.isFinite(bounds.maxX)
                 || !Double.isFinite(bounds.maxY) || !Double.isFinite(bounds.maxZ)) {
             return Double.POSITIVE_INFINITY;
         }
 
-        // Preserve Sable's original guard on the rare no-plot fallback path:
-        // Pym's candidate builder deliberately leaves that scan unchanged.
         if (subLevel == null || subLevel.getPlot() == null) {
             return original.call(bounds);
         }
 
-        // With a plot present, the later candidate builder returns no blocks
-        // for empty plots or disjoint queries.
         if (!PlotScanBounds.clipCollisionSearchToPlot(subLevel, bounds)) {
             return 0.0D;
         }
@@ -129,17 +108,6 @@ public abstract class SubLevelEntityCollisionMixin {
         return SubLevelCollisionCache.state(accel, pos);
     }
 
-    /**
-     * Sable 2.0.6 uses an absolute 0.01 *local voxel-volume* tolerance when
-     * deciding whether to discard a contact as an interior/shared-face hit.
-     * For local shapes whose volume is less than 0.01, every possible difference
-     * between their intersection and full volume is below that threshold, so
-     * the test may incorrectly discard all of those contacts -- including
-     * legitimate landing support from thin/complex shapes.
-     *
-     * Make it a one-percent *relative* tolerance instead. Ordinary full-cube
-     * contacts retain Sable's 0.01 value and its control flow is unchanged.
-     */
     @ModifyExpressionValue(
             method = "collide",
             at = @At(value = "CONSTANT", args = "doubleValue=0.01"),
@@ -213,8 +181,6 @@ public abstract class SubLevelEntityCollisionMixin {
             double value,
             @Local(argsOnly = true) Pose3dc subLevelPose
     ) {
-        // Sable already uses entity.maxUpStep() in world units. Its probe stride must
-        // follow the sublevel voxel size, including when the player is also small.
         return value * pym$subLevelScale(subLevelPose);
     }
 
@@ -284,5 +250,4 @@ public abstract class SubLevelEntityCollisionMixin {
         double scale = Math.abs(pose.scale().x());
         return Double.isFinite(scale) && scale > 1.0E-7 ? scale : 1.0;
     }
-
 }

@@ -11,17 +11,25 @@
     "RopeScaleBoundaryMixin",
     "SwivelBearingFaceAnchorMixin",
     "SpringLinkScaleMixin",
-    "SpringScaleBoundaryMixin",
-    "PlaceSpringPacketScaleMixin",
-    "HoldInteractionReachMixin"
+    "HoldInteractionReachMixin",
+    "HandleConstraintScaleMixin",
+    "MagnetPairScaleMixin",
+    "MagnetMapReachScaleMixin",
+    "RedstoneMagnetFieldLineScaleMixin",
+    "MagnetFieldEmitterScaleMixin",
+    "DockingConnectorAccess",
+    "DockingConnectorPairAccess",
+    "DockingToleranceScaleMixin",
+    "DockingLockOffsetScaleMixin",
+    "DiagramDataScaleMixin"
   ],
   "client": [
     "RopeStrandScaleMixin",
     "SpringTaperMixin",
-    "SpringItemScaleBoundaryMixin",
     "MergingGlueScaleClientMixin",
     "ClientRopeItemScaleBoundaryMixin",
     "HoneyGlueClientLookupMixin",
+    "HandleHoldDistanceScaleMixin",
     "PhysicsStaffPickupTargetMixin",
     "PhysicsStaffHoldDistanceScaleMixin",
     "PhysicsStaffScrollStepScaleMixin",
@@ -31,7 +39,7 @@
     "PhysicsBeamEndSegmentMixin",
     "PhysicsStaffFocusScaleMixin",
     "PhysicsStaffLockIconScaleMixin",
-    "DiagramScaleOverlayMixin"
+    "DiagramViewScaleMixin"
   ],
   "injectors": {
     "defaultRequire": 0

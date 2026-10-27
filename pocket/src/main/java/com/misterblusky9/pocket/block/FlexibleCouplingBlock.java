@@ -115,6 +115,25 @@ public class FlexibleCouplingBlock extends WrenchableDirectionalBlock
     }
 
     @Override
+    protected boolean isSignalSource(BlockState state) {
+        return true;
+    }
+
+    @Override
+    protected int getSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
+        return level.getBlockEntity(pos) instanceof FlexibleCouplingBlockEntity shaft ? shaft.getRedstoneOutput() : 0;
+    }
+
+    @Override
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
+                                   BlockPos neighborPos, boolean movedByPiston) {
+        super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
+        if (level.getBlockEntity(pos) instanceof FlexibleCouplingBlockEntity shaft) {
+            shaft.updateRedstoneInput();
+        }
+    }
+
+    @Override
     public void updateIndirectNeighbourShapes(BlockState state, LevelAccessor level, BlockPos pos,
                                               int flags, int count) {
         if (level.isClientSide()) {

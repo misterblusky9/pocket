@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.item;
 
-/** Standalone cost-policy regression test; run with javac/java (no game dependencies). */
 public final class LevititeUseCostTest {
     private static int tested;
 
@@ -17,12 +16,12 @@ public final class LevititeUseCostTest {
     }
 
     public static void main(String[] args) {
-        expect(1000, 100, 4, 100, 0); // full tank: never damage
-        expect(100, 100, 4, 100, 0);  // exact charge
-        expect(99, 100, 4, 99, 0);   // last partial dose never damages
+        expect(1000, 100, 4, 100, 0);
+        expect(100, 100, 4, 100, 0);
+        expect(99, 100, 4, 99, 0);
         expect(50, 100, 4, 50, 0);
         expect(1, 100, 4, 1, 0);
-        expect(0, 100, 4, 0, 4);     // only empty tank uses backup wear
+        expect(0, 100, 4, 0, 4);
         expect(-1, 100, 4, 0, 4);
         expect(0, 100, 0, 0, 0);
         expect(25, 0, 4, 0, 0);

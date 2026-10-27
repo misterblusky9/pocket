@@ -20,27 +20,27 @@ public final class ModItems {
     );
 
     public static final DeferredItem<EmptyBoxItem> EMPTY_BOX = ITEMS.register(
-            "empty_box", () -> new EmptyBoxItem(new Item.Properties())
+            "empty_box", () -> new EmptyBoxItem(new Item.Properties().stacksTo(16))
     );
 
     public static final DeferredItem<EmptyBoxItem> DISPLAY_BOTTLE = ITEMS.register(
-            "display_bottle", () -> new EmptyBoxItem(new Item.Properties())
+            "display_bottle", () -> new EmptyBoxItem(new Item.Properties().stacksTo(1))
     );
 
     public static final DeferredItem<EmptyBoxItem> BRASS_DISPLAY_CASE = ITEMS.register(
-            "brass_display_case", () -> new EmptyBoxItem(new Item.Properties())
+            "brass_display_case", () -> new EmptyBoxItem(new Item.Properties().stacksTo(1))
     );
 
     public static final DeferredItem<EmptyBoxItem> BRASS_DISPLAY_PLATE = ITEMS.register(
-            "brass_display_plate", () -> new EmptyBoxItem(new Item.Properties())
+            "brass_display_plate", () -> new EmptyBoxItem(new Item.Properties().stacksTo(1))
     );
 
     public static final DeferredItem<EmptyBoxItem> ANDESITE_DISPLAY_CASE = ITEMS.register(
-            "andesite_display_case", () -> new EmptyBoxItem(new Item.Properties())
+            "andesite_display_case", () -> new EmptyBoxItem(new Item.Properties().stacksTo(1))
     );
 
     public static final DeferredItem<EmptyBoxItem> ANDESITE_DISPLAY_PLATE = ITEMS.register(
-            "andesite_display_plate", () -> new EmptyBoxItem(new Item.Properties())
+            "andesite_display_plate", () -> new EmptyBoxItem(new Item.Properties().stacksTo(1))
     );
 
     public static final DeferredItem<CreativeShrinkRayItem> CREATIVE_SHRINK_RAY = ITEMS.register(
@@ -73,7 +73,7 @@ public final class ModItems {
     );
 
     public static final DeferredItem<SelfResizeDeviceItem> SELF_RESIZE_DEVICE = ITEMS.register(
-            "self_resize_device", () -> new SelfResizeDeviceItem(new Item.Properties().stacksTo(1).durability(16))
+            "self_resize_device", () -> new SelfResizeDeviceItem(new Item.Properties().stacksTo(1))
     );
 
     public static final DeferredItem<ColliderWandItem> COLLIDER_WAND = ITEMS.register(

@@ -18,7 +18,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Captures ownership BEFORE Sable's add hook projects plot coordinates. */
 @Mixin(value = ParticleEngine.class, priority = 1100)
 public abstract class ParticleSpawnScaleMixin {
     @Inject(method = "add", at = @At("HEAD"))
@@ -43,7 +42,6 @@ public abstract class ParticleSpawnScaleMixin {
         state.pym$setApplied(true);
         double emitter = state.pym$getEmissionScale();
         ParticleExtension extension = (ParticleExtension) particle;
-        // Idempotent; Sable normally calls this at the start of add().
         extension.sable$initialKickOut();
         SubLevel tracking = extension.sable$getTrackingSubLevel();
         double projection = tracking instanceof ClientSubLevel plot && !plot.isRemoved()
@@ -51,10 +49,6 @@ public abstract class ParticleSpawnScaleMixin {
         double ratio = ParticleScalePolicy.remainingVelocityRatio(emitter, projection);
         if (!Double.isFinite(ratio) || ratio <= 0.0D) return;
         ParticleMotionAccessor motion = (ParticleMotionAccessor) particle;
-        // Keep the existing successful debris correction at the point where
-        // Sable has already projected velocity. This is a TerrainParticle
-        // setPower compatibility rule shared by EVERY breaking block, not a
-        // handler for a particular block, particle texture, or emitter.
         if (particle instanceof TerrainParticle && tracking instanceof ClientSubLevel) {
             motion.pym$setYd(motion.pym$getYd()
                     + ParticleScalePolicy.terrainLegacyWorldLiftAdjustment(projection));
@@ -69,7 +63,6 @@ public abstract class ParticleSpawnScaleMixin {
         }
     }
 
-    /** Particle providers may add world-space jitter after Level selected a source position. */
     @Inject(method = "createParticle", at = @At("RETURN"))
     private void pym$scaleProviderLocalOffset(
             ParticleOptions options, double x, double y, double z,
@@ -78,8 +71,6 @@ public abstract class ParticleSpawnScaleMixin {
         if (particle == null) return;
         double explicit = ParticleEmitterSource.currentScale();
         if (!ParticleScalePolicy.valid(explicit) || Math.abs(explicit - 1.0D) < 1.0E-7D) return;
-        // A plotted particle was projected by Sable. Its source and final
-        // positions are now in DIFFERENT coordinate frames; never subtract them.
         if (((ParticleExtension) particle).sable$getTrackingSubLevel() != null) return;
         ParticleMotionAccessor m = (ParticleMotionAccessor) particle;
         double x0 = m.pym$getX();

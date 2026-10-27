@@ -14,7 +14,6 @@ sourceSets.main.resources {
     exclude("src/generated/**/.cache")
 }
 
-// dev runs only - never packaged into the jar
 sourceSets {
     debug {
         compileClasspath += main.output + main.compileClasspath
@@ -65,7 +64,6 @@ neoForge {
             programArguments.addAll(providers.of(LatestSaveQuickPlay) {
                 it.parameters.saves = rootProject.layout.projectDirectory.dir("runs/client1/saves")
             })
-
         }
 
         client2 {
@@ -76,14 +74,12 @@ neoForge {
             programArguments = [
                     "--username", "Player2"
             ]
-
         }
 
         server {
             server()
             sourceSet = sourceSets.debug
             gameDirectory = rootProject.file("runs/server")
-
         }
 
         data {
@@ -162,6 +158,9 @@ dependencies {
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
 
     implementation "maven.modrinth:t5W7Jfwy:nKHizsl6"
+
+    compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}:api"
+    localRuntime "top.theillusivec4.curios:curios-neoforge:${curios_version}"
 
     localRuntime "maven.modrinth:spark:v5qtqRQi"
 }

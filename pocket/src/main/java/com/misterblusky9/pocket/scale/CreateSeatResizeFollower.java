@@ -1,6 +1,5 @@
 package com.misterblusky9.pocket.scale;
 
-import com.misterblusky9.pocket.compression.PersonalLock;
 import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
@@ -41,9 +40,7 @@ final class CreateSeatResizeFollower implements ResizeFollower {
         Set<Entity> found = new LinkedHashSet<>();
         for (Entity entity : level.getEntities((Entity) null, search,
                 candidate -> candidate != null && candidate.isAlive() && !candidate.isSpectator())) {
-            if (Pym.entities().supports(entity)
-                    && (!(entity instanceof Player player) || !PersonalLock.blocksResize(driver, player))
-                    && seatSubLevel(entity) == subLevel) found.add(entity);
+            if (Pym.entities().supports(entity) && seatSubLevel(entity) == subLevel) found.add(entity);
         }
         return found;
     }

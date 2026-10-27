@@ -152,27 +152,18 @@ public class FlexibleCouplingRenderer extends SmartBlockEntityRenderer<FlexibleC
             renderPose.transformPositionInverse(otherCenter);
         }
         normalB.normalize();
-        // Resolve actual *rendered* sizes at both ends. Pym's between() is globally disabled,
-        // so construct a local taper only for this shaft; do not switch on global link tapering.
         double ownerScale = renderedScale(subLevel);
         double partnerScale = renderedScale(otherSubLevel);
         double inverseOwnerScale = 1.0D / ownerScale;
-        // Texture repetitions describe the physical shaft, not the block coordinates of
-        // whichever end was clicked first. Keep them invariant under owner-scale changes.
-        // The taper uses normalized progress (UV / textureLength), so it still reaches
-        // the correct radius at either endpoint when the owner/partner are swapped.
         double textureLength = Math.max(1.0E-6D,
                 be.getRenderLength(partialTicks) - 0.75D);
         taper = otherSubLevelID == null || otherSubLevel != null
                 ? TaperedLinkProfile.of(1.0D, partnerScale / ownerScale, textureLength)
                 : TaperedLinkProfile.UNIFORM;
 
-        // This is visual overstretch feedback, NOT spring tension or physical stress.
         int color = getStressColor(be, partialTicks, otherCenter.distance(center),
                 inverseOwnerScale, minecraft);
         double localDistance = center.distance(otherCenter);
-        // Shape and subdivision count must also be measured in physical world blocks.
-        // Otherwise the same shaft curves and tessellates differently from the tiny end.
         List<SplinePoint> splinePoints = generateSpline(JOMLConversion.ZERO,
                 otherCenter.sub(center, new Vector3d()), normalA, normalB,
                 localDistance / 5.0D + 0.25D * inverseOwnerScale,
@@ -347,10 +338,6 @@ public class FlexibleCouplingRenderer extends SmartBlockEntityRenderer<FlexibleC
 
     @Override
     public boolean shouldRender(FlexibleCouplingBlockEntity blockEntity, Vec3 cameraPos) {
-        // Sable provides cameraPos in the containing sublevel's local coordinates.
-        // The vanilla 64-block check would therefore clip a 1/8x owner at ~8 world
-        // blocks, even though the same shaft remains visible when linked from 1x.
-        // Convert the world-space visibility radius to those local coordinates.
         double ownerScale = renderedScale(Sable.HELPER.getContainingClient(blockEntity));
         double reach = blockEntity.isController() && blockEntity.isLinked()
                 ? blockEntity.getSnappingDistance() : 0.0D;

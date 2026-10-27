@@ -1,15 +1,25 @@
 package com.misterblusky9.pocket.item;
 
+import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 
+import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.misterblusky9.pocket.compression.PersonalScale;
 import com.misterblusky9.pocket.config.DeviceRanges;
+import com.misterblusky9.pocket.scale.CompressionStage;
+import com.simibubi.create.AllSoundEvents;
+import com.simibubi.create.content.contraptions.AbstractContraptionEntity;
+import com.simibubi.create.content.contraptions.actors.seat.SeatEntity;
+import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -22,7 +32,6 @@ import java.util.List;
 public final class SelfResizeDeviceItem extends Item implements ScaleSelectingItem, PriorityInteractionItem {
     public static final int CAPACITY = 1000;
     public static final int LEVITITE_PER_USE = 100;
-    public static final int DURABILITY_PER_USE = 4;
     private static final int COOLDOWN_TICKS = 10;
 
     public SelfResizeDeviceItem(Properties properties) {
@@ -31,8 +40,6 @@ public final class SelfResizeDeviceItem extends Item implements ScaleSelectingIt
 
     @Override
     public boolean claimsBlock(Player player, ItemStack stack, Level level, BlockPos pos) {
-        // Sneaking intentionally bypasses PSC activation; respect normal block
-        // interactions in that mode.
         return !player.isShiftKeyDown();
     }
 
@@ -48,28 +55,50 @@ public final class SelfResizeDeviceItem extends Item implements ScaleSelectingIt
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
 
-        double selected = selection(stack, player);
-        double current = PersonalScale.currentScale(serverPlayer);
+        return new InteractionResultHolder<>(activate(serverPlayer, stack), stack);
+    }
+
+    public static InteractionResult activate(ServerPlayer player, ItemStack stack) {
+        double selected = CreativeShrinkRayItem.selectedScale(stack);
+        double current = PersonalScale.liveScale(player);
+        double seat = seatScale(player);
+        if (ScaleBounds.isValid(seat) && !ScaleBounds.same(seat, current) && !ScaleBounds.same(seat, selected)
+                && stack.getItem() instanceof SelfResizeDeviceItem device && device.permitsSelection(stack, player, seat)) {
+            device.select(stack, seat);
+            AllSoundEvents.CONFIRM.playFrom(player, 1.0F, 1.0F);
+            return InteractionResult.SUCCESS;
+        }
+
         double target = ScaleBounds.same(current, selected) ? ScaleBounds.FULL : selected;
-        if (ScaleBounds.same(target, current)) return InteractionResultHolder.pass(stack);
+        if (ScaleBounds.same(target, current)) return InteractionResult.PASS;
 
-        if (!CompressionGunTank.consumeForActivation(
-                serverPlayer, stack, LEVITITE_PER_USE, DURABILITY_PER_USE)) {
+        if (!player.isCreative() && CompressionGunTank.drain(stack, LEVITITE_PER_USE) == 0) {
             player.displayClientMessage(Component.translatable("pocket.message.no_power"), true);
-            return InteractionResultHolder.fail(stack);
+            AllSoundEvents.CARDBOARD_SWORD.playFrom(player, 0.75F, 1.85F);
+            return InteractionResult.FAIL;
         }
 
-        PersonalScale.instant(serverPlayer, target);
-        player.getCooldowns().addCooldown(this, COOLDOWN_TICKS);
+        PersonalScale.instant(player, target);
+        player.getCooldowns().addCooldown(stack.getItem(), COOLDOWN_TICKS);
+        AllSoundEvents.CONFIRM.playFrom(player, 1.0F, 1.0F);
+        return InteractionResult.SUCCESS;
+    }
 
-        if (!player.isCreative()
-                && stack.isDamageableItem()
-                && stack.getDamageValue() >= stack.getMaxDamage()
-                && CompressionGunTank.amount(stack) < LEVITITE_PER_USE) {
-            player.onEquippedItemBroken(stack.getItem(), LivingEntity.getSlotForHand(hand));
-            stack.shrink(1);
+    private static double seatScale(ServerPlayer player) {
+        Entity vehicle = player.getVehicle();
+        boolean seated = vehicle instanceof SeatEntity
+                || vehicle instanceof AbstractContraptionEntity contraptionEntity
+                        && contraptionEntity.getContraption() != null
+                        && contraptionEntity.getContraption().getSeatOf(player.getUUID()) != null;
+        if (!seated) return Double.NaN;
+        for (Entity current = vehicle; current != null; current = current.getVehicle()) {
+            SubLevel subLevel = Sable.HELPER.getContaining(current);
+            if (subLevel == null) subLevel = Sable.HELPER.getTrackingSubLevel(current);
+            if (subLevel instanceof ServerSubLevel server && !server.isRemoved()) {
+                return CompressionStage.snap(Pym.scale().target(server));
+            }
         }
-        return InteractionResultHolder.success(stack);
+        return Double.NaN;
     }
 
     @Override
@@ -84,7 +113,9 @@ public final class SelfResizeDeviceItem extends Item implements ScaleSelectingIt
 
     @Override
     public boolean permitsSelection(ItemStack stack, Player player, double scale) {
-        return ScaleBounds.isValid(scale);
+        return ScaleBounds.isValid(scale)
+                && (selectionRange(player).contains(scale)
+                        || EntityCompressionTargeting.carriedNearby(player, CreativeShrinkRayItem.RANGE, scale));
     }
 
     @Override

@@ -132,8 +132,6 @@ public abstract class VanillaChunkedSubLevelRenderDataMixin {
                 traceBounds.maxZ() - traceBounds.minZ() + 1);
 
         if (PortraitScope.isDrawing(this.subLevel)) {
-            // The portrait's size lives in the caller's model-view rather than the pose, so the
-            // normal matrix comes out shrunk by it. Undo that; fog is already off for portraits.
             pym$applyNormalScale(shader, modelView, PortraitScope.visualScale());
             return;
         }

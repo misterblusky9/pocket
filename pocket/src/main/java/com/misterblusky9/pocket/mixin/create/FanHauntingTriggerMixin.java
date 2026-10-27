@@ -18,7 +18,6 @@ import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(value = AirCurrent.class, remap = false)
 public abstract class FanHauntingTriggerMixin {
-    // Loose item
     @WrapOperation(
             method = "tickAffectedEntities",
             at = @At(value = "INVOKE", target = "Lcom/simibubi/create/content/kinetics/fan/processing/FanProcessing;"
@@ -40,7 +39,6 @@ public abstract class FanHauntingTriggerMixin {
         return processed;
     }
 
-    // Belt
     @WrapOperation(
             method = "lambda$tickAffectedHandlers$0",
             at = @At(value = "INVOKE", target = "Lcom/simibubi/create/content/kinetics/fan/processing/FanProcessing;"

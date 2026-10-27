@@ -13,6 +13,9 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaterniondc;
@@ -28,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 public final class ScaledFluidForces {
     private static final double BUOYANCY_ACCELERATION = 10.5D;
@@ -44,6 +48,7 @@ public final class ScaledFluidForces {
     private static final double DIAGNOSTIC_DELTA_V = 2.0D;
     private static final double DIAGNOSTIC_DELTA_OMEGA = 4.0D;
     private static final long DIAGNOSTIC_COOLDOWN_TICKS = 10L;
+    private static final Predicate<BlockState> HAS_FLUID = state -> !state.getFluidState().isEmpty();
 
     private static final Map<ServerLevel, FluidPass> ACTIVE =
             Collections.synchronizedMap(new IdentityHashMap<>());
@@ -74,7 +79,7 @@ public final class ScaledFluidForces {
                 }
 
                 HydroShape shape = hydroShape(subLevel);
-                if (shape == null || !overlapsFluid(level, subLevel.logicalPose(), shape)) continue;
+                if (shape == null || !nativeProbeMayTouchFluid(level, subLevel, shape)) continue;
                 if (!ColliderCoordinator.suppressNativeFluidProbe(subLevel)) continue;
 
                 pass.suppressed.add(subLevel);
@@ -156,6 +161,7 @@ public final class ScaledFluidForces {
         FluidSlice fluid = scratch.fluid;
         BlockPos.MutableBlockPos fluidPos = scratch.fluidPos;
         double dragWork = 0.0D;
+        double swayScale = Math.min(scale, 1.0D);
         double submergedVolumeTotal = 0.0D;
         double submergedMomentX = 0.0D;
         double submergedMomentY = 0.0D;
@@ -192,10 +198,14 @@ public final class ScaledFluidForces {
 
             localFlow.set(fluid.flowX, fluid.flowY, fluid.flowZ);
             orientation.transformInverse(localFlow);
-            angularVelocity.cross(lever, pointVelocity).add(linearVelocity).sub(localFlow);
-            force.set(pointVelocity).mul(-LINEAR_DRAG * submergedVolume * timeStep);
-            dragWork += force.dot(pointVelocity);
+            localFlow.sub(linearVelocity).negate();
+            angularVelocity.cross(lever, pointVelocity);
+            double drag = -LINEAR_DRAG * submergedVolume * timeStep;
+            force.set(pointVelocity).mul(swayScale).add(localFlow).mul(drag);
+            dragWork += force.dot(localFlow);
             dragLinearImpulse.add(force);
+            force.set(pointVelocity).add(localFlow).mul(drag);
+            dragWork += force.dot(pointVelocity);
             lever.cross(force, torque);
             dragAngularImpulse.add(torque);
         }
@@ -226,7 +236,25 @@ public final class ScaledFluidForces {
                     "scaled fluid hybrid active uuid={} scale={} elements={} linearImpulse={} angularImpulse={}",
                     id, scale, shape.size, linearImpulse, angularImpulse);
         }
+        heldMassCorrection(subLevel, scale, linearImpulse, angularImpulse);
         handle.applyLinearAndAngularImpulse(linearImpulse, angularImpulse, false);
+    }
+
+    private static void heldMassCorrection(
+            ServerSubLevel subLevel,
+            double scale,
+            Vector3d linearImpulse,
+            Vector3d angularImpulse
+    ) {
+        double held = RapierBridge.syncedMassScale(subLevel, scale);
+        if (ScaleBounds.same(held, scale) || !ScaleBounds.isValid(held)) return;
+
+        double raw = subLevel.getMassTracker().getMass();
+        double floor = CoupledMass.solverFloor(subLevel);
+        double[] current = ScaledMassData.forceFactors(raw, scale, floor);
+        double[] synced = ScaledMassData.forceFactors(raw, held, floor);
+        linearImpulse.mul(synced[0] / current[0]);
+        angularImpulse.mul(synced[1] / current[1]);
     }
 
     public static void forget(UUID id) {
@@ -640,46 +668,79 @@ public final class ScaledFluidForces {
         return result;
     }
 
-    private static boolean overlapsFluid(ServerLevel level, Pose3d pose, HydroShape shape) {
-        WorldBounds bounds = worldBounds(pose, shape);
-        if (bounds == null) return false;
+    private static boolean nativeProbeMayTouchFluid(
+            ServerLevel level,
+            ServerSubLevel subLevel,
+            HydroShape shape
+    ) {
+        Pose3d pose = subLevel.logicalPose();
+        WorldBounds scaled = worldBounds(pose, shape);
+        WorldBounds probe = nativeProbeBounds(subLevel, pose);
+        if (scaled == null) return probe != null && anyFluidCell(level, probe);
+        if (probe == null) return anyFluidCell(level, scaled);
+        return anyFluidCell(level, new WorldBounds(
+                Math.min(scaled.minX, probe.minX), Math.min(scaled.minY, probe.minY),
+                Math.min(scaled.minZ, probe.minZ), Math.max(scaled.maxX, probe.maxX),
+                Math.max(scaled.maxY, probe.maxY), Math.max(scaled.maxZ, probe.maxZ)));
+    }
 
+    private static WorldBounds nativeProbeBounds(ServerSubLevel subLevel, Pose3d pose) {
+        CompiledCollider.Bounds local = ColliderCoordinator.nativeLocalBounds(subLevel);
+        var tracker = subLevel.getMassTracker();
+        Vector3dc com = tracker == null ? null : tracker.getCenterOfMass();
+        if (local == null || com == null) return null;
+
+        Vector3d worldCom = pose.transformPosition(new Vector3d(com));
+        Quaterniondc orientation = pose.orientation();
+        double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY, minZ = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY, maxZ = Double.NEGATIVE_INFINITY;
+        Vector3d corner = new Vector3d();
+        for (int mask = 0; mask < 8; mask++) {
+            corner.set(
+                    ((mask & 1) == 0 ? local.minX() : local.maxX() + 1.0D) - com.x(),
+                    ((mask & 2) == 0 ? local.minY() : local.maxY() + 1.0D) - com.y(),
+                    ((mask & 4) == 0 ? local.minZ() : local.maxZ() + 1.0D) - com.z());
+            orientation.transform(corner).add(worldCom);
+            minX = Math.min(minX, corner.x);
+            minY = Math.min(minY, corner.y);
+            minZ = Math.min(minZ, corner.z);
+            maxX = Math.max(maxX, corner.x);
+            maxY = Math.max(maxY, corner.y);
+            maxZ = Math.max(maxZ, corner.z);
+        }
+        return new WorldBounds(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    private static boolean anyFluidCell(ServerLevel level, WorldBounds bounds) {
         int minX = floor(bounds.minX);
-        int minY = floor(bounds.minY);
+        int minY = Math.max(floor(bounds.minY), level.getMinBuildHeight());
         int minZ = floor(bounds.minZ);
         int maxX = floor(bounds.maxX - BOUNDS_EPSILON);
-        int maxY = floor(bounds.maxY - BOUNDS_EPSILON);
+        int maxY = Math.min(floor(bounds.maxY - BOUNDS_EPSILON), level.getMaxBuildHeight() - 1);
         int maxZ = floor(bounds.maxZ - BOUNDS_EPSILON);
-        long cells = (long) (maxX - minX + 1)
-                * (maxY - minY + 1)
-                * (maxZ - minZ + 1);
-        if (cells <= 0L) return false;
+        if (maxX < minX || maxY < minY || maxZ < minZ) return false;
 
-        if (cells > MAX_WORLD_FLUID_SCAN) {
-            ForceScratch scratch = FORCE_SCRATCH.get();
-            BlockPos.MutableBlockPos pos = scratch.fluidPos;
-            Vector3d world = scratch.worldCenter;
-            FluidSlice slice = scratch.fluid;
-            scratch.fluidCache.begin();
-            for (int i = 0; i < shape.size; i++) {
-                world.set(shape.centerX[i], shape.centerY[i], shape.centerZ[i]);
-                pose.transformPosition(world);
-                sampleFluidColumn(level, world, MIN_EXTENT, pos, scratch.fluidCache, slice);
-                if (slice.fraction > 0.0D) return true;
-            }
-            return false;
-        }
+        long budget = MAX_WORLD_FLUID_SCAN;
+        for (int chunkX = minX >> 4; chunkX <= maxX >> 4; chunkX++) {
+            for (int chunkZ = minZ >> 4; chunkZ <= maxZ >> 4; chunkZ++) {
+                LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
+                if (chunk == null) continue;
+                for (int sectionY = minY >> 4; sectionY <= maxY >> 4; sectionY++) {
+                    LevelChunkSection section = chunk.getSection(level.getSectionIndexFromSectionY(sectionY));
+                    if (section.hasOnlyAir() || !section.maybeHas(HAS_FLUID)) continue;
 
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                for (int y = minY; y <= maxY; y++) {
-                    pos.set(x, y, z);
-                    if (!level.hasChunkAt(pos)) continue;
-                    FluidState fluid = level.getFluidState(pos);
-                    if (fluid.isEmpty()) continue;
-                    double top = y + fluid.getHeight(level, pos);
-                    if (top > bounds.minY && y < bounds.maxY) return true;
+                    int x0 = Math.max(minX, chunkX << 4), x1 = Math.min(maxX, (chunkX << 4) + 15);
+                    int y0 = Math.max(minY, sectionY << 4), y1 = Math.min(maxY, (sectionY << 4) + 15);
+                    int z0 = Math.max(minZ, chunkZ << 4), z1 = Math.min(maxZ, (chunkZ << 4) + 15);
+                    budget -= (long) (x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1);
+                    if (budget < 0L) return true;
+                    for (int y = y0; y <= y1; y++) {
+                        for (int z = z0; z <= z1; z++) {
+                            for (int x = x0; x <= x1; x++) {
+                                if (!section.getFluidState(x & 15, y & 15, z & 15).isEmpty()) return true;
+                            }
+                        }
+                    }
                 }
             }
         }

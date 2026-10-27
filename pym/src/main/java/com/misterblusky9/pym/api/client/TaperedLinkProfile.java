@@ -6,7 +6,6 @@ import dev.ryanhcode.sable.companion.math.Pose3dc;
 
 public record TaperedLinkProfile(double startRadius, double endRadius, double length) {
     public static final TaperedLinkProfile UNIFORM = new TaperedLinkProfile(1.0D, 1.0D, 1.0D);
-    // disabled for now
     public static final boolean ENABLED = false;
 
     public static TaperedLinkProfile between(

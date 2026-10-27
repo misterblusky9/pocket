@@ -10,10 +10,6 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 @Mixin(GameRenderer.class)
 public abstract class SubLevelNearPlaneScaleMixin {
-    // Read the final zNear operand passed to JOML, not Minecraft's original
-    // 0.05F constant. Pehkui also modifies that constant for small entities.
-    // Multiplying the same constant by both scales creates an unnecessarily
-    // tiny near plane and ruins distant-world depth-buffer precision.
     @ModifyArg(
             method = "getProjectionMatrix(D)Lorg/joml/Matrix4f;",
             at = @At(

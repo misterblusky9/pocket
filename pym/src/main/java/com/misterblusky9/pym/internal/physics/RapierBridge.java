@@ -10,8 +10,14 @@ import org.joml.Vector3d;
 import org.joml.Vector3dc;
 
 import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class RapierBridge {
+    private record SyncedMass(int bodyId, double scale) {}
+    private static final Map<UUID, SyncedMass> SYNCED_MASS = new ConcurrentHashMap<>();
+
     private static final Class<?> RAPIER_3D;
     private static final Method CREATE_VOXEL_COLLIDER_ENTRY;
     private static final Method REMOVE_CONSTRAINT;
@@ -96,8 +102,10 @@ public final class RapierBridge {
         try {
             double volume = shape.volume();
             PymTrace.enter("Rapier3D.createVoxelColliderEntry",
-                    "volume=" + volume, "boxes=" + shape.faces().size());
-            Object collider = CREATE_VOXEL_COLLIDER_ENTRY.invoke(null, 1.0D, volume, 0.0D, false, null);
+                    "volume=" + volume, "boxes=" + shape.faces().size(), "material=" + shape.material());
+            ColliderMaterial material = shape.material();
+            Object collider = CREATE_VOXEL_COLLIDER_ENTRY.invoke(
+                    null, material.friction(), volume, material.restitution(), false, null);
             PymTrace.exit("Rapier3D.createVoxelColliderEntry");
 
             addBoxes(collider, shape);
@@ -262,7 +270,6 @@ public final class RapierBridge {
         }
     }
 
-
     public static void syncMassProperties(
             ServerSubLevel subLevel,
             double scale,
@@ -271,7 +278,6 @@ public final class RapierBridge {
         if (subLevel == null || subLevel.getLevel() == null) return;
         MassData raw = subLevel.getMassTracker();
         if (raw == null) return;
-        // massless craft (e.g. all weightless blocks): Sable skips the mass update too
         Vector3dc center = raw.getCenterOfMass();
         if (center == null) return;
         try {
@@ -283,9 +289,20 @@ public final class RapierBridge {
             }
             SET_MASS_PROPERTIES_FROM.invoke(
                     null, scene, id, new ScaledMassData(raw, scale, CoupledMass.solverFloor(subLevel), CoupledMass.solverInertiaFloor(subLevel)));
+            if (subLevel.getUniqueId() != null) SYNCED_MASS.put(subLevel.getUniqueId(), new SyncedMass(id, scale));
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Failed to sync scaled Sable Rapier mass properties", exception);
         }
+    }
+
+    public static double syncedMassScale(ServerSubLevel subLevel, double fallback) {
+        if (subLevel == null || subLevel.getUniqueId() == null) return fallback;
+        SyncedMass synced = SYNCED_MASS.get(subLevel.getUniqueId());
+        return synced != null && synced.bodyId() == bodyId(subLevel) ? synced.scale() : fallback;
+    }
+
+    public static void forget(UUID id) {
+        if (id != null) SYNCED_MASS.remove(id);
     }
 
     private static long scene(ServerLevel level) throws ReflectiveOperationException {
