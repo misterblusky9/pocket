@@ -19,7 +19,11 @@
     "OutlineFaceCullMixin",
     "LineOutlineScaleMixin",
     "OutlineParamsEmitterMixin",
-    "FlywheelSubLevelScaleMixin"
+    "FlywheelSubLevelScaleMixin",
+    "SchematicQuillScaleMixin",
+    "SchematicToolScaleMixin",
+    "SchematicToolOutlineScaleMixin",
+    "DeployToolOutlineScaleMixin"
   ],
   "injectors": {
     "defaultRequire": 0

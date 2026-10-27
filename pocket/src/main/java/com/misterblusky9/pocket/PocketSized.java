@@ -7,6 +7,7 @@ import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
 import com.misterblusky9.pocket.create.PocketContraptionTypes;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
 import com.misterblusky9.pocket.entity.ModEntities;
+import com.misterblusky9.pocket.entity.ScaledRespawn;
 import com.misterblusky9.pocket.item.HeldInteractionPriority;
 import com.misterblusky9.pocket.item.ModCreativeTabs;
 import com.misterblusky9.pocket.item.ModItems;
@@ -36,6 +37,8 @@ public final class PocketSized {
 
         PocketPymIntegration.register();
 
+        ScaledRespawn.registerRespawnTicket();
+
         ModBlocks.BLOCKS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
         modBus.addListener(SubspaceRecyclerBlockEntity::registerCapabilities);
@@ -44,6 +47,7 @@ public final class PocketSized {
         com.misterblusky9.pocket.item.CompressionGunTank.COMPONENTS.register(modBus);
         modBus.addListener(com.misterblusky9.pocket.item.CompressionGunTank::registerCapabilities);
         ModEntities.ENTITIES.register(modBus);
+        com.misterblusky9.pocket.particle.ModParticles.PARTICLE_TYPES.register(modBus);
         modBus.addListener(ModEntities::registerAttributes);
         ModCreativeTabs.TABS.register(modBus);
         com.misterblusky9.pocket.advancement.HauntedCompressionGunTrigger.TRIGGERS.register(modBus);

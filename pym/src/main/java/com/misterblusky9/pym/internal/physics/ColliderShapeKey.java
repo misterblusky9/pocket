@@ -4,7 +4,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public record ColliderShapeKey(List<Face> faces) {
+public record ColliderShapeKey(List<Face> faces, ColliderMaterial material) {
+    public ColliderShapeKey {
+        if (material == null) material = ColliderMaterial.DEFAULT;
+    }
+
     public record Face(
             long minX, long minY, long minZ,
             long maxX, long maxY, long maxZ
@@ -32,6 +36,10 @@ public record ColliderShapeKey(List<Face> faces) {
     }
 
     public static ColliderShapeKey of(List<Face> faces) {
+        return of(faces, ColliderMaterial.DEFAULT);
+    }
+
+    public static ColliderShapeKey of(List<Face> faces, ColliderMaterial material) {
         ArrayList<Face> canonical = new ArrayList<>(faces == null ? List.of() : faces);
         canonical.removeIf(Face::degenerate);
         canonical.sort(Comparator
@@ -40,12 +48,12 @@ public record ColliderShapeKey(List<Face> faces) {
         for (int i = canonical.size() - 1; i > 0; i--) {
             if (canonical.get(i).equals(canonical.get(i - 1))) canonical.remove(i);
         }
-        return new ColliderShapeKey(List.copyOf(canonical));
+        return new ColliderShapeKey(List.copyOf(canonical), material);
     }
 
     public static ColliderShapeKey of(Face face) {
-        if (face == null || face.degenerate()) return new ColliderShapeKey(List.of());
-        return new ColliderShapeKey(List.of(face));
+        if (face == null || face.degenerate()) return new ColliderShapeKey(List.of(), ColliderMaterial.DEFAULT);
+        return new ColliderShapeKey(List.of(face), ColliderMaterial.DEFAULT);
     }
 
     public double volume() {

@@ -5,6 +5,8 @@ import com.misterblusky9.pym.api.Pym;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3dc;
+import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.ryanhcode.sable.util.SubLevelInclusiveLevelEntityGetter;
 import com.misterblusky9.pym.api.ScaleBounds;
@@ -133,6 +135,58 @@ public final class EntityCompressionTargeting {
 
     public static double scale(Entity entity) {
         return entity == null ? 1.0D : Pym.entities().scaleOf(entity) * containerScale(entity);
+    }
+
+    public static boolean carriedNearby(Player player, double range, double scale) {
+        if (player == null || range <= 0.0D || !ScaleBounds.isValid(scale)) return false;
+        Level level = player.level();
+        AABB reach = new AABB(player.getEyePosition(1.0F), player.getEyePosition(1.0F)).inflate(range);
+
+        SubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container != null) {
+            for (SubLevel subLevel : container.getAllSubLevels()) {
+                if (subLevel.isRemoved()) continue;
+                BoundingBox3dc bounds = subLevel.boundingBox();
+                if (bounds == null || !reach.intersects(bounds.minX(), bounds.minY(), bounds.minZ(),
+                        bounds.maxX(), bounds.maxY(), bounds.maxZ())) continue;
+                if (matches(scale, Pym.scale().settled(subLevel))
+                        || matches(scale, Pym.scale().of(subLevel))
+                        || subLevel instanceof ServerSubLevel server
+                                && matches(scale, Pym.scale().target(server))) return true;
+            }
+        }
+
+        if (!Pym.entities().available()) return false;
+        boolean[] found = {false};
+        LevelEntityGetter<Entity> getter = ((LevelEntityGetterAccessor) level).pocket$getEntities();
+        Consumer<Entity> visitor = candidate -> {
+            if (found[0] || candidate == player || !candidate.isAlive() || candidate.isSpectator()
+                    || !(candidate instanceof LivingEntity)) return;
+            double holder = containerScale(candidate);
+            found[0] = matches(scale, Pym.entities().scaleOf(candidate) * holder)
+                    || matches(scale, Pym.entities().target(candidate) * holder);
+        };
+        query(getter, reach, candidate -> {
+            if (Sable.HELPER.getContaining(candidate) == null) visitor.accept(candidate);
+        });
+        if (found[0] || container == null) return found[0];
+        for (SubLevel subLevel : container.getAllSubLevels()) {
+            if (subLevel.isRemoved()) continue;
+            BoundingBox3dc bounds = subLevel.boundingBox();
+            BoundingBox3ic plot = subLevel.getPlot().getBoundingBox();
+            if (bounds == null || plot == null || !reach.intersects(bounds.minX(), bounds.minY(), bounds.minZ(),
+                    bounds.maxX(), bounds.maxY(), bounds.maxZ())) continue;
+            query(getter, new AABB(plot.minX(), plot.minY(), plot.minZ(),
+                    plot.maxX() + 1.0D, plot.maxY() + 1.0D, plot.maxZ() + 1.0D).inflate(1.0D), candidate -> {
+                if (Sable.HELPER.getContaining(candidate) == subLevel) visitor.accept(candidate);
+            });
+            if (found[0]) return true;
+        }
+        return false;
+    }
+
+    private static boolean matches(double picked, double actual) {
+        return ScaleBounds.isValid(actual) && Math.abs(picked - actual) <= 1.0E-3D * Math.max(picked, actual);
     }
 
     public static double containerScale(Entity entity) {

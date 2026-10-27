@@ -16,18 +16,30 @@ public final class PlotShape implements SubLevelShape {
 
     public record TileKey(int x, int y, int z) {}
 
+    private record Tile(List<Box> boxes, short[] materials) {
+        private static final Tile EMPTY = new Tile(List.of(), new short[0]);
+
+        private boolean isEmpty() {
+            return this.boxes.isEmpty();
+        }
+    }
+
     private final ColliderDetail.Level level;
+    private final PlotSource source;
     private final int minX, minY, minZ, maxX, maxY, maxZ;
-    private final Map<TileKey, List<Box>> tiles;
+    private final Map<TileKey, Tile> tiles;
     private final List<Box> boxes;
+    private final short[] materials;
 
     private PlotShape(
             ColliderDetail.Level level,
+            PlotSource source,
             int minX, int minY, int minZ,
             int maxX, int maxY, int maxZ,
-            Map<TileKey, List<Box>> tiles
+            Map<TileKey, Tile> tiles
     ) {
         this.level = level;
+        this.source = source;
         this.minX = minX;
         this.minY = minY;
         this.minZ = minZ;
@@ -37,8 +49,15 @@ public final class PlotShape implements SubLevelShape {
         this.tiles = tiles;
 
         List<Box> flattened = new ArrayList<>();
-        for (List<Box> tile : tiles.values()) flattened.addAll(tile);
+        int count = 0;
+        for (Tile tile : tiles.values()) count += tile.boxes().size();
+        short[] flatMaterials = new short[count];
+        for (Tile tile : tiles.values()) {
+            System.arraycopy(tile.materials(), 0, flatMaterials, flattened.size(), tile.boxes().size());
+            flattened.addAll(tile.boxes());
+        }
         this.boxes = List.copyOf(flattened);
+        this.materials = flatMaterials;
     }
 
     @Override
@@ -46,8 +65,16 @@ public final class PlotShape implements SubLevelShape {
         return this.boxes;
     }
 
+    public short material(int boxIndex) {
+        return this.materials[boxIndex];
+    }
+
     public ColliderDetail.Level level() {
         return this.level;
+    }
+
+    public PlotSource source() {
+        return this.source;
     }
 
     public int minX() { return this.minX; }
@@ -82,12 +109,12 @@ public final class PlotShape implements SubLevelShape {
         int lastTileY = Math.floorDiv(source.blockMaxY(), span);
         int lastTileZ = Math.floorDiv(source.blockMaxZ(), span);
 
-        Map<TileKey, List<Box>> tiles = new HashMap<>();
+        Map<TileKey, Tile> tiles = new HashMap<>();
         for (int x = firstTileX; x <= lastTileX; x++) {
             for (int y = firstTileY; y <= lastTileY; y++) {
                 for (int z = firstTileZ; z <= lastTileZ; z++) {
                     TileKey key = new TileKey(x, y, z);
-                    List<Box> built = meshTile(source, level, key);
+                    Tile built = meshTile(source, level, key);
                     if (!built.isEmpty()) tiles.put(key, built);
                 }
             }
@@ -96,6 +123,7 @@ public final class PlotShape implements SubLevelShape {
         if (tiles.isEmpty()) return null;
         return new PlotShape(
                 level,
+                source,
                 source.blockMinX(), source.blockMinY(), source.blockMinZ(),
                 source.blockMaxX(), source.blockMaxY(), source.blockMaxZ(),
                 tiles);
@@ -104,9 +132,9 @@ public final class PlotShape implements SubLevelShape {
     public PlotShape remesh(PlotSource source, Collection<TileKey> dirty) {
         if (source == null || dirty == null || dirty.isEmpty()) return this;
 
-        Map<TileKey, List<Box>> updated = new HashMap<>(this.tiles);
+        Map<TileKey, Tile> updated = new HashMap<>(this.tiles);
         for (TileKey key : dirty) {
-            List<Box> built = meshTile(source, this.level, key);
+            Tile built = meshTile(source, this.level, key);
             if (built.isEmpty()) updated.remove(key);
             else updated.put(key, built);
         }
@@ -114,12 +142,13 @@ public final class PlotShape implements SubLevelShape {
 
         return new PlotShape(
                 this.level,
+                source,
                 source.blockMinX(), source.blockMinY(), source.blockMinZ(),
                 source.blockMaxX(), source.blockMaxY(), source.blockMaxZ(),
                 updated);
     }
 
-    private static List<Box> meshTile(
+    private static Tile meshTile(
             PlotSource source,
             ColliderDetail.Level level,
             TileKey tile
@@ -129,14 +158,18 @@ public final class PlotShape implements SubLevelShape {
         int baseX = tile.x() * TILE, baseY = tile.y() * TILE, baseZ = tile.z() * TILE;
 
         boolean[] solid = new boolean[TILE * TILE * TILE];
+        short[] material = new short[TILE * TILE * TILE];
         List<Box> boxes = new ArrayList<>();
+        List<Short> boxMaterials = new ArrayList<>();
         boolean any = false;
 
         for (int i = 0; i < TILE; i++) {
             for (int j = 0; j < TILE; j++) {
                 for (int k = 0; k < TILE; k++) {
                     if (!occupied(source, level, group, baseX + i, baseY + j, baseZ + k)) continue;
-                    solid[tileIndex(i, j, k)] = true;
+                    int index = tileIndex(i, j, k);
+                    solid[index] = true;
+                    material[index] = material(source, group, baseX + i, baseY + j, baseZ + k);
                     any = true;
                 }
             }
@@ -146,13 +179,17 @@ public final class PlotShape implements SubLevelShape {
             for (int i = 0; i < TILE; i++) {
                 for (int j = 0; j < TILE; j++) {
                     for (int k = 0; k < TILE; k++) {
-                        boxes.addAll(source.partialsAt(baseX + i, baseY + j, baseZ + k));
+                        List<Box> partials = source.partialsAt(baseX + i, baseY + j, baseZ + k);
+                        if (partials.isEmpty()) continue;
+                        short partialMaterial = source.materialAt(baseX + i, baseY + j, baseZ + k);
+                        boxes.addAll(partials);
+                        for (int p = 0; p < partials.size(); p++) boxMaterials.add(partialMaterial);
                     }
                 }
             }
         }
 
-        if (!any) return boxes.isEmpty() ? List.of() : List.copyOf(boxes);
+        if (!any) return tile(boxes, boxMaterials);
 
         boolean[] used = new boolean[TILE * TILE * TILE];
         for (int j = 0; j < TILE; j++) {
@@ -160,15 +197,16 @@ public final class PlotShape implements SubLevelShape {
                 for (int i = 0; i < TILE; i++) {
                     int start = tileIndex(i, j, k);
                     if (!solid[start] || used[start]) continue;
+                    short want = material[start];
 
                     int width = 1;
-                    while (i + width < TILE && free(solid, used, i + width, j, k)) width++;
+                    while (i + width < TILE && free(solid, used, material, want, i + width, j, k)) width++;
 
                     int depth = 1;
                     depthLoop:
                     while (k + depth < TILE) {
                         for (int w = 0; w < width; w++) {
-                            if (!free(solid, used, i + w, j, k + depth)) break depthLoop;
+                            if (!free(solid, used, material, want, i + w, j, k + depth)) break depthLoop;
                         }
                         depth++;
                     }
@@ -178,7 +216,7 @@ public final class PlotShape implements SubLevelShape {
                     while (j + height < TILE) {
                         for (int d = 0; d < depth; d++) {
                             for (int w = 0; w < width; w++) {
-                                if (!free(solid, used, i + w, j + height, k + d)) break heightLoop;
+                                if (!free(solid, used, material, want, i + w, j + height, k + d)) break heightLoop;
                             }
                         }
                         height++;
@@ -202,11 +240,39 @@ public final class PlotShape implements SubLevelShape {
                             Math.min(lowX + width * (double) quantum, source.blockMaxX() + 1.0D),
                             Math.min(lowY + height * (double) quantum, source.blockMaxY() + 1.0D),
                             Math.min(lowZ + depth * (double) quantum, source.blockMaxZ() + 1.0D)));
+                    boxMaterials.add(want);
                 }
             }
         }
 
-        return List.copyOf(boxes);
+        return tile(boxes, boxMaterials);
+    }
+
+    private static Tile tile(List<Box> boxes, List<Short> boxMaterials) {
+        if (boxes.isEmpty()) return Tile.EMPTY;
+        short[] materials = new short[boxMaterials.size()];
+        for (int i = 0; i < materials.length; i++) materials[i] = boxMaterials.get(i);
+        return new Tile(List.copyOf(boxes), materials);
+    }
+
+    private static short material(
+            PlotSource source,
+            int group,
+            int cellX, int cellY, int cellZ
+    ) {
+        if (group == 1) return source.materialAt(cellX, cellY, cellZ);
+
+        ColliderMaterial.Tally tally = new ColliderMaterial.Tally();
+        int firstX = cellX * group, firstY = cellY * group, firstZ = cellZ * group;
+        for (int x = 0; x < group; x++) {
+            for (int y = 0; y < group; y++) {
+                for (int z = 0; z < group; z++) {
+                    if (source.at(firstX + x, firstY + y, firstZ + z) == PlotSource.EMPTY) continue;
+                    tally.add(source.materialAt(firstX + x, firstY + y, firstZ + z), 1.0D);
+                }
+            }
+        }
+        return tally.winner();
     }
 
     private static boolean occupied(
@@ -271,9 +337,15 @@ public final class PlotShape implements SubLevelShape {
         return value < min ? min : Math.min(value, max);
     }
 
-    private static boolean free(boolean[] solid, boolean[] used, int i, int j, int k) {
+    private static boolean free(
+            boolean[] solid,
+            boolean[] used,
+            short[] material,
+            short want,
+            int i, int j, int k
+    ) {
         int index = tileIndex(i, j, k);
-        return solid[index] && !used[index];
+        return solid[index] && !used[index] && material[index] == want;
     }
 
     private static int tileIndex(int i, int j, int k) {

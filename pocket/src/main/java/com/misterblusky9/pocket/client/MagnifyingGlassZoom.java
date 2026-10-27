@@ -28,7 +28,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import org.joml.Vector3f;
 
-
 public final class MagnifyingGlassZoom {
     private static final double MIN_DIAL = 1.0D;
     private static final double EYE_DIAL = 2.0D;

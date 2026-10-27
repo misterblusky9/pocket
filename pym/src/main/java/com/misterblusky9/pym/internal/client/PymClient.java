@@ -26,6 +26,8 @@ public final class PymClient {
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) RenderFrame.capture(event.getFrustum());
         });
         NeoForge.EVENT_BUS.addListener(ColliderOutlines::render);
+        NeoForge.EVENT_BUS.addListener(PortraitMirror::registerCommand);
+        NeoForge.EVENT_BUS.addListener(PortraitMirror::renderHand);
         if (ModList.get().isLoaded("create")) ContraptionColliderOutlines.register();
         NeoForge.EVENT_BUS.addListener((LevelEvent.Unload event) -> {
             if (!event.getLevel().isClientSide()) return;

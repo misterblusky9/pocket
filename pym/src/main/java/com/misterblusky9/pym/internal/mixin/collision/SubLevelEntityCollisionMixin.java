@@ -1,9 +1,12 @@
 package com.misterblusky9.pym.internal.mixin.collision;
 
-import com.misterblusky9.pym.internal.collision.SubLevelCollisionCache;
 import com.misterblusky9.pym.internal.collision.InteriorCollisionTolerance;
+import com.misterblusky9.pym.internal.collision.PlotScanBounds;
+import com.misterblusky9.pym.internal.collision.SubLevelCollisionCache;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
@@ -22,10 +25,39 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-
-
 @Mixin(value = SubLevelEntityCollision.class, remap = false)
 public abstract class SubLevelEntityCollisionMixin {
+    @WrapOperation(
+            method = "collide",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Ldev/ryanhcode/sable/companion/math/BoundingBox3d;volume()D",
+                    ordinal = 0
+            ),
+            remap = false,
+            require = 1
+    )
+    private static double pym$clipLocalBoundsBeforeSableGuard(
+            BoundingBox3d bounds,
+            Operation<Double> original,
+            @Local(name = "subLevel") SubLevel subLevel
+    ) {
+        if (!Double.isFinite(bounds.minX) || !Double.isFinite(bounds.minY)
+                || !Double.isFinite(bounds.minZ) || !Double.isFinite(bounds.maxX)
+                || !Double.isFinite(bounds.maxY) || !Double.isFinite(bounds.maxZ)) {
+            return Double.POSITIVE_INFINITY;
+        }
+
+        if (subLevel == null || subLevel.getPlot() == null) {
+            return original.call(bounds);
+        }
+
+        if (!PlotScanBounds.clipCollisionSearchToPlot(subLevel, bounds)) {
+            return 0.0D;
+        }
+        return original.call(bounds);
+    }
+
     @Redirect(
             method = "collide",
             at = @At(
@@ -218,5 +250,4 @@ public abstract class SubLevelEntityCollisionMixin {
         double scale = Math.abs(pose.scale().x());
         return Double.isFinite(scale) && scale > 1.0E-7 ? scale : 1.0;
     }
-
 }

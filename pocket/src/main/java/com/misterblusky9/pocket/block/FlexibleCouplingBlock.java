@@ -29,6 +29,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -111,6 +112,25 @@ public class FlexibleCouplingBlock extends WrenchableDirectionalBlock
             return;
         }
         kbe.preventSpeedUpdate = 2;
+    }
+
+    @Override
+    protected boolean isSignalSource(BlockState state) {
+        return true;
+    }
+
+    @Override
+    protected int getSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
+        return level.getBlockEntity(pos) instanceof FlexibleCouplingBlockEntity shaft ? shaft.getRedstoneOutput() : 0;
+    }
+
+    @Override
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
+                                   BlockPos neighborPos, boolean movedByPiston) {
+        super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
+        if (level.getBlockEntity(pos) instanceof FlexibleCouplingBlockEntity shaft) {
+            shaft.updateRedstoneInput();
+        }
     }
 
     @Override

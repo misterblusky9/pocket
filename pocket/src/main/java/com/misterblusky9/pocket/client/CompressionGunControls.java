@@ -10,22 +10,18 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.lwjgl.glfw.GLFW;
 
 public final class CompressionGunControls {
-    public static void onScroll(InputEvent.MouseScrollingEvent event) {
-        if (event.isCanceled()) return;
+    public static void onKey(InputEvent.Key event) {
+        if (event.getAction() != GLFW.GLFW_PRESS) return;
+        if (event.getKey() != GLFW.GLFW_KEY_LEFT_ALT && event.getKey() != GLFW.GLFW_KEY_RIGHT_ALT) return;
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         if (player == null || minecraft.screen != null) return;
-        if (!player.isShiftKeyDown()) return;
 
         InteractionHand hand = handHoldingGun(player);
         if (hand == null) return;
-
-        double delta = event.getScrollDeltaY();
-        if (delta == 0.0D) return;
-
-        event.setCanceled(true);
         if (CompressionGunItem.modeLocked(player, hand)) return;
 
         ItemStack stack = player.getItemInHand(hand);

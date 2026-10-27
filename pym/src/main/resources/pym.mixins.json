@@ -15,9 +15,11 @@
     "physics.ConstraintHandleSafeRemoveMixin",
     "physics.RapierConstraintAnchorScaleMixin",
     "physics.ServerSubLevelSplitScaleMixin",
+    "physics.SubLevelAssemblySplitScaleMixin",
     "physics.ServerSubLevelForceContextMixin",
     "physics.RigidBodyHandleForceScaleMixin",
     "physics.AeroForceScaleMixin",
+    "physics.PropellerAirflowScaleMixin",
     "physics.RapierExternalImpulseMixin",
     "physics.SubLevelStepVelocityGuardMixin",
     "companion.BoundingBoxIntersectMixin",
@@ -40,7 +42,8 @@
     "sable.RiderEyeScaleMixin",
     "sable.SubLevelAssemblyRemovedBodyGuardMixin",
     "sable.PlotChangeCacheMixin",
-    "sable.SubLevelEntityQueryBoundsMixin"
+    "sable.SubLevelEntityQueryBoundsMixin",
+    "sable.PunchStrengthScaleMixin"
   ],
   "client": [
     "client.ClientSubLevelMixin",
@@ -48,6 +51,7 @@
     "client.SubLevelCameraZoomScaleMixin",
     "client.SubLevelNearPlaneScaleMixin",
     "client.VanillaChunkedSubLevelRenderDataMixin",
+    "client.PortraitPoseMixin",
     "client.SingleBlockSubLevelScaleMixin",
     "client.SubLevelOutlineCameraMixin",
     "client.SubLevelRenderOffsetScaleMixin",

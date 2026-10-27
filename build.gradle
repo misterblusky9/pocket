@@ -46,6 +46,18 @@ subprojects {
                 includeGroup "maven.modrinth"
             }
         }
+
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = "Illusive Soulworks"
+                    url = "https://maven.theillusivec4.top/"
+                }
+            }
+            filter {
+                includeGroup "top.theillusivec4.curios"
+            }
+        }
     }
 
     tasks.withType(JavaCompile).configureEach {

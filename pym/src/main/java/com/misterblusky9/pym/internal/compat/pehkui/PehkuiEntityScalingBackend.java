@@ -3,6 +3,7 @@ package com.misterblusky9.pym.internal.compat.pehkui;
 import net.minecraft.world.entity.Entity;
 import virtuoel.pehkui.api.ScaleData;
 import virtuoel.pehkui.api.ScaleTypes;
+import virtuoel.pehkui.util.ScaleUtils;
 
 final class PehkuiEntityScalingBackend implements PehkuiEntityScaling.Backend {
     @Override
@@ -21,6 +22,12 @@ final class PehkuiEntityScalingBackend implements PehkuiEntityScaling.Backend {
     @Override
     public double blockReachScale(Entity entity) {
         float value = ScaleTypes.BLOCK_REACH.getScaleData(entity).getScale(1.0F);
+        return valid(value) ? value : 1.0D;
+    }
+
+    @Override
+    public double motionScale(Entity entity) {
+        float value = ScaleUtils.getMotionScale(entity);
         return valid(value) ? value : 1.0D;
     }
 

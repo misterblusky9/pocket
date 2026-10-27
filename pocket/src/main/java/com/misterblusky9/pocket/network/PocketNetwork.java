@@ -3,6 +3,8 @@ package com.misterblusky9.pocket.network;
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.item.MagnifyingGlassItem;
+import com.misterblusky9.pocket.item.PersonalCompressors;
+import com.misterblusky9.pocket.item.SelfResizeDeviceItem;
 import com.misterblusky9.pocket.item.ScaleToolModifier;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pocket.item.ScaleSelectingItem;
@@ -13,7 +15,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class PocketNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("20");
+        PayloadRegistrar registrar = event.registrar("22");
         registrar.playToClient(
                 CompressionSyncPayload.TYPE,
                 CompressionSyncPayload.STREAM_CODEC,
@@ -103,6 +105,27 @@ public final class PocketNetwork {
                 (payload, context) -> context.enqueueWork(() -> {
                     ItemStack stack = context.player().getItemInHand(payload.hand());
                     if (stack.getItem() instanceof ScaleSelectingItem tool
+                            && tool.permitsSelection(stack, context.player(), payload.scale())) {
+                        tool.select(stack, payload.scale());
+                    }
+                })
+        );
+        registrar.playToServer(
+                PersonalCompressorUsePayload.TYPE,
+                PersonalCompressorUsePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (!(context.player() instanceof ServerPlayer player) || player.isSpectator()) return;
+                    ItemStack stack = PersonalCompressors.find(player);
+                    if (stack == null || player.getCooldowns().isOnCooldown(stack.getItem())) return;
+                    SelfResizeDeviceItem.activate(player, stack);
+                })
+        );
+        registrar.playToServer(
+                PersonalCompressorScalePayload.TYPE,
+                PersonalCompressorScalePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    ItemStack stack = PersonalCompressors.find(context.player());
+                    if (stack != null && stack.getItem() instanceof ScaleSelectingItem tool
                             && tool.permitsSelection(stack, context.player(), payload.scale())) {
                         tool.select(stack, payload.scale());
                     }

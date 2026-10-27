@@ -32,6 +32,22 @@ public final class PlotScanBounds {
         return BlockPos.betweenClosed(x0, y0, z0, x1, y1, z1);
     }
 
+    public static boolean clipCollisionSearchToPlot(SubLevel subLevel, BoundingBox3d local) {
+        BoundingBox3ic plot = plotBounds(subLevel);
+        if (plot == null || plot.volume() <= 0.0D) return false;
+
+        double minX = Math.max(local.minX, plot.minX());
+        double minY = Math.max(local.minY, plot.minY());
+        double minZ = Math.max(local.minZ, plot.minZ());
+        double maxX = Math.min(local.maxX, plot.maxX() + 1.0D);
+        double maxY = Math.min(local.maxY, plot.maxY() + 1.0D);
+        double maxZ = Math.min(local.maxZ, plot.maxZ() + 1.0D);
+
+        if (minX > maxX || minY > maxY || minZ > maxZ) return false;
+        local.set(minX, minY, minZ, maxX, maxY, maxZ);
+        return true;
+    }
+
     public static void clampCells(SubLevel subLevel, BoundingBox3d local) {
         BoundingBox3ic plot = plotBounds(subLevel);
         if (plot == null) return;

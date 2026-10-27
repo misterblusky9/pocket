@@ -1,0 +1,7 @@
+{
+  "selector": "pocket:blueprint_encased_cogwheel",
+
+  "properties": {
+    "sable:friction": 1.65
+  }
+}

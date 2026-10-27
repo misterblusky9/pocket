@@ -3,29 +3,35 @@ package com.misterblusky9.pocket.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.settings.IKeyConflictContext;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import org.lwjgl.glfw.GLFW;
 
-public final class PocketKeys {
-    public static final KeyMapping WELD_ROTATE = new KeyMapping(
-            "key.pocket.weld_rotate",
-            KeyConflictContext.IN_GAME,
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_R,
-            "key.categories.pocket"
-    );
+import java.util.ArrayList;
+import java.util.List;
 
-    public static final KeyMapping MAGNIFIER_TOGGLE = new KeyMapping(
-            "key.pocket.magnifier_toggle",
-            KeyConflictContext.IN_GAME,
-            InputConstants.Type.KEYSYM,
-            GLFW.GLFW_KEY_V,
-            "key.categories.pocket"
-    );
+public final class PocketKeys {
+    private static final String CATEGORY = "key.categories.pocket";
+    private static final List<KeyMapping> ALL = new ArrayList<>();
+
+    public static final KeyMapping WELD_ROTATE = key("weld_rotate", KeyConflictContext.IN_GAME, GLFW.GLFW_KEY_R);
+    public static final KeyMapping MAGNIFIER_TOGGLE = key("magnifier_toggle", KeyConflictContext.IN_GAME, GLFW.GLFW_KEY_V);
+    public static final KeyMapping PERSONAL_COMPRESSOR = key("personal_compressor", KeyConflictContext.IN_GAME, GLFW.GLFW_KEY_UNKNOWN);
+
+    private static KeyMapping key(String name, IKeyConflictContext context, int defaultKey) {
+        KeyMapping mapping = new KeyMapping(
+                "key.pocket." + name,
+                context,
+                InputConstants.Type.KEYSYM,
+                defaultKey,
+                CATEGORY
+        );
+        ALL.add(mapping);
+        return mapping;
+    }
 
     public static void register(RegisterKeyMappingsEvent event) {
-        event.register(WELD_ROTATE);
-        event.register(MAGNIFIER_TOGGLE);
+        ALL.forEach(event::register);
     }
 
     private PocketKeys() {}

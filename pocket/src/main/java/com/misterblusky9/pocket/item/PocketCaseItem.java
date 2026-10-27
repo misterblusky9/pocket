@@ -53,6 +53,7 @@ import com.simibubi.create.content.logistics.box.PackageEntity;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import com.simibubi.create.content.logistics.box.PackageStyles;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
@@ -144,7 +145,7 @@ public class PocketCaseItem extends PackageItem {
     }
 
     public static ResourceLocation containerId(ItemStack stack) {
-        CompoundTag tag = customTag(stack);
+        CompoundTag tag = storedTag(stack);
         if (tag == null || !tag.contains(CONTAINER_KEY)) return null;
         return ResourceLocation.tryParse(tag.getString(CONTAINER_KEY));
     }
@@ -280,7 +281,7 @@ public class PocketCaseItem extends PackageItem {
     }
 
     public static double pocketedScale(ItemStack stack) {
-        CompoundTag tag = customTag(stack);
+        CompoundTag tag = storedTag(stack);
         if (tag == null || !tag.contains(SCALE_KEY, net.minecraft.nbt.Tag.TAG_ANY_NUMERIC)) return POCKETABLE_SCALE;
         double scale = tag.getDouble(SCALE_KEY);
         if (!ScaleBounds.isValid(scale)) return POCKETABLE_SCALE;
@@ -295,10 +296,10 @@ public class PocketCaseItem extends PackageItem {
     }
 
     public static int[] facadeOffset(ItemStack stack) {
-        CompoundTag tag = customTag(stack);
+        CompoundTag tag = storedTag(stack);
         if (tag == null || !tag.contains(FACADE_OFFSET_KEY, Tag.TAG_INT_ARRAY)) return null;
         int[] offset = tag.getIntArray(FACADE_OFFSET_KEY);
-        return offset.length == 3 ? offset : null;
+        return offset.length == 3 ? offset.clone() : null;
     }
 
     public static int modelQuarterTurns(ItemStack stack) {
@@ -390,7 +391,7 @@ public class PocketCaseItem extends PackageItem {
     }
 
     public static UUID token(ItemStack stack) {
-        CompoundTag tag = customTag(stack);
+        CompoundTag tag = storedTag(stack);
         return tag != null && tag.hasUUID(TOKEN_KEY) ? tag.getUUID(TOKEN_KEY) : null;
     }
 
@@ -406,6 +407,11 @@ public class PocketCaseItem extends PackageItem {
     public static CompoundTag customTag(ItemStack stack) {
         CustomData data = stack.get(DataComponents.CUSTOM_DATA);
         return data == null ? null : data.copyTag();
+    }
+
+    private static CompoundTag storedTag(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        return data == null ? null : data.getUnsafe();
     }
 
     @Override

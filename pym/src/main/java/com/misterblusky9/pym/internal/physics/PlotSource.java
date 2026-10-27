@@ -14,8 +14,10 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class PlotSource {
     public static final byte EMPTY = 0;
@@ -36,6 +38,7 @@ public final class PlotSource {
     private final int cellMinX, cellMinY, cellMinZ;
     private final int cellsX, cellsY, cellsZ;
     private final byte[] cells;
+    private short[] materials;
 
     private final Map<Integer, List<PlotShape.Box>> partials;
 
@@ -97,6 +100,64 @@ public final class PlotSource {
             return EMPTY;
         }
         return this.cells[index(x, y, z)];
+    }
+
+    public short materialAt(int cellX, int cellY, int cellZ) {
+        if (this.materials == null) return ColliderMaterial.DEFAULT_ID;
+        int x = cellX - this.cellMinX;
+        int y = cellY - this.cellMinY;
+        int z = cellZ - this.cellMinZ;
+        if (x < 0 || y < 0 || z < 0 || x >= this.cellsX || y >= this.cellsY || z >= this.cellsZ) {
+            return ColliderMaterial.DEFAULT_ID;
+        }
+        return this.materials[index(x, y, z)];
+    }
+
+    public short surfaceMaterial(
+            double minX, double minY, double minZ,
+            double maxX, double maxY, double maxZ
+    ) {
+        ColliderMaterial.Tally exposed = new ColliderMaterial.Tally();
+        ColliderMaterial.Tally volume = new ColliderMaterial.Tally();
+        int firstX = cellOf((int) Math.floor(minX)), lastX = cellOf((int) Math.ceil(maxX) - 1);
+        int firstY = cellOf((int) Math.floor(minY)), lastY = cellOf((int) Math.ceil(maxY) - 1);
+        int firstZ = cellOf((int) Math.floor(minZ)), lastZ = cellOf((int) Math.ceil(maxZ) - 1);
+        for (int x = firstX; x <= lastX; x++) {
+            double spanX = overlap(x, minX, maxX, this.blockMinX, this.blockMaxX);
+            if (spanX <= 0.0D) continue;
+            for (int y = firstY; y <= lastY; y++) {
+                double spanY = overlap(y, minY, maxY, this.blockMinY, this.blockMaxY);
+                if (spanY <= 0.0D) continue;
+                for (int z = firstZ; z <= lastZ; z++) {
+                    if (at(x, y, z) == EMPTY) continue;
+                    double spanZ = overlap(z, minZ, maxZ, this.blockMinZ, this.blockMaxZ);
+                    if (spanZ <= 0.0D) continue;
+                    double weight = spanX * spanY * spanZ;
+                    short material = materialAt(x, y, z);
+                    volume.add(material, weight);
+                    int open = openFaces(x, y, z);
+                    if (open > 0) exposed.add(material, weight * open);
+                }
+            }
+        }
+        return exposed.isEmpty() ? volume.winner() : exposed.winner();
+    }
+
+    private double overlap(int cell, double min, double max, int blockMin, int blockMax) {
+        double low = Math.max(min, Math.max((double) cell * this.quantum, blockMin));
+        double high = Math.min(max, Math.min((double) (cell + 1) * this.quantum, blockMax + 1.0D));
+        return high - low;
+    }
+
+    private int openFaces(int cellX, int cellY, int cellZ) {
+        int open = 0;
+        if (at(cellX - 1, cellY, cellZ) != FULL) open++;
+        if (at(cellX + 1, cellY, cellZ) != FULL) open++;
+        if (at(cellX, cellY - 1, cellZ) != FULL) open++;
+        if (at(cellX, cellY + 1, cellZ) != FULL) open++;
+        if (at(cellX, cellY, cellZ - 1) != FULL) open++;
+        if (at(cellX, cellY, cellZ + 1) != FULL) open++;
+        return open;
     }
 
     public List<PlotShape.Box> partialsAt(int cellX, int cellY, int cellZ) {
@@ -161,6 +222,7 @@ public final class PlotSource {
         } else {
             source.scanBlocks(level, sectionsUsable ? reader : null);
         }
+        if (quantum > 1) source.resolveCoarseMaterials(level, reader);
 
         return source.isEmpty() ? null : source;
     }
@@ -185,18 +247,22 @@ public final class PlotSource {
 
         int index = index(x, y, z);
         byte before = this.cells[index];
+        short materialBefore = materialAtIndex(index);
         List<PlotShape.Box> partialsBefore = this.partials.get(index);
+        LevelReader reader = level instanceof LevelReader candidate ? candidate : null;
 
         if (this.quantum >= SECTION_QUANTUM) {
-            byte after = level instanceof LevelReader reader
+            byte after = reader != null
                     && sectionHasBlocks(reader, cellX, cellY, cellZ, this.quantum)
                     ? FULL
                     : EMPTY;
             this.cells[index] = after;
-            return after != before;
+            resolveCellMaterial(level, reader, cellX, cellY, cellZ);
+            return after != before || materialAtIndex(index) != materialBefore;
         }
 
         this.cells[index] = EMPTY;
+        setMaterial(index, ColliderMaterial.DEFAULT_ID);
         this.partials.remove(index);
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int firstX = Math.max(this.blockMinX, cellX * this.quantum);
@@ -213,8 +279,10 @@ public final class PlotSource {
                 }
             }
         }
+        if (this.quantum > 1) resolveCellMaterial(level, reader, cellX, cellY, cellZ);
 
         return this.cells[index] != before
+                || materialAtIndex(index) != materialBefore
                 || !equalBoxes(partialsBefore, this.partials.get(index));
     }
 
@@ -288,8 +356,9 @@ public final class PlotSource {
             BlockState state,
             int index
     ) {
-        VoxelShape collision = state.getCollisionShape(level, pos);
+        VoxelShape collision = SableColliderShapes.of(level, state);
         if (collision.isEmpty()) return;
+        if (this.quantum == 1) setMaterial(index, ColliderMaterial.id(state));
 
         if (Block.isShapeFullBlock(collision)) {
             this.cells[index] = FULL;
@@ -318,6 +387,105 @@ public final class PlotSource {
 
     private int index(int x, int y, int z) {
         return x + this.cellsX * (z + this.cellsZ * y);
+    }
+
+    private short materialAtIndex(int index) {
+        return this.materials == null ? ColliderMaterial.DEFAULT_ID : this.materials[index];
+    }
+
+    private void setMaterial(int index, short material) {
+        if (this.materials == null) {
+            if (material == ColliderMaterial.DEFAULT_ID) return;
+            this.materials = new short[this.cells.length];
+        }
+        this.materials[index] = material;
+    }
+
+    private void resolveCoarseMaterials(BlockGetter level, LevelReader reader) {
+        if (reader == null) return;
+        Set<Integer> candidates = new HashSet<>();
+        forEachSection(reader, this.blockMinX, this.blockMinY, this.blockMinZ,
+                this.blockMaxX, this.blockMaxY, this.blockMaxZ,
+                (sectionX, sectionY, sectionZ, section) -> {
+                    if (!section.maybeHas(ColliderMaterial::special)) return;
+                    int firstX = Math.max(this.blockMinX, sectionX << 4);
+                    int firstY = Math.max(this.blockMinY, sectionY << 4);
+                    int firstZ = Math.max(this.blockMinZ, sectionZ << 4);
+                    int lastX = Math.min(this.blockMaxX, (sectionX << 4) + 15);
+                    int lastY = Math.min(this.blockMaxY, (sectionY << 4) + 15);
+                    int lastZ = Math.min(this.blockMaxZ, (sectionZ << 4) + 15);
+                    for (int x = cellOf(firstX); x <= cellOf(lastX); x++) {
+                        for (int y = cellOf(firstY); y <= cellOf(lastY); y++) {
+                            for (int z = cellOf(firstZ); z <= cellOf(lastZ); z++) {
+                                candidates.add(index(x - this.cellMinX, y - this.cellMinY, z - this.cellMinZ));
+                            }
+                        }
+                    }
+                });
+
+        for (int index : candidates) {
+            int x = index % this.cellsX;
+            int rest = index / this.cellsX;
+            int z = rest % this.cellsZ;
+            int y = rest / this.cellsZ;
+            resolveCellMaterial(level, reader, x + this.cellMinX, y + this.cellMinY, z + this.cellMinZ);
+        }
+    }
+
+    private void resolveCellMaterial(
+            BlockGetter level,
+            LevelReader reader,
+            int cellX, int cellY, int cellZ
+    ) {
+        int x = cellX - this.cellMinX;
+        int y = cellY - this.cellMinY;
+        int z = cellZ - this.cellMinZ;
+        if (x < 0 || y < 0 || z < 0 || x >= this.cellsX || y >= this.cellsY || z >= this.cellsZ) return;
+        int index = index(x, y, z);
+        if (this.cells[index] == EMPTY) {
+            setMaterial(index, ColliderMaterial.DEFAULT_ID);
+            return;
+        }
+
+        int firstX = Math.max(this.blockMinX, cellX * this.quantum);
+        int firstY = Math.max(this.blockMinY, cellY * this.quantum);
+        int firstZ = Math.max(this.blockMinZ, cellZ * this.quantum);
+        int lastX = Math.min(this.blockMaxX, cellX * this.quantum + this.quantum - 1);
+        int lastY = Math.min(this.blockMaxY, cellY * this.quantum + this.quantum - 1);
+        int lastZ = Math.min(this.blockMaxZ, cellZ * this.quantum + this.quantum - 1);
+
+        if (reader != null) {
+            boolean[] special = { false };
+            forEachSection(reader, firstX, firstY, firstZ, lastX, lastY, lastZ,
+                    (sectionX, sectionY, sectionZ, section) -> {
+                        if (!special[0] && section.maybeHas(ColliderMaterial::special)) special[0] = true;
+                    });
+            if (!special[0]) {
+                setMaterial(index, ColliderMaterial.DEFAULT_ID);
+                return;
+            }
+        }
+
+        ColliderMaterial.Tally tally = new ColliderMaterial.Tally();
+        if (this.quantum >= SECTION_QUANTUM && reader != null) {
+            forEachSection(reader, firstX, firstY, firstZ, lastX, lastY, lastZ,
+                    (sectionX, sectionY, sectionZ, section) -> section.getStates().count((state, count) -> {
+                        if (state.isAir() || SableColliderShapes.of(level, state).isEmpty()) return;
+                        tally.add(ColliderMaterial.id(state), count);
+                    }));
+        } else {
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            for (int bx = firstX; bx <= lastX; bx++) {
+                for (int by = firstY; by <= lastY; by++) {
+                    for (int bz = firstZ; bz <= lastZ; bz++) {
+                        BlockState state = level.getBlockState(pos.set(bx, by, bz));
+                        if (state.isAir() || SableColliderShapes.of(level, state).isEmpty()) continue;
+                        tally.add(ColliderMaterial.id(state), 1.0D);
+                    }
+                }
+            }
+        }
+        setMaterial(index, tally.winner());
     }
 
     private static boolean equalBoxes(List<PlotShape.Box> left, List<PlotShape.Box> right) {

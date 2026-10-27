@@ -141,6 +141,16 @@ public final class ColliderCoordinator {
         LAST_BOUNDS.put(subLevel.getUniqueId(), key);
     }
 
+    public static synchronized CompiledCollider.Bounds nativeLocalBounds(ServerSubLevel subLevel) {
+        if (subLevel == null || subLevel.getUniqueId() == null) return null;
+        int bodyId = RapierBridge.bodyId(subLevel);
+        if (bodyId == RapierBridge.NO_BODY) return null;
+        BoundsKey applied = LAST_BOUNDS.get(subLevel.getUniqueId());
+        if (applied != null && applied.bodyId() == bodyId) return applied.bounds();
+        CompiledCollider.Bounds bounds = boundsOf(subLevel, bodyId);
+        return bounds == null ? null : ScalePhysicsTransitions.nativeBounds(subLevel, bounds);
+    }
+
     public static synchronized boolean suppressNativeFluidProbe(ServerSubLevel subLevel) {
         if (subLevel == null || SubLevelLoadGuard.isLoading()) return false;
         int bodyId = RapierBridge.bodyId(subLevel);

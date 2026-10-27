@@ -35,10 +35,15 @@ public final class InternalForceScaleContext {
 
     public static double activeScale(PhysicsPipelineBody body) {
         if (!(body instanceof ServerSubLevel subLevel)) return 1.0D;
+        if (PairedForceScale.factorsFor(body) != null) return scaleOf(subLevel);
 
         ArrayDeque<ServerSubLevel> stack = STACK.get();
         if (stack == null || stack.isEmpty() || stack.peek() != subLevel) return 1.0D;
 
+        return scaleOf(subLevel);
+    }
+
+    public static double scaleOf(ServerSubLevel subLevel) {
         double scale = ScaleState.getServerScale(subLevel);
         if (!Double.isFinite(scale)
                 || scale <= 0.0D
@@ -49,11 +54,21 @@ public final class InternalForceScaleContext {
     }
 
     public static double[] forceFactors(PhysicsPipelineBody body) {
+        double[] paired = PairedForceScale.factorsFor(body);
+        if (paired != null) return paired;
         double scale = activeScale(body);
         if (scale == 1.0D || !(body instanceof ServerSubLevel subLevel)) {
             return IDENTITY;
         }
+        return factorsAt(subLevel, scale);
+    }
 
+    public static double[] queuedFactors(ServerSubLevel subLevel) {
+        double scale = scaleOf(subLevel);
+        return scale == 1.0D ? IDENTITY : factorsAt(subLevel, scale);
+    }
+
+    private static double[] factorsAt(ServerSubLevel subLevel, double scale) {
         var tracker = subLevel.getMassTracker();
         double rawMass = tracker == null ? 0.0D : tracker.getMass();
         return ScaledMassData.forceFactors(rawMass, scale, CoupledMass.solverFloor(subLevel));

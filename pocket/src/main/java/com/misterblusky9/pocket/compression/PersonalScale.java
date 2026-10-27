@@ -38,6 +38,12 @@ public final class PersonalScale {
         return CompressionStage.fromDepth(data.getInt(STAGE_KEY)).scale();
     }
 
+    public static double liveScale(ServerPlayer player) {
+        if (player == null) return ScaleBounds.FULL;
+        double target = Pym.entities().target(player);
+        return ScaleBounds.isValid(target) ? CompressionStage.snap(target) : ScaleBounds.FULL;
+    }
+
     public static double goalFor(Entity entity, double current, double goal) {
         if (!(entity instanceof Player)) return goal;
         ScaleBounds bounds = DeviceRanges.of(DeviceRanges.Device.PERSONAL_COMPRESSOR);

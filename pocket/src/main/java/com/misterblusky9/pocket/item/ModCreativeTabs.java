@@ -23,6 +23,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.CREATIVE_SHRINK_RAY.get());
                         output.accept(CompressionGunTank.filled(
                                 new ItemStack(ModItems.SELF_RESIZE_DEVICE.get()), SelfResizeDeviceItem.CAPACITY));
+                        output.accept(CompressionGunTank.levitite().getBucket());
                         output.accept(ModItems.GLUE_GUN.get());
                         output.accept(ModItems.POCKET_KNIFE.get());
                         output.accept(ModItems.MAGNIFYING_GLASS.get());
@@ -43,6 +44,8 @@ public final class ModCreativeTabs {
 
                         output.accept(ModItems.BLUEPRINT_CASING.get());
                         output.accept(ModItems.COPYCAT_FACADE.get());
+
+                        output.accept(ModItems.SUBSPACE_RECYCLER.get());
                     })
                     .build()
     );

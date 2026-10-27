@@ -116,7 +116,7 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
         ScaleBounds ray = limits(player);
         if (mode != TargetingMode.ENTITIES) return ray;
         ScaleBounds personal = DeviceRanges.of(DeviceRanges.Device.PERSONAL_COMPRESSOR);
-        return new ScaleBounds(Math.min(ray.min(), personal.max()), personal.max());
+        return new ScaleBounds(Math.min(ray.min(), personal.min()), personal.max());
     }
 
     public static ScaleBounds limits(ItemStack stack, Player player) {
@@ -124,7 +124,9 @@ public final class CreativeShrinkRayItem extends ZapperItem implements PriorityI
     }
 
     public static boolean permits(ItemStack stack, Player player, double scale) {
-        return ScaleBounds.isValid(scale);
+        return ScaleBounds.isValid(scale)
+                && (limits(stack, player).contains(scale)
+                        || EntityCompressionTargeting.carriedNearby(player, RANGE, scale));
     }
 
     public static double selectedScale(ItemStack stack, Player player) {

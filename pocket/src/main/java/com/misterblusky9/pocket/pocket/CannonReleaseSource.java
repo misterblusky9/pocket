@@ -27,6 +27,7 @@ public final class CannonReleaseSource implements ScaleCommandSource {
     private final CannonExpansionMode mode;
     private final double pocketedScale;
     private boolean released;
+    private boolean finished;
     private String jam = "";
 
     private CannonReleaseSource(
@@ -141,6 +142,13 @@ public final class CannonReleaseSource implements ScaleCommandSource {
 
     @Override
     public boolean isRemoved() {
-        return this.subLevel.isRemoved() || this.level.getGameTime() > this.expiresAt;
+        if (this.finished) return true;
+        long now = this.level.getGameTime();
+        if (this.subLevel.isRemoved() || now > this.expiresAt
+                || Pym.resize().driversSuspended(this.subLevel.getUniqueId(), now)
+                || this.released && ScaleBounds.same(Pym.scale().settled(this.subLevel), CompressionStage.NORMAL.scale())) {
+            this.finished = true;
+        }
+        return this.finished;
     }
 }

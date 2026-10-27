@@ -192,6 +192,7 @@ public final class EntityCompressionSessions {
             if (!Pym.entities().setScale(target, scale / EntityCompressionTargeting.containerScale(target), RESIZE_TICKS)) {
                 return false;
             }
+            if (target instanceof ServerPlayer player) PersonalScale.remember(player, scale);
             this.resizingTo = scale;
             this.resizeAge = 0;
             return true;

@@ -5,6 +5,7 @@ import com.misterblusky9.pym.internal.debug.PymTrace;
 import com.misterblusky9.pym.internal.physics.ColliderDetail;
 import com.misterblusky9.pym.internal.physics.PivotDriftCompensation;
 import com.misterblusky9.pym.internal.physics.ColliderCoordinator;
+import com.misterblusky9.pym.internal.physics.RapierBridge;
 import com.misterblusky9.pym.internal.physics.ScaledColliderRebuildQueue;
 import com.misterblusky9.pym.internal.physics.ScaledFluidForces;
 import com.misterblusky9.pym.internal.physics.ScaledSweepGuard;
@@ -40,6 +41,7 @@ public final class ScaleLifecycle {
         ScaledVelocityGuard.forget(id);
         ScaledSweepGuard.forget(id);
         ScaledFluidForces.forget(id);
+        RapierBridge.forget(id);
         ColliderDetail.forget(id);
         PivotDriftCompensation.forget(id);
         SubLevelParentage.forget(id);
