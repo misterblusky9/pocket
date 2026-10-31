@@ -26,7 +26,8 @@
   "item.pocket.compression_gun.tooltip.summary": "Prototype shrinkray capable of growing or shrinking whatever it hits. Runs on _Levitite Blend_.",
   "item.pocket.compression_gun.tooltip.condition1": "Hold R-Click",
   "item.pocket.compression_gun.tooltip.behaviour1": "Resizes the target after spooling up.",
-  "item.pocket.compression_gun.tooltip.condition2": "Alt",
+  "item.pocket.compression_gun.tooltip.condition2": "Compression Cannon Toggle Key",
+  "item.pocket.compression_gun.tooltip.condition2.bound": "Press %s",
   "item.pocket.compression_gun.tooltip.behaviour2": "Toggle scaling mode.",
   "item.pocket.compression_gun.tooltip.condition3": "Hold Ctrl while firing",
   "item.pocket.compression_gun.tooltip.behaviour3": "Rescales _only_ the _target_, without affecting its _neighbours_.",
@@ -34,7 +35,8 @@
   "item.pocket.pearlescent_compression_gun.tooltip.summary": "A _shiny_ prototype shrinkray capable of growing or shrinking whatever it hits. Runs on _Levitite Blend_.",
   "item.pocket.pearlescent_compression_gun.tooltip.condition1": "Hold R-Click",
   "item.pocket.pearlescent_compression_gun.tooltip.behaviour1": "Resizes the target after spooling up.",
-  "item.pocket.pearlescent_compression_gun.tooltip.condition2": "Alt",
+  "item.pocket.pearlescent_compression_gun.tooltip.condition2": "Compression Cannon Toggle Key",
+  "item.pocket.pearlescent_compression_gun.tooltip.condition2.bound": "Press %s",
   "item.pocket.pearlescent_compression_gun.tooltip.behaviour2": "Toggle scaling mode.",
   "item.pocket.pearlescent_compression_gun.tooltip.condition3": "Hold Ctrl while firing",
   "item.pocket.pearlescent_compression_gun.tooltip.behaviour3": "Rescales _only_ the _target_, without affecting its _neighbours_.",
@@ -140,5 +142,6 @@
   "item.pocket.golf_ball": "Golf Ball",
   "item.pocket.magnifying_glass": "Magnifying Glass (WIP!)",
   "key.pocket.magnifier_toggle": "Toggle Magnifier",
-  "key.pocket.personal_compressor": "Toggle Personal Scale"
+  "key.pocket.personal_compressor": "Toggle Personal Scale",
+  "key.pocket.compression_cannon_toggle": "Compression Cannon Toggle"
 }

@@ -107,7 +107,7 @@ public final class PocketSizedClient {
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onClientTick);
         NeoForge.EVENT_BUS.addListener(PersonalCompressorKey::onClientTick);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onScroll);
-        NeoForge.EVENT_BUS.addListener(CompressionGunControls::onKey);
+        NeoForge.EVENT_BUS.addListener(CompressionGunControls::onClientTick);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onComputeFov);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onTurn);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onRenderHand);

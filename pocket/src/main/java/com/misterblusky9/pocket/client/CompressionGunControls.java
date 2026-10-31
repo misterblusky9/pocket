@@ -8,18 +8,20 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
-import org.lwjgl.glfw.GLFW;
 
 public final class CompressionGunControls {
-    public static void onKey(InputEvent.Key event) {
-        if (event.getAction() != GLFW.GLFW_PRESS) return;
-        if (event.getKey() != GLFW.GLFW_KEY_LEFT_ALT && event.getKey() != GLFW.GLFW_KEY_RIGHT_ALT) return;
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
-        if (player == null || minecraft.screen != null) return;
+        while (PocketKeys.COMPRESSION_CANNON_TOGGLE.consumeClick()) {
+            if (player == null || minecraft.screen != null) continue;
+            toggle(player);
+        }
+    }
 
+    private static void toggle(LocalPlayer player) {
         InteractionHand hand = handHoldingGun(player);
         if (hand == null) return;
         if (CompressionGunItem.modeLocked(player, hand)) return;

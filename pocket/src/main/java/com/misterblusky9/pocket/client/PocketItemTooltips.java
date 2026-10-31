@@ -17,11 +17,15 @@ import java.util.Locale;
 public final class PocketItemTooltips {
     private static final String PSC_KEY_LINE = "item.pocket.self_resize_device.tooltip.condition4";
     private static final String GLUE_ROTATE_LINE = "item.pocket.glue_gun.tooltip.condition4";
+    private static final String GUN_TOGGLE_LINE = "item.pocket.compression_gun.tooltip.condition2";
+    private static final String PEARLESCENT_TOGGLE_LINE = "item.pocket.pearlescent_compression_gun.tooltip.condition2";
 
     public static void register(FMLClientSetupEvent event) {
         describe(ModItems.CREATIVE_SHRINK_RAY.get(), FontHelper.Palette.PURPLE);
-        describe(ModItems.COMPRESSION_GUN.get(), FontHelper.Palette.STANDARD_CREATE);
-        describe(ModItems.PEARLESCENT_COMPRESSION_GUN.get(), FontHelper.Palette.STANDARD_CREATE);
+        describe(ModItems.COMPRESSION_GUN.get(), FontHelper.Palette.STANDARD_CREATE,
+                context -> showBoundKey(context.getToolTip(), PocketKeys.COMPRESSION_CANNON_TOGGLE, GUN_TOGGLE_LINE));
+        describe(ModItems.PEARLESCENT_COMPRESSION_GUN.get(), FontHelper.Palette.STANDARD_CREATE,
+                context -> showBoundKey(context.getToolTip(), PocketKeys.COMPRESSION_CANNON_TOGGLE, PEARLESCENT_TOGGLE_LINE));
         describe(ModItems.SELF_RESIZE_DEVICE.get(), FontHelper.Palette.STANDARD_CREATE,
                 context -> showBoundKey(context.getToolTip(), PocketKeys.PERSONAL_COMPRESSOR, PSC_KEY_LINE));
         describe(ModItems.GLUE_GUN.get(), FontHelper.Palette.STANDARD_CREATE,
