@@ -1,6 +1,10 @@
 package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.config.DeviceRanges;
+import com.simibubi.create.AllEnchantments;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -10,6 +14,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -22,6 +27,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 public final class CompressionGunTank {
     public static final int CAPACITY = 3000;
+    public static final int ENCHANTMENT_VALUE = 10;
 
     private static final ResourceLocation LEVITITE_BLEND =
             ResourceLocation.fromNamespaceAndPath("aeronautics", "levitite_blend");
@@ -41,13 +47,26 @@ public final class CompressionGunTank {
     public static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerItem(
                 Capabilities.FluidHandler.ITEM,
-                (stack, context) -> new Handler(stack, CAPACITY),
+                (stack, context) -> new Handler(stack, capacity(stack)),
                 ModItems.COMPRESSION_GUN.get(),
-                ModItems.PEARLESCENT_COMPRESSION_GUN.get());
-        event.registerItem(
-                Capabilities.FluidHandler.ITEM,
-                (stack, context) -> new Handler(stack, SelfResizeDeviceItem.CAPACITY),
+                ModItems.PEARLESCENT_COMPRESSION_GUN.get(),
                 ModItems.SELF_RESIZE_DEVICE.get());
+    }
+
+    public static int capacity(ItemStack stack) {
+        int base = stack.getItem() instanceof SelfResizeDeviceItem ? SelfResizeDeviceItem.CAPACITY : CAPACITY;
+        return (int) Math.round(base * (1.0D + DeviceRanges.tankBonusPerCapacityLevel() * capacityLevel(stack)));
+    }
+
+    private static int capacityLevel(ItemStack stack) {
+        for (Object2IntMap.Entry<Holder<Enchantment>> entry : stack.getTagEnchantments().entrySet()) {
+            if (entry.getKey().is(AllEnchantments.CAPACITY)) return entry.getIntValue();
+        }
+        return 0;
+    }
+
+    public static boolean isCapacity(Holder<Enchantment> enchantment) {
+        return enchantment.is(AllEnchantments.CAPACITY);
     }
 
     public static Fluid levitite() {
@@ -66,11 +85,11 @@ public final class CompressionGunTank {
 
     public static int amount(ItemStack stack) {
         FluidStack fluid = stack.getOrDefault(CONTENTS.get(), SimpleFluidContent.EMPTY).copy();
-        return isLevitite(fluid) ? fluid.getAmount() : 0;
+        return isLevitite(fluid) ? Math.min(fluid.getAmount(), capacity(stack)) : 0;
     }
 
     public static ItemStack filled(ItemStack stack) {
-        return filled(stack, CAPACITY);
+        return filled(stack, capacity(stack));
     }
 
     public static ItemStack filled(ItemStack stack, int capacity) {
@@ -161,6 +180,11 @@ public final class CompressionGunTank {
     private static final class Handler extends FluidHandlerItemStack {
         private Handler(ItemStack container, int capacity) {
             super(CONTENTS, container, capacity);
+        }
+
+        @Override
+        public int fill(FluidStack resource, FluidAction action) {
+            return getFluid().getAmount() >= capacity ? 0 : super.fill(resource, action);
         }
 
         @Override

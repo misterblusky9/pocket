@@ -23,6 +23,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.core.Holder;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -119,13 +121,33 @@ public final class SelfResizeDeviceItem extends Item implements ScaleSelectingIt
     }
 
     @Override
+    public boolean isEnchantable(ItemStack stack) {
+        return true;
+    }
+
+    @Override
+    public int getEnchantmentValue() {
+        return CompressionGunTank.ENCHANTMENT_VALUE;
+    }
+
+    @Override
+    public boolean supportsEnchantment(ItemStack stack, Holder<Enchantment> enchantment) {
+        return CompressionGunTank.isCapacity(enchantment) || super.supportsEnchantment(stack, enchantment);
+    }
+
+    @Override
+    public boolean isPrimaryItemFor(ItemStack stack, Holder<Enchantment> enchantment) {
+        return CompressionGunTank.isCapacity(enchantment) || super.isPrimaryItemFor(stack, enchantment);
+    }
+
+    @Override
     public boolean isBarVisible(ItemStack stack) {
         return true;
     }
 
     @Override
     public int getBarWidth(ItemStack stack) {
-        return Math.round(13.0F * CompressionGunTank.amount(stack) / CAPACITY);
+        return Math.round(13.0F * CompressionGunTank.amount(stack) / CompressionGunTank.capacity(stack));
     }
 
     @Override
@@ -141,6 +163,6 @@ public final class SelfResizeDeviceItem extends Item implements ScaleSelectingIt
             TooltipFlag flag
     ) {
         tooltip.add(Component.translatable("pocket.tooltip.levitite",
-                CompressionGunTank.amount(stack), CAPACITY).withStyle(ChatFormatting.GRAY));
+                CompressionGunTank.amount(stack), CompressionGunTank.capacity(stack)).withStyle(ChatFormatting.GRAY));
     }
 }

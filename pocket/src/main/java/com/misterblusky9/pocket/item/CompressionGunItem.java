@@ -20,6 +20,7 @@ import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -33,6 +34,7 @@ import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.item.component.CustomData;
@@ -309,13 +311,33 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
     }
 
     @Override
+    public boolean isEnchantable(ItemStack stack) {
+        return true;
+    }
+
+    @Override
+    public int getEnchantmentValue() {
+        return CompressionGunTank.ENCHANTMENT_VALUE;
+    }
+
+    @Override
+    public boolean supportsEnchantment(ItemStack stack, Holder<Enchantment> enchantment) {
+        return CompressionGunTank.isCapacity(enchantment) || super.supportsEnchantment(stack, enchantment);
+    }
+
+    @Override
+    public boolean isPrimaryItemFor(ItemStack stack, Holder<Enchantment> enchantment) {
+        return CompressionGunTank.isCapacity(enchantment) || super.isPrimaryItemFor(stack, enchantment);
+    }
+
+    @Override
     public boolean isBarVisible(ItemStack stack) {
         return true;
     }
 
     @Override
     public int getBarWidth(ItemStack stack) {
-        return Math.round(13.0F * CompressionGunTank.amount(stack) / CompressionGunTank.CAPACITY);
+        return Math.round(13.0F * CompressionGunTank.amount(stack) / CompressionGunTank.capacity(stack));
     }
 
     @Override
@@ -331,6 +353,6 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
             TooltipFlag flag
     ) {
         tooltip.add(Component.translatable("pocket.tooltip.levitite",
-                CompressionGunTank.amount(stack), CompressionGunTank.CAPACITY).withStyle(ChatFormatting.GRAY));
+                CompressionGunTank.amount(stack), CompressionGunTank.capacity(stack)).withStyle(ChatFormatting.GRAY));
     }
 }

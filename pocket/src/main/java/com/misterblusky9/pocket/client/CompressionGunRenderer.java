@@ -152,7 +152,7 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
     private static Spin advanceSpin(ItemStack rendered, Holder holder, BakedModel body) {
         ItemStack stack = holder.live();
         Spin state = stateFor(stack, holder);
-        float targetFill = CompressionGunTank.amount(stack) / (float) CompressionGunTank.CAPACITY;
+        float targetFill = CompressionGunTank.amount(stack) / (float) CompressionGunTank.capacity(stack);
         float now = AnimationTickHolder.getRenderTime();
         float delta = Float.isNaN(state.lastTime)
                 ? 0.0F

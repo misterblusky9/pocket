@@ -54,6 +54,7 @@ public final class DeviceRanges {
     private static final ModConfigSpec.BooleanValue CREATIVE_POCKETS_ANYTHING;
     private static final ModConfigSpec.IntValue KNIFE_MAX_BLOCKS;
     private static final ModConfigSpec.IntValue KNIFE_MAX_MOVED_BLOCKS;
+    private static final ModConfigSpec.DoubleValue TANK_BONUS_PER_CAPACITY_LEVEL;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -97,6 +98,12 @@ public final class DeviceRanges {
                 .defineInRange("maxMovedBlocks", 16_384, 0, Integer.MAX_VALUE);
         builder.pop();
 
+        builder.push("levititeTanks");
+        TANK_BONUS_PER_CAPACITY_LEVEL = builder.comment(
+                "Fraction of the base levitite tank added per level of Create's Capacity enchantment, on Compression Guns and the Personal Subspace Compressor.")
+                .defineInRange("bonusPerCapacityLevel", 1.0D / 3.0D, 0.0D, 100.0D);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -122,6 +129,10 @@ public final class DeviceRanges {
 
     public static int knifeMaxMovedBlocks() {
         return SPEC.isLoaded() ? KNIFE_MAX_MOVED_BLOCKS.get() : 16_384;
+    }
+
+    public static double tankBonusPerCapacityLevel() {
+        return SPEC.isLoaded() ? TANK_BONUS_PER_CAPACITY_LEVEL.get() : 1.0D / 3.0D;
     }
 
     public static ScaleBounds of(Device device) {
