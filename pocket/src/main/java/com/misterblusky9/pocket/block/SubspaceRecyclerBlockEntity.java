@@ -1,13 +1,11 @@
 package com.misterblusky9.pocket.block;
 
-import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelRecycling;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelSavedData;
-import com.simibubi.create.AllRecipeTypes;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import com.simibubi.create.content.kinetics.belt.behaviour.DirectBeltInputBehaviour;
-import com.simibubi.create.content.kinetics.millstone.MillingRecipe;
+import com.simibubi.create.content.logistics.box.PackageItem;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.simibubi.create.foundation.item.ItemHelper;
 import com.simibubi.create.foundation.sound.SoundScapes;
@@ -34,7 +32,6 @@ import java.util.UUID;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Clearable;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
@@ -45,10 +42,8 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.wrapper.CombinedInvWrapper;
-import net.neoforged.neoforge.items.wrapper.RecipeWrapper;
 
 import java.util.List;
-import java.util.Optional;
 
 public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implements Clearable {
     public final ItemStackHandler inputInv;
@@ -56,35 +51,13 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
     public final IItemHandler capability;
     public int timer;
 
-    private MillingRecipe lastRecipe;
-
     private int recycleStage;
     private UUID recycleToken;
     private String recycleDimension = "";
     private final ArrayList<ItemStack> backlog = new ArrayList<>();
-    private String lastError = "";
-    private String lastSalvageReport = "";
-    private int pendingSalvageWarnings;
     private boolean journalCorrupt;
 
     public boolean isPreparing() { return recycleStage == 1; }
-
-    public String inspectionStatus() {
-        if (journalCorrupt) return "Output journal corrupt: keep the machine intact and inspect the server log";
-        if (recycleStage == 1)
-            return lastError.isEmpty() ? "Finishing pocket retirement" : "Transaction paused: " + lastError;
-        if (recycleStage == 2)
-            return backlog.isEmpty() ? "Output ready for extraction" :
-                    "Waiting for output space: " + backlog.size() + " buffered stacks";
-        if (inputInv.getStackInSlot(0).isEmpty()) return lastSalvageReport.isEmpty()
-                ? (getSpeed() == 0 ? "No rotational power" : "No input pocket or milling item")
-                : lastSalvageReport;
-        if (getSpeed() == 0) return "No rotational power";
-        if (!lastError.isEmpty()) return "Cannot process: " + lastError;
-        if (PocketCaseItem.isUnique(inputInv.getStackInSlot(0)))
-            return "Pocket in processing queue";
-        return "Ordinary milling input in processing queue";
-    }
 
     private static final int MAX_BUFFERED_STACKS = 8192;
 
@@ -93,7 +66,6 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
         inputInv = new ItemStackHandler(1) {
             @Override
             protected void onContentsChanged(int slot) {
-                if (recycleStage == 0) lastError = "";
                 setChanged();
                 if (level != null && !level.isClientSide) sendData();
             }
@@ -146,10 +118,7 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
             return;
         }
         if (!(level instanceof ServerLevel server)) return;
-        if (journalCorrupt) {
-            recordProblem("Recycler output journal is corrupt; automatic processing is locked");
-            return;
-        }
+        if (journalCorrupt) return;
 
         if (recycleStage == 1) {
             commitJournal(server);
@@ -164,25 +133,14 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
             setChanged();
         }
 
-        if (getSpeed() == 0 || inputInv.getStackInSlot(0).isEmpty()) return;
+        ItemStack incoming = inputInv.getStackInSlot(0);
+        if (getSpeed() == 0 || !PocketCaseItem.isUnique(incoming)) return;
         if (timer > 0) {
             timer -= getProcessingSpeed();
-            if (timer <= 0) process(server);
+            if (timer <= 0) processPocket(server, incoming);
             return;
         }
-        ItemStack incoming = inputInv.getStackInSlot(0);
-        if (PocketCaseItem.isUnique(incoming)) {
-            timer = 100;
-            sendData();
-            return;
-        }
-        RecipeWrapper inventoryIn = new RecipeWrapper(inputInv);
-        if (lastRecipe == null || !lastRecipe.matches(inventoryIn, level)) {
-            Optional<RecipeHolder<MillingRecipe>> recipe = AllRecipeTypes.MILLING.find(inventoryIn, level);
-            if (recipe.isEmpty()) return;
-            lastRecipe = recipe.get().value();
-        }
-        timer = lastRecipe.getProcessingDuration();
+        timer = 100;
         sendData();
     }
 
@@ -211,47 +169,16 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
             for (ItemStack stack : backlog) Block.popResource(level, worldPosition, stack.copy());
     }
 
-    private void process(ServerLevel server) {
-        ItemStack incoming = inputInv.getStackInSlot(0);
-        if (PocketCaseItem.isUnique(incoming)) {
-            processPocket(server, incoming);
-            return;
-        }
-        RecipeWrapper inventoryIn = new RecipeWrapper(inputInv);
-        if (lastRecipe == null || !lastRecipe.matches(inventoryIn, level)) {
-            Optional<RecipeHolder<MillingRecipe>> recipe = AllRecipeTypes.MILLING.find(inventoryIn, level);
-            if (recipe.isEmpty()) return;
-            lastRecipe = recipe.get().value();
-        }
-        ArrayList<ItemStack> generated = new ArrayList<>(lastRecipe.rollResults(level.random));
-        ItemStack craftingRemainder = incoming.getCraftingRemainingItem();
-        if (!craftingRemainder.isEmpty()) generated.add(craftingRemainder);
-        ArrayList<ItemStack> packed = withBacklog(generated);
-        if (packed.size() > MAX_BUFFERED_STACKS) {
-            timer = 100;
-            return;
-        }
-        incoming.shrink(1);
-        inputInv.setStackInSlot(0, incoming);
-        backlog.clear();
-        backlog.addAll(packed);
-        recycleStage = 2;
-        setChanged();
-        sendData();
-    }
-
     private void processPocket(ServerLevel server, ItemStack carrier) {
         try {
             PocketedSubLevelRecycling.Plan plan = PocketedSubLevelRecycling.plan(server, carrier);
             ArrayList<ItemStack> packed = compact(plan.drops());
             if (packed.size() > MAX_BUFFERED_STACKS) {
-                recordProblem("Recycling would exceed the " + MAX_BUFFERED_STACKS + "-stack buffer");
                 timer = 200;
                 return;
             }
-            pendingSalvageWarnings = plan.salvageWarnings();
             backlog.clear();
-            backlog.addAll(packed);
+            backlog.addAll(packaged(packed));
             recycleToken = plan.token();
             recycleDimension = plan.source().dimension().location().toString();
             recycleStage = 1;
@@ -259,13 +186,11 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
             server.save(null, false, false);
             commitJournal(server);
         } catch (RuntimeException e) {
-            recordProblem("Cannot recycle this pocket: " + e.getMessage());
             if (recycleStage == 1 && stagedPayloadExists(server)) {
                 recycleStage = 0;
                 recycleToken = null;
                 recycleDimension = "";
                 backlog.clear();
-                pendingSalvageWarnings = 0;
             }
             timer = 200;
             setChanged();
@@ -286,20 +211,11 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
 
     private void commitJournal(ServerLevel server) {
         if (recycleStage != 1 || recycleToken == null) return;
-        if (journalCorrupt || backlog.isEmpty()) {
-            recordProblem("Corrupt or empty recycle journal: payload is locked for recovery");
-            return;
-        }
+        if (journalCorrupt || backlog.isEmpty()) return;
         ServerLevel source = stagedSource(server);
-        if (source == null) {
-            recordProblem("The source dimension is unavailable; recycling is paused");
-            return;
-        }
+        if (source == null) return;
         PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(source);
-        if (!storage.contains(recycleToken) && !storage.wasDeployed(recycleToken)) {
-            recordProblem("Saved pocket record is missing; the output journal is locked");
-            return;
-        }
+        if (!storage.contains(recycleToken) && !storage.wasDeployed(recycleToken)) return;
         try {
             if (storage.contains(recycleToken)) storage.remove(recycleToken);
             storage.markDeployed(recycleToken);
@@ -307,17 +223,9 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
             inputInv.setStackInSlot(0, ItemStack.EMPTY);
             timer = 0;
             recycleStage = 2;
-            lastSalvageReport = pendingSalvageWarnings == 0
-                    ? "Last pocket salvaged without warnings"
-                    : "Last pocket salvaged with " + pendingSalvageWarnings
-                            + " best-effort warnings; see server log for lost/inferred data";
-            pendingSalvageWarnings = 0;
             setChanged();
             server.save(null, false, false);
-            PocketTrace.debug("[Recycler] committed token={} outputs={} pos={}",
-                    recycleToken, backlog.size(), worldPosition);
-        } catch (RuntimeException e) {
-            recordProblem("Pocket retirement could not be saved: " + e.getMessage());
+        } catch (RuntimeException ignored) {
         }
     }
 
@@ -347,10 +255,22 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
         return packed;
     }
 
-    private ArrayList<ItemStack> withBacklog(List<ItemStack> incoming) {
-        ArrayList<ItemStack> combined = new ArrayList<>(backlog);
-        combined.addAll(incoming);
-        return compact(combined);
+    private static ArrayList<ItemStack> packaged(List<ItemStack> stacks) {
+        ArrayList<ItemStack> packages = new ArrayList<>();
+        ArrayList<ItemStack> batch = new ArrayList<>();
+        for (ItemStack stack : stacks) {
+            if (PackageItem.isPackage(stack)) {
+                packages.add(stack);
+                continue;
+            }
+            batch.add(stack);
+            if (batch.size() == PackageItem.SLOTS) {
+                packages.add(PackageItem.containing(batch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) packages.add(PackageItem.containing(batch));
+        return packages;
     }
 
     private void flushBacklog() {
@@ -365,13 +285,6 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
             changed = true;
         }
         if (changed) { setChanged(); sendData(); }
-    }
-
-    private void recordProblem(String message) {
-        if (!message.equals(lastError)) {
-            lastError = message;
-            PocketTrace.logger().warn("[Recycler] {} at {}", message, worldPosition);
-        }
     }
 
     public void spawnParticles() {
@@ -395,8 +308,6 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
         compound.putInt("RecycleStage", recycleStage);
         if (recycleToken != null) compound.putUUID("RecycleToken", recycleToken);
         compound.putString("RecycleDimension", recycleDimension);
-        compound.putString("LastSalvageReport", lastSalvageReport);
-        compound.putInt("PendingSalvageWarnings", pendingSalvageWarnings);
         if (!clientPacket) {
             ListTag buffered = new ListTag();
             for (ItemStack stack : backlog) buffered.add(stack.save(registries));
@@ -414,8 +325,6 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
         recycleStage = compound.getInt("RecycleStage");
         recycleToken = compound.hasUUID("RecycleToken") ? compound.getUUID("RecycleToken") : null;
         recycleDimension = compound.getString("RecycleDimension");
-        lastSalvageReport = compound.getString("LastSalvageReport");
-        pendingSalvageWarnings = compound.getInt("PendingSalvageWarnings");
         if (!clientPacket) {
             backlog.clear();
             ListTag buffered = compound.getList("RecycleBacklog", Tag.TAG_COMPOUND);
@@ -435,16 +344,6 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
         return Mth.clamp((int) Math.abs(getSpeed() / 16f), 1, 512);
     }
 
-    private boolean canProcess(ItemStack stack) {
-        ItemStackHandler tester = new ItemStackHandler(1);
-        tester.setStackInSlot(0, stack);
-        RecipeWrapper inventoryIn = new RecipeWrapper(tester);
-
-        if (lastRecipe != null && lastRecipe.matches(inventoryIn, level)) return true;
-        return PocketCaseItem.isUnique(stack)
-                || AllRecipeTypes.MILLING.find(inventoryIn, level).isPresent();
-    }
-
     private final class RecyclerInventoryHandler extends CombinedInvWrapper {
         private RecyclerInventoryHandler() {
             super(inputInv, outputInv);
@@ -453,7 +352,7 @@ public final class SubspaceRecyclerBlockEntity extends KineticBlockEntity implem
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
             if (outputInv == getHandlerFromIndex(getIndexForSlot(slot))) return false;
-            return recycleStage == 0 && canProcess(stack) && super.isItemValid(slot, stack);
+            return recycleStage == 0 && PocketCaseItem.isUnique(stack) && super.isItemValid(slot, stack);
         }
 
         @Override

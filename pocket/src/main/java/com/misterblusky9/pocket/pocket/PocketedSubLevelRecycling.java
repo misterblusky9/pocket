@@ -1,7 +1,6 @@
 package com.misterblusky9.pocket.pocket;
 
 import com.misterblusky9.pocket.item.PocketCaseItem;
-import com.misterblusky9.pocket.debug.PocketTrace;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -47,7 +46,7 @@ import java.util.UUID;
 
 public final class PocketedSubLevelRecycling {
     public record Plan(ServerLevel source, PocketedSubLevelSavedData storage,
-                       UUID token, List<ItemStack> drops, int salvageWarnings) {}
+                       UUID token, List<ItemStack> drops) {}
 
     public static Plan plan(ServerLevel current, ItemStack carrier) {
         UUID token = PocketCaseItem.token(carrier);
@@ -76,12 +75,9 @@ public final class PocketedSubLevelRecycling {
                 * (1 << (container.getLogPlotSize() + 4));
         CompoundTag chunks = plot.getCompound("chunks");
         List<ItemStack> results = new ArrayList<>();
-        SalvageWarnings warnings = new SalvageWarnings(token);
         int blockCount = 0;
         int beCount = 0;
         int harmlessOrphans = 0;
-        int skippedNonItemBlocks = 0;
-        int salvagedModdedStacks = 0;
         for (String chunkKey : chunks.getAllKeys()) {
             long key;
             try { key = Long.parseLong(chunkKey); }
@@ -118,15 +114,9 @@ public final class PocketedSubLevelRecycling {
                     BlockEntity be = null;
                     if (beTag != null) {
                         beCount++;
-                        if (containsNonEmptySpecialStorage(beTag))
-                            warnings.add("Non-item fluid/energy may not survive recycling of "
-                                    + beTag.getString("id") + " at " + pos
-                                    + "; physical machine and readable items are still recovered");
                         try {
                             be = BlockEntity.loadStatic(pos, state, beTag, source.registryAccess());
-                        } catch (RuntimeException error) {
-                            warnings.add("Could not load " + beTag.getString("id") + " at " + pos
-                                    + " (" + error.getClass().getSimpleName() + "); salvaging saved items directly");
+                        } catch (RuntimeException ignored) {
                         }
                         boolean rolledLoot = false;
                         if (beTag.contains("LootTable", Tag.TAG_STRING)) {
@@ -140,9 +130,7 @@ public final class PocketedSubLevelRecycling {
                                         .getLootTable(ResourceKey.create(Registries.LOOT_TABLE, lootId))
                                         .getRandomItems(lootContext, beTag.getLong("LootTableSeed")));
                                 rolledLoot = true;
-                            } catch (RuntimeException error) {
-                                warnings.add("Unresolved block loot table on " + beTag.getString("id")
-                                        + " at " + pos + ": " + error.getClass().getSimpleName());
+                            } catch (RuntimeException ignored) {
                             }
                         }
                         int storedItems = 0;
@@ -155,21 +143,11 @@ public final class PocketedSubLevelRecycling {
                                         storedItems++;
                                     }
                                 }
-                            } catch (RuntimeException error) {
-                                warnings.add("Could not read inventory on " + beTag.getString("id")
-                                        + " at " + pos + ": " + error.getClass().getSimpleName());
+                            } catch (RuntimeException ignored) {
                             }
                         }
-                        if (!rolledLoot && storedItems == 0 && containsInventoryData(beTag)) {
-                            int before = results.size();
-                            if (!recoverSerializedInventories(beTag, source, results))
-                                warnings.add("Some inventory data could not be decoded in "
-                                        + beTag.getString("id") + " at " + pos + "; recovered readable stacks");
-                            salvagedModdedStacks += results.size() - before;
-                        }
-                        if (be == null)
-                            warnings.add("Unrecognized block entity " + beTag.getString("id")
-                                    + " at " + pos + "; falling back to block item and saved stacks");
+                        if (!rolledLoot && storedItems == 0 && containsInventoryData(beTag))
+                            recoverSerializedInventories(beTag, source, results);
                     }
                     if (state.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)
                             && state.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF) == DoubleBlockHalf.UPPER)
@@ -186,53 +164,25 @@ public final class PocketedSubLevelRecycling {
                                 && (beTag == null || !containsInventoryData(beTag))) {
                             try {
                                 be.saveToItem(physical, source.registryAccess());
-                            } catch (RuntimeException error) {
-                                warnings.add("Cannot preserve all item components on " + state
-                                        + " at " + pos + "; returning its plain block item");
+                            } catch (RuntimeException ignored) {
                             }
                         }
                         results.add(physical);
                     } else {
                         try {
-                            List<ItemStack> nativeDrops = Block.getDrops(state, source, pos, be);
-                            for (ItemStack drop : nativeDrops)
+                            for (ItemStack drop : Block.getDrops(state, source, pos, be))
                                 if (!drop.isEmpty()) results.add(drop.copy());
-                            if (nativeDrops.isEmpty()) skippedNonItemBlocks++;
-                        } catch (RuntimeException error) {
-                            warnings.add("Block drops failed for " + state + " at " + pos
-                                    + "; skipping an undroppable/unsupported block");
-                            skippedNonItemBlocks++;
+                        } catch (RuntimeException ignored) {
                         }
                     }
                 }
             }
             for (Map.Entry<BlockPos, CompoundTag> orphan : blockEntities.entrySet()) {
                 CompoundTag tag = orphan.getValue();
-                BlockPos pos = orphan.getKey();
                 harmlessOrphans++;
-                if (containsNonEmptySpecialStorage(tag))
-                    warnings.add("Discarding orphaned fluid/energy resource in "
-                            + tag.getString("id") + " at " + pos);
-                if (tag.contains("LootTable", Tag.TAG_STRING))
-                    warnings.add("Cannot resolve loot from orphan " + tag.getString("id")
-                            + " at " + pos + " without a corresponding block; skipping its loot table");
-                if (containsInventoryData(tag)) {
-                    int before = results.size();
-                    if (!recoverSerializedInventories(tag, source, results))
-                        warnings.add("Partially decoded orphaned inventory "
-                                + tag.getString("id") + " at " + pos);
-                    salvagedModdedStacks += results.size() - before;
-                }
+                if (containsInventoryData(tag)) recoverSerializedInventories(tag, source, results);
                 ItemStack recovered = orphanBlockItem(tag.getString("id"));
-                if (!recovered.isEmpty()) {
-                    results.add(recovered);
-                    warnings.add("Recovered inferred block item from orphan "
-                            + tag.getString("id") + " at " + pos
-                            + " (no matching block exists in the saved palette)");
-                } else {
-                    warnings.add("Discarded obsolete block-entity record "
-                            + tag.getString("id") + " at " + pos + " (no corresponding block)");
-                }
+                if (!recovered.isEmpty()) results.add(recovered);
             }
         }
         CompoundTag integrity = payload.getCompound("pocket_integrity");
@@ -256,9 +206,7 @@ public final class PocketedSubLevelRecycling {
             Entity entity = null;
             try {
                 entity = EntityType.loadEntityRecursive(entityTag, source, e -> e);
-            } catch (RuntimeException error) {
-                warnings.add("Stored entity #" + i + " cannot load (" + error.getClass().getSimpleName()
-                        + "); attempting raw item salvage");
+            } catch (RuntimeException ignored) {
             }
             if (entity == null) {
                 String savedId = entityTag.getString("id");
@@ -271,37 +219,21 @@ public final class PocketedSubLevelRecycling {
                     CompoundTag itemTag = entityTag.getCompound("Item");
                     ItemStack dropped = decodeItemStack(source, itemTag);
                     if (!dropped.isEmpty()) results.add(dropped.copy());
-                    else if (!isExplicitlyEmpty(itemTag))
-                        warnings.add("Unrecoverable saved item on entity " + savedId
-                                + " (#" + i + ")");
                 }
-                if (containsInventoryData(entityTag)) {
-                    if (!recoverSerializedInventories(entityTag, source, results))
-                        warnings.add("Unreadable inventory in missing entity #" + i);
-                }
-                warnings.add("Skipping unknown/removed entity #" + i + " (no longer blocks recycling)");
+                if (containsInventoryData(entityTag)) recoverSerializedInventories(entityTag, source, results);
                 continue;
             }
             if (containsInventoryData(entityTag) && !(entity instanceof Container)
-                    && !(entity instanceof ItemEntity)) {
-                if (!recoverSerializedInventories(entityTag, source, results))
-                    warnings.add("Some saved entity inventory data could not be decoded in entity #" + i);
-            }
+                    && !(entity instanceof ItemEntity))
+                recoverSerializedInventories(entityTag, source, results);
             try {
                 collectEntity(source, entity, results);
-            } catch (RuntimeException error) {
-                warnings.add("Could not recover all drops from entity " + entity.getType()
-                        + " (#" + i + "): " + error.getClass().getSimpleName());
+            } catch (RuntimeException ignored) {
             }
         }
-        PocketTrace.debug("[Recycler] scanned token={} blocks={} matchedBlockEntities={} "
-                        + "staleBlockEntities={} ignoredNoDropBlocks={} recoveredSerializedStacks={} "
-                        + "salvageWarnings={}",
-                token, blockCount, beCount, harmlessOrphans, skippedNonItemBlocks,
-                salvagedModdedStacks, warnings.count());
         Item emptyCarrier = PocketCaseItem.containerItem(carrier);
         if (emptyCarrier != Items.AIR) results.add(new ItemStack(emptyCarrier));
-        return new Plan(source, storage, token, results, warnings.count());
+        return new Plan(source, storage, token, results);
     }
 
     private static void collectEntity(ServerLevel source, Entity entity, List<ItemStack> results) {
@@ -321,9 +253,7 @@ public final class PocketedSubLevelRecycling {
             try {
                 results.addAll(source.getServer().reloadableRegistries()
                         .getLootTable(living.getLootTable()).getRandomItems(context));
-            } catch (RuntimeException error) {
-                PocketTrace.logger().warn("[Recycler] No loot from entity {}: {}",
-                        living.getType(), error.toString());
+            } catch (RuntimeException ignored) {
             }
             for (ItemStack equipped : living.getAllSlots())
                 if (!equipped.isEmpty()) results.add(equipped.copy());
@@ -442,23 +372,6 @@ public final class PocketedSubLevelRecycling {
         return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
     }
 
-    private static final class SalvageWarnings {
-        private final UUID token;
-        private int count;
-
-        private SalvageWarnings(UUID token) { this.token = token; }
-
-        private void add(String message) {
-            count++;
-            if (count <= 24)
-                PocketTrace.logger().warn("[Recycler] Best-effort salvage token={}: {}", token, message);
-            else if (count == 25)
-                PocketTrace.logger().warn("[Recycler] Further salvage warnings for token={} suppressed", token);
-        }
-
-        private int count() { return count; }
-    }
-
     private static boolean isExplicitlyEmpty(CompoundTag tag) {
         return tag.getString("id").equals("minecraft:air")
                 || (tag.contains("count", Tag.TAG_ANY_NUMERIC) && tag.getInt("count") <= 0)
@@ -483,49 +396,6 @@ public final class PocketedSubLevelRecycling {
         return name.equals("items") || name.contains("inventory")
                 || name.contains("itemhandler") || name.equals("stacks")
                 || name.equals("helditem") || name.equals("inv");
-    }
-
-    private static boolean containsNonEmptySpecialStorage(Tag tag) {
-        if (tag instanceof CompoundTag compound) {
-            for (String key : compound.getAllKeys()) {
-                String lower = key.toLowerCase(java.util.Locale.ROOT);
-                Tag child = compound.get(key);
-                if ((lower.equals("energy") || lower.equals("storedenergy")
-                        || lower.equals("energystored") || lower.equals("fe"))
-                        && child instanceof net.minecraft.nbt.NumericTag numeric
-                        && numeric.getAsLong() > 0) return true;
-                if (lower.contains("tank") || lower.contains("fluid")
-                        || lower.equals("gas") || lower.equals("steam")) {
-                    if (child instanceof CompoundTag resource
-                            && hasPositiveStoredAmount(resource)) return true;
-                }
-                if (containsNonEmptySpecialStorage(child)) return true;
-            }
-        } else if (tag instanceof ListTag list) {
-            for (int i = 0; i < list.size(); i++)
-                if (containsNonEmptySpecialStorage(list.get(i))) return true;
-        }
-        return false;
-    }
-
-    private static boolean hasPositiveStoredAmount(CompoundTag tag) {
-        for (String key : tag.getAllKeys()) {
-            String lower = key.toLowerCase(java.util.Locale.ROOT);
-            if ((lower.equals("amount") || lower.equals("stored")
-                    || lower.equals("energystored") || lower.equals("energy"))
-                    && tag.contains(key, Tag.TAG_ANY_NUMERIC) && tag.getLong(key) > 0) return true;
-            if (hasPositiveAmountNested(tag.get(key))) return true;
-        }
-        return false;
-    }
-
-    private static boolean hasPositiveAmountNested(Tag tag) {
-        if (tag instanceof CompoundTag compound) return hasPositiveStoredAmount(compound);
-        if (tag instanceof ListTag list) {
-            for (int i = 0; i < list.size(); i++)
-                if (hasPositiveAmountNested(list.get(i))) return true;
-        }
-        return false;
     }
 
     private static boolean containsInventoryData(Tag tag) {
