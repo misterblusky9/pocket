@@ -29,20 +29,6 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
-abstract class LatestSaveQuickPlay implements ValueSource<List<String>, Params> {
-    interface Params extends ValueSourceParameters {
-        DirectoryProperty getSaves()
-    }
-
-    @Override
-    List<String> obtain() {
-        final File latest = parameters.saves.get().asFile.listFiles()
-                ?.findAll { new File(it, "level.dat").isFile() }
-                ?.max { new File(it, "level.dat").lastModified() }
-        return latest == null ? [] : ["--quickPlaySingleplayer", latest.name]
-    }
-}
-
 neoForge {
     version = project.neo_version
 
@@ -61,9 +47,6 @@ neoForge {
             programArguments = [
                     "--username", "MisterBluSky"
             ]
-            programArguments.addAll(providers.of(LatestSaveQuickPlay) {
-                it.parameters.saves = rootProject.layout.projectDirectory.dir("runs/client1/saves")
-            })
         }
 
         client2 {
@@ -158,6 +141,7 @@ dependencies {
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
 
     implementation "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    compileOnly "maven.modrinth:hNGBYvQN:hwxjOCxE"
 
     compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}:api"
     localRuntime "top.theillusivec4.curios:curios-neoforge:${curios_version}"

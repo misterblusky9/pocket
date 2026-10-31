@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.physics;
 
+import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterRivets;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import com.misterblusky9.pym.internal.scale.ScaleState;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -45,9 +46,13 @@ public final class ColliderCoordinator {
             PymTrace.warn("scaled collider rebuild at unsafe mutation point {}", PymTrace.context(subLevel));
         }
 
-        PlotShape shape = ScalePhysicsTransitions.usePrism(subLevel)
-                ? null
-                : PlotShapeCache.get(subLevel);
+        boolean rivet = CoasterRivets.isRivetSubLevel(subLevel);
+        PlotShape shape = PlotShapeCache.get(subLevel);
+        if (rivet && shape == null) return;
+        if (!rivet && shape != null && !shape.boxes().isEmpty()
+                && ScalePhysicsTransitions.usePrism(subLevel)) {
+            shape = null;
+        }
         int revision = PlotShapeCache.revision(id);
         CompiledCollider.GeometryKey request = ColliderCompiler.requestKey(
                 subLevel, bodyId, revision, shape != null);

@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket;
 
 import com.misterblusky9.pocket.config.DeviceRanges;
+import com.misterblusky9.pocket.compat.photomancy.PhotomancyCompat;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
@@ -19,6 +20,7 @@ import com.misterblusky9.pocket.scale.PocketPymIntegration;
 import com.misterblusky9.pym.api.Pym;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 
@@ -36,6 +38,7 @@ public final class PocketSized {
         modBus.addListener(PocketContraptionTypes::register);
 
         PocketPymIntegration.register();
+        if (ModList.get().isLoaded("sable_schematic_api")) PhotomancyCompat.register();
 
         ScaledRespawn.registerRespawnTicket();
 

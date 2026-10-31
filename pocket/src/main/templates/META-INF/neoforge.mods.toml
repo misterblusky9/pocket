@@ -36,7 +36,7 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="pym"
 type="required"
-versionRange="[${pym_mod_version},0.5.0)"
+versionRange="[${pym_mod_version},0.6.0)"
 ordering="AFTER"
 side="BOTH"
 
@@ -80,4 +80,11 @@ modId="curios"
 type="optional"
 versionRange="[9.0.0,10)"
 ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="sable_schematic_api"
+type="optional"
+versionRange="[1.0.1,2)"
+ordering="AFTER"
 side="BOTH"

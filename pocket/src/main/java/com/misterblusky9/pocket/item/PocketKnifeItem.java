@@ -9,21 +9,31 @@ import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.SwordItem;
+import net.minecraft.world.item.Tier;
+import net.minecraft.world.item.Tiers;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.SimpleTier;
 
-public class PocketKnifeItem extends Item implements PriorityInteractionItem {
+public class PocketKnifeItem extends SwordItem implements PriorityInteractionItem {
+    public static final Tier TIER = new SimpleTier(BlockTags.INCORRECT_FOR_WOODEN_TOOL, 100,
+            Tiers.WOOD.getSpeed(), Tiers.WOOD.getAttackDamageBonus(), Tiers.WOOD.getEnchantmentValue(),
+            () -> Ingredient.EMPTY);
+
     public PocketKnifeItem(Properties properties) {
-        super(properties);
+        super(TIER, properties);
     }
 
     @Override
@@ -73,6 +83,10 @@ public class PocketKnifeItem extends Item implements PriorityInteractionItem {
     ) {
         WeldRecord record = CrossScaleWelds.weldNear(level, point);
         if (record == null) return false;
+        if (player != null && (!ToolPermissions.mayAlter(player, level, record.smallPos())
+                || (record.bigPos() != null && !ToolPermissions.mayAlter(player, level, record.bigPos())))) {
+            return true;
+        }
 
         WeldRuntime.drop(record.weldId());
         WeldStore.get(level).remove(record.weldId());
@@ -85,6 +99,11 @@ public class PocketKnifeItem extends Item implements PriorityInteractionItem {
         level.playSound(
                 null, pos, SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.4F);
         return true;
+    }
+
+    @Override
+    public boolean canAttackBlock(BlockState state, Level level, BlockPos pos, Player player) {
+        return false;
     }
 
     @Override

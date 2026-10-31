@@ -10,6 +10,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
@@ -101,19 +105,29 @@ public final class ScaledPlacementGate {
                 Mth.floor(search.maxX()), Mth.floor(search.maxY()), Mth.floor(search.maxZ()))) {
 
             if (other == containing && pos.equals(clicked)) continue;
-            if (level.getBlockState(pos).canBeReplaced(context)) continue;
+            BlockState state = level.getBlockState(pos);
+            if (state.canBeReplaced(context)) continue;
 
-            center.set(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
-            orientation.identity();
-            if (other != null) {
-                other.logicalPose().transformPosition(center);
-                orientation.set(other.logicalPose().orientation());
+            VoxelShape shape = state.getCollisionShape(level, pos);
+            if (shape.isEmpty()) continue;
+
+            for (AABB part : shape.toAabbs()) {
+                Vec3 middle = part.getCenter();
+                center.set(pos.getX() + middle.x, pos.getY() + middle.y, pos.getZ() + middle.z);
+                orientation.identity();
+                if (other != null) {
+                    other.logicalPose().transformPosition(center);
+                    orientation.set(other.logicalPose().orientation());
+                }
+
+                OrientedBoundingBox3d otherBox = new OrientedBoundingBox3d(
+                        center,
+                        new Vector3d(part.getXsize(), part.getYsize(), part.getZsize()).mul(otherScale),
+                        orientation,
+                        sink);
+
+                if (OrientedBoundingBox3d.sat(otherBox, selfBox).lengthSquared() > contact) return true;
             }
-
-            OrientedBoundingBox3d otherBox = new OrientedBoundingBox3d(
-                    center, new Vector3d(otherScale), orientation, sink);
-
-            if (OrientedBoundingBox3d.sat(otherBox, selfBox).lengthSquared() > contact) return true;
         }
 
         return false;

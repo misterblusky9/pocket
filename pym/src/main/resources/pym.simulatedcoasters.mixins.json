@@ -5,6 +5,7 @@
   "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "RivetPoseAlignmentScaleMixin",
     "CoasterCartTrackSnapScaleMixin",
     "CoasterPathTraceEndpointsScaleMixin",
     "CoasterCartTrackHitCacheScaleMixin",
@@ -14,9 +15,13 @@
     "CoasterCartMidTrackPlacementScaleMixin",
     "CoasterCartPlacementCollisionScaleMixin",
     "CoasterCartLinkPlacementScaleMixin",
-    "CoasterPathTrackFrameScaleMixin"
+    "CoasterPathTrackFrameScaleMixin",
+    "CoasterCartPlotScanOptimizationMixin"
   ],
   "client": [
+    "RivetPlacementPreviewScaleMixin",
+    "RivetPlacementParticleSourceMixin",
+    "RivetPlacementParticlesScaleMixin",
     "CoasterCartClientFrameScaleMixin",
     "CoasterCartBottomSliceScaleMixin",
     "CoasterCartWheelAxisScaleMixin",

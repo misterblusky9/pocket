@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.aero_no_horizon.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ContactSampleMixin",
+    "SableTrackPhysicsHelperMixin",
+    "SableTrackRuntimeCacheMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

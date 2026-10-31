@@ -11,10 +11,14 @@ import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.simulated_team.simulated.service.SimConfigService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.fml.ModList;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
@@ -37,7 +41,12 @@ public final class CrossScaleWelds {
     private static volatile List<WeldRecord> clientWelds = List.of();
     private static final Map<Level, CachedGraph> SERVER_GRAPHS = new WeakHashMap<>();
 
+    private static final Map<Level, CachedRivetGraph> RIVET_GRAPHS =
+            Collections.synchronizedMap(new WeakHashMap<>());
+
     private record CachedGraph(long tick, long revision, WeldGraph graph) {}
+
+    private record CachedRivetGraph(long tick, Object source, long revision, WeldGraph graph) {}
 
     public static final String SCALE_LIMIT = "Connected sublevel at scale limit";
     public static final String POCKET_BLOCKED = "Cut welds before pocketing";
@@ -49,6 +58,7 @@ public final class CrossScaleWelds {
         OUT_OF_RANGE("create.package_port.too_far", true),
         OUT_OF_PLOT("create.package_port.too_far", true),
         SCALE_CHANGING("Still scaling", false),
+        ATTACHMENT_UNLOADED("Connected craft not loaded", false),
         ALREADY_CONNECTED("Already connected", false),
         SAME_SUBLEVEL("Cannot weld to itself", false),
         WORLD_ALREADY_CONNECTED("Already welded to the world", false),
@@ -193,14 +203,22 @@ public final class CrossScaleWelds {
                 return Refusal.SCALE_CHANGING;
             }
 
+            SubLevelContainer container = SubLevelContainer.getContainer(level);
+            boolean includeRivets = ModList.get().isLoaded("simulatedcoasters");
+            WeldGraph attachments = container == null ? WeldGraph.EMPTY
+                    : includeRivets ? rivetSnapshot(container) : snapshot(container);
+            if (includeRivets && (!attachments.complete(this.small.getUniqueId())
+                    || (!worldAnchored() && !attachments.complete(this.big.getUniqueId())))) {
+                return Refusal.ATTACHMENT_UNLOADED;
+            }
+
             if (worldAnchored()) {
-                SubLevelContainer container = SubLevelContainer.getContainer(level);
-                return container != null && snapshot(container).worldAnchored(this.small.getUniqueId())
+                return attachments.worldAnchored(this.small.getUniqueId())
                         ? Refusal.WORLD_ALREADY_CONNECTED
                         : Refusal.NONE;
             }
 
-            return directlyWelded(level, this.small.getUniqueId(), this.big.getUniqueId())
+            return attachments.adjacent(this.small.getUniqueId(), this.big.getUniqueId())
                     ? Refusal.ALREADY_CONNECTED
                     : Refusal.NONE;
         }
@@ -390,6 +408,29 @@ public final class CrossScaleWelds {
 
     public static void invalidate(Level level) {
         SERVER_GRAPHS.remove(level);
+        RIVET_GRAPHS.remove(level);
+    }
+
+    private static WeldGraph rivetSnapshot(SubLevelContainer container) {
+        Level level = container.getLevel();
+        Object source;
+        long revision;
+        if (level instanceof ServerLevel serverLevel) {
+            WeldStore store = WeldStore.get(serverLevel);
+            source = store;
+            revision = store.revision();
+        } else {
+            source = clientWelds;
+            revision = 0L;
+        }
+        long tick = level.getGameTime();
+        CachedRivetGraph cached = RIVET_GRAPHS.get(level);
+        if (cached != null && cached.tick() == tick && cached.source() == source
+                && cached.revision() == revision) return cached.graph();
+
+        WeldGraph graph = buildGraph(container, records(level), true);
+        RIVET_GRAPHS.put(level, new CachedRivetGraph(tick, source, revision, graph));
+        return graph;
     }
 
     public static WeldGraph snapshot(SubLevelContainer container) {
@@ -409,7 +450,13 @@ public final class CrossScaleWelds {
     }
 
     private static WeldGraph buildGraph(SubLevelContainer container, Collection<WeldRecord> records) {
-        if (records.isEmpty()) return WeldGraph.EMPTY;
+        return buildGraph(container, records, false);
+    }
+
+    private static WeldGraph buildGraph(
+            SubLevelContainer container, Collection<WeldRecord> records, boolean includeRivets
+    ) {
+        if (records.isEmpty() && !includeRivets) return WeldGraph.EMPTY;
 
         Set<UUID> endpointIds = new HashSet<>();
         Set<UUID> unresolved = new HashSet<>();
@@ -439,6 +486,44 @@ public final class CrossScaleWelds {
             if (!live(container, b)) unresolved.add(b);
         }
 
+        if (includeRivets) {
+            Level level = container.getLevel();
+            ResourceLocation rivet = ResourceLocation.fromNamespaceAndPath("simulatedcoasters", "rivet");
+            for (SubLevel sub : container.getAllSubLevels()) {
+                if (sub.isRemoved()) continue;
+                var embedded = sub.getPlot().getEmbeddedLevelAccessor();
+                if (!rivet.equals(BuiltInRegistries.BLOCK.getKey(embedded.getBlockState(BlockPos.ZERO).getBlock()))) continue;
+                var blockEntity = embedded.getBlockEntity(BlockPos.ZERO);
+                if (blockEntity == null) continue;
+
+                UUID id = sub.getUniqueId();
+                endpointIds.add(id);
+                CompoundTag tag = blockEntity.saveWithoutMetadata(level.registryAccess());
+                if (!tag.contains("HostPos", 4)) {
+                    unresolved.add(id);
+                    continue;
+                }
+                BlockPos hostPos = BlockPos.of(tag.getLong("HostPos"));
+                if (!level.hasChunkAt(hostPos) || level.getBlockState(hostPos).isAir()) {
+                    unresolved.add(id);
+                    continue;
+                }
+                SubLevel host = Sable.HELPER.getContaining(level, hostPos);
+                UUID hostId = host != null ? host.getUniqueId()
+                        : tag.hasUUID("HostSubLevel") ? tag.getUUID("HostSubLevel") : null;
+                if (hostId == null) {
+                    worldAnchors.add(id);
+                } else if (!id.equals(hostId)) {
+                    endpointIds.add(hostId);
+                    links.computeIfAbsent(id, ignored -> new HashSet<>()).add(hostId);
+                    links.computeIfAbsent(hostId, ignored -> new HashSet<>()).add(id);
+                    if (!live(container, hostId)) unresolved.add(hostId);
+                } else {
+                    unresolved.add(id);
+                }
+            }
+        }
+
         if (endpointIds.isEmpty()) return WeldGraph.EMPTY;
         return WeldGraph.create(links, endpointIds, unresolved, worldAnchors, edges);
     }
@@ -464,17 +549,17 @@ public final class CrossScaleWelds {
         return weldOrientation(weld, 0);
     }
 
-    public static Quaterniond weldOrientation(Weld weld, int rotationTurns) {
+    public static Quaterniond weldOrientation(Weld weld, int rotationDegrees) {
         Quaterniond aligned = WeldGeometry.alignment(
                 relativeOrientation(weld.small(), weld.big()),
                 WeldGeometry.normal(weld.smallFacing()),
                 WeldGeometry.normal(weld.bigFacing()));
-        int turns = Math.floorMod(rotationTurns, 4);
-        if (turns == 0) return aligned;
+        int degrees = Math.floorMod(rotationDegrees, 360);
+        if (degrees == 0) return aligned;
 
         Vector3d axis = WeldGeometry.normal(weld.smallFacing());
         return new Quaterniond()
-                .rotationAxis(turns * Math.PI * 0.5D, axis.x, axis.y, axis.z)
+                .rotationAxis(Math.toRadians(degrees), axis.x, axis.y, axis.z)
                 .mul(aligned)
                 .normalize();
     }

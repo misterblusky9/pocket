@@ -1,6 +1,7 @@
 package com.misterblusky9.pym.internal.physics;
 
 import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.internal.collision.SubLevelIndexedCollision;
 
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -247,7 +248,6 @@ public final class PlotShapeCache {
 
     public static void invalidate(UUID id) {
         if (id == null) return;
-
         CLIENT_ENTRIES.remove(id);
         if (SERVER_ENTRIES.remove(id) != null) {
             REVISIONS.merge(id, 1, Integer::sum);
@@ -261,6 +261,7 @@ public final class PlotShapeCache {
 
     public static void forget(UUID id) {
         if (id == null) return;
+        SubLevelIndexedCollision.forget(id);
         CLIENT_ENTRIES.remove(id);
         SERVER_ENTRIES.remove(id);
         REVISIONS.remove(id);

@@ -3,6 +3,7 @@ package com.misterblusky9.pocket.mixin.sable;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
+import com.misterblusky9.pocket.compat.simulated.WeldMergeMigration;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -20,8 +21,10 @@ public abstract class SubLevelAssemblyWeldMoveMixin {
         CrossScaleWelds.beginAssemblyMove();
         try {
             original.call(level, transform, blocks);
-            CrossScaleWelds.refreshLoaded(transform.getLevel());
-            if (transform.getLevel() != level) CrossScaleWelds.refreshLoaded(level);
+            if (!WeldMergeMigration.isMoving(level)) {
+                CrossScaleWelds.refreshLoaded(transform.getLevel());
+                if (transform.getLevel() != level) CrossScaleWelds.refreshLoaded(level);
+            }
         } finally {
             CrossScaleWelds.endAssemblyMove();
         }

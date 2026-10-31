@@ -418,6 +418,44 @@ public final class WeldRuntime {
         }
     }
 
+    public static void forgetMergedBody(ServerLevel level, UUID removedId) {
+        if (level == null || removedId == null) return;
+        Map<BodyPair, PhysicsConstraintHandle> pairs = NO_CONTACT.get(level.dimension());
+        if (pairs == null) return;
+        Iterator<Map.Entry<BodyPair, PhysicsConstraintHandle>> iterator = pairs.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<BodyPair, PhysicsConstraintHandle> entry = iterator.next();
+            if (!removedId.equals(entry.getKey().first())
+                    && !removedId.equals(entry.getKey().second())) continue;
+            release(entry.getValue());
+            iterator.remove();
+        }
+    }
+
+    public static void rebindMigrated(ServerLevel level, Iterable<UUID> ids) {
+        if (level == null || ids == null) return;
+        var container = dev.ryanhcode.sable.api.sublevel.SubLevelContainer.getContainer(level);
+        if (container == null) return;
+        Map<UUID, PhysicsConstraintHandle> live =
+                LIVE.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
+        Map<UUID, Settle> settling =
+                SETTLING.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
+        WeldStore store = WeldStore.get(level);
+        for (UUID id : ids) {
+            WeldRecord record = store.get(id);
+            if (record == null) continue;
+            ServerSubLevel small = liveSubLevel(container, record.smallSubLevel());
+            ServerSubLevel big = record.worldAnchored() ? null
+                    : liveSubLevel(container, record.bigSubLevel());
+            if (small == null || (!record.worldAnchored() && big == null)) continue;
+            if (create(live, container, record, small, big,
+                    record.anchorFor(false), record.orientation())) {
+                settling.put(id, new Settle(level.getGameTime() - (long) SETTLE_TICKS - 1L,
+                        record.anchorFor(false), new Quaterniond(record.orientation())));
+            }
+        }
+    }
+
     private static void release(PhysicsConstraintHandle handle) {
         if (handle == null) return;
         try {

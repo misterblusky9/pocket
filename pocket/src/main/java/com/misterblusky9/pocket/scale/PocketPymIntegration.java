@@ -4,6 +4,7 @@ import com.misterblusky9.pocket.compat.simulated.CrossScaleWeldSync;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldAnchorCoupling;
 import com.misterblusky9.pocket.compat.simulated.WeldRecord;
+import com.misterblusky9.pocket.compat.simulated.WeldMergeMigration;
 import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.compression.CompressionSessions;
@@ -61,6 +62,7 @@ public final class PocketPymIntegration {
 
     private static void releaseWelds(ServerSubLevel subLevel, UUID id) {
         if (!(subLevel.getLevel() instanceof ServerLevel serverLevel)) return;
+        if (WeldMergeMigration.isMoving(serverLevel, id)) return;
         List<WeldRecord> cut = WeldStore.get(serverLevel).removeAllTouching(id);
         if (cut.isEmpty()) return;
         for (WeldRecord record : cut) WeldRuntime.drop(record.weldId());

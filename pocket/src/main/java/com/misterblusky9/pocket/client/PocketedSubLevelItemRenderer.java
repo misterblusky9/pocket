@@ -81,6 +81,10 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         }
     };
 
+    static void invalidateMeshes() {
+        MESHES.clear();
+    }
+
     private static final double COMPRESSED_SCALE = 1.0D / 16.0D;
 
     private static final float WHEEL_MIN_RADIUS = 0.35F;

@@ -46,7 +46,7 @@ public final class HotGlueGunClient {
     private static Direction firstFacing;
     private static Vec3 firstHit;
     private static InteractionHand firstHand;
-    private static int rotationTurns;
+    private static int rotationDegrees;
     private static PreviewShape originShape;
     private static PreviewShape previewShape;
     private static PreviewShape previewSource;
@@ -136,7 +136,7 @@ public final class HotGlueGunClient {
                 bigHit.y,
                 bigHit.z,
                 placementMode(weld).ordinal(),
-                rotationTurns));
+                rotationDegrees));
         HotGlueGunRenderHandler.INSTANCE.shoot(event.getHand(), player.position());
 
         clear();
@@ -212,7 +212,8 @@ public final class HotGlueGunClient {
         }
 
         while (PocketKeys.WELD_ROTATE.consumeClick()) {
-            rotationTurns = (rotationTurns + 1) & 3;
+            int step = AllKeys.ctrlDown() ? (AllKeys.altDown() ? 1 : 15) : (AllKeys.altDown() ? 5 : 45);
+            rotationDegrees = Math.floorMod(rotationDegrees + (player.isShiftKeyDown() ? step : -step), 360);
         }
 
         Vector3d firstAnchor = WeldGeometry.faceCentre(firstPos, firstFacing);
@@ -259,7 +260,7 @@ public final class HotGlueGunClient {
         firstFacing = hit.getDirection();
         firstHit = hitFraction(hit);
         firstHand = hand;
-        rotationTurns = 0;
+        rotationDegrees = 0;
         originShape = null;
         previewShape = null;
         previewSource = null;
@@ -281,7 +282,7 @@ public final class HotGlueGunClient {
     private static void renderPreview(Minecraft minecraft, CrossScaleWelds.Weld weld) {
         int color = weld.check().allowed() ? SimColors.SUCCESS_LIME : SimColors.NUH_UH_RED;
         boolean sourceIsSmall = weld.startedSmall(firstPos);
-        Quaterniond orientation = CrossScaleWelds.weldOrientation(weld, rotationTurns);
+        Quaterniond orientation = CrossScaleWelds.weldOrientation(weld, rotationDegrees);
         double cell = sourceIsSmall
                 ? ScaleBounds.clampValid(weld.smallScale()) / ScaleBounds.clampValid(weld.bigScale())
                 : ScaleBounds.clampValid(weld.bigScale()) / ScaleBounds.clampValid(weld.smallScale());
@@ -445,7 +446,7 @@ public final class HotGlueGunClient {
         firstFacing = null;
         firstHit = null;
         firstHand = null;
-        rotationTurns = 0;
+        rotationDegrees = 0;
         originShape = null;
         previewShape = null;
         previewSource = null;

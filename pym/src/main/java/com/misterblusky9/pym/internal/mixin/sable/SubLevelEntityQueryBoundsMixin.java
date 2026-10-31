@@ -1,6 +1,7 @@
 package com.misterblusky9.pym.internal.mixin.sable;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.misterblusky9.pym.internal.scale.ScaleState;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.misterblusky9.pym.internal.collision.PlotScanBounds;
@@ -33,6 +34,10 @@ public abstract class SubLevelEntityQueryBoundsMixin {
             Operation<Void> original,
             @Local(ordinal = 1) SubLevel subLevel
     ) {
+        if (!ScaleState.isScaled(subLevel)) {
+            original.call(delegate, bounds, consumer);
+            return;
+        }
         AABB clipped = PlotScanBounds.clipEntityQuery(subLevel, bounds);
         if (clipped != null) original.call(delegate, clipped, consumer);
     }
@@ -54,6 +59,10 @@ public abstract class SubLevelEntityQueryBoundsMixin {
             Operation<Void> original,
             @Local(ordinal = 1) SubLevel subLevel
     ) {
+        if (!ScaleState.isScaled(subLevel)) {
+            original.call(delegate, type, bounds, consumer);
+            return;
+        }
         AABB clipped = PlotScanBounds.clipEntityQuery(subLevel, bounds);
         if (clipped != null) original.call(delegate, type, clipped, consumer);
     }

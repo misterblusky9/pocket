@@ -1,5 +1,8 @@
 package com.misterblusky9.pym.internal.mixin.collision;
 
+import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.internal.scale.ScaleState;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.mixinhelpers.CanFallAtleastHelper;
@@ -44,6 +47,10 @@ public abstract class PlayerSubLevelEdgeScaleMixin extends LivingEntity {
     ) {
         SubLevel trackingSubLevel = Sable.HELPER.getTrackingSubLevel(this);
         if (trackingSubLevel == null) return;
+        if (!ScaleState.isScaled(trackingSubLevel)
+                && ScaleBounds.same(Pym.entities().scaleOf((Player) (Object) this), ScaleBounds.FULL)) {
+            return;
+        }
 
         float maxUpStep = this.maxUpStep();
         if (this.abilities.flying

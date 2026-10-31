@@ -1,6 +1,7 @@
 package com.misterblusky9.pym.internal;
 
 import com.misterblusky9.pym.internal.compat.pehkui.PehkuiEntityScaling;
+import com.misterblusky9.pym.internal.compat.photomancy.BlueprintScales;
 import com.misterblusky9.pym.internal.compat.simulated.SimulatedCompat;
 import com.misterblusky9.pym.internal.compat.simurail.SimurailCompat;
 import com.misterblusky9.pym.internal.config.PymConfig;
@@ -21,5 +22,6 @@ public final class PymMod {
         PehkuiEntityScaling.initialize();
         if (ModList.get().isLoaded("simulated")) SimulatedCompat.init();
         if (ModList.get().isLoaded("simurail")) SimurailCompat.init();
+        if (ModList.get().isLoaded("sable_schematic_api")) BlueprintScales.register();
     }
 }

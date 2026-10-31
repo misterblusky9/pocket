@@ -52,6 +52,8 @@ public final class DeviceRanges {
     private static final ModConfigSpec.EnumValue<PvpScalingMode> PVP_SCALING_MODE;
     private static final ModConfigSpec.BooleanValue ALLOW_PVP_SCALING_TOGGLE;
     private static final ModConfigSpec.BooleanValue CREATIVE_POCKETS_ANYTHING;
+    private static final ModConfigSpec.IntValue KNIFE_MAX_BLOCKS;
+    private static final ModConfigSpec.IntValue KNIFE_MAX_MOVED_BLOCKS;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -86,6 +88,15 @@ public final class DeviceRanges {
                 .define("creativePocketsAnything", false);
         builder.pop();
 
+        builder.push("pocketKnife");
+        KNIFE_MAX_BLOCKS = builder.comment(
+                "Largest sublevel, in blocks, the Pocket Knife may cut. 0 means no limit.")
+                .defineInRange("maxBlocks", 32_768, 0, Integer.MAX_VALUE);
+        KNIFE_MAX_MOVED_BLOCKS = builder.comment(
+                "Most blocks one Pocket Knife cut may split off. 0 means no limit.")
+                .defineInRange("maxMovedBlocks", 16_384, 0, Integer.MAX_VALUE);
+        builder.pop();
+
         SPEC = builder.build();
     }
 
@@ -103,6 +114,14 @@ public final class DeviceRanges {
 
     public static boolean creativePocketsAnything() {
         return SPEC.isLoaded() && CREATIVE_POCKETS_ANYTHING.get();
+    }
+
+    public static int knifeMaxBlocks() {
+        return SPEC.isLoaded() ? KNIFE_MAX_BLOCKS.get() : 32_768;
+    }
+
+    public static int knifeMaxMovedBlocks() {
+        return SPEC.isLoaded() ? KNIFE_MAX_MOVED_BLOCKS.get() : 16_384;
     }
 
     public static ScaleBounds of(Device device) {

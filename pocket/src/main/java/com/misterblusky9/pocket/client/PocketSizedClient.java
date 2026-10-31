@@ -38,6 +38,8 @@ public final class PocketSizedClient {
     }
 
     public PocketSizedClient(IEventBus modBus) {
+        modBus.addListener((net.neoforged.neoforge.client.event.ModelEvent.BakingCompleted event) ->
+                PocketedSubLevelItemRenderer.invalidateMeshes());
         modBus.addListener((FMLClientSetupEvent event) -> event.enqueueWork(PunchyCompat::apply));
         modBus.addListener((FMLClientSetupEvent event) ->
                 event.enqueueWork(() -> PonderIndex.addPlugin(new PocketPonderPlugin())));
@@ -79,11 +81,13 @@ public final class PocketSizedClient {
         modBus.addListener(CopycatFacadeModel::registerColours);
         NeoForge.EVENT_BUS.addListener(CompressionFieldRenderer::render);
         NeoForge.EVENT_BUS.addListener(CompressionBeamRenderer::render);
-        DebugOverlay.showCollidersWhile(() -> {
+        java.util.function.BooleanSupplier colliderWand = () -> {
             var player = Minecraft.getInstance().player;
             return player != null && (player.getMainHandItem().getItem() instanceof ColliderWandItem
                     || player.getOffhandItem().getItem() instanceof ColliderWandItem);
-        });
+        };
+        DebugOverlay.showCollidersWhile(colliderWand);
+        DebugOverlay.showPlayerLodWhile(colliderWand);
         NeoForge.EVENT_BUS.addListener(SwitchBearingOutlineRenderer::render);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassIndicator::render);
         NeoForge.EVENT_BUS.addListener(WeldFaceRenderer::render);

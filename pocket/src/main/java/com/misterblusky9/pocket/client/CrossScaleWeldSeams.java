@@ -8,6 +8,7 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldContact;
 import com.misterblusky9.pocket.compat.simulated.WeldRecord;
+import com.misterblusky9.pocket.compat.simulated.SlimeWeldMerge;
 import com.misterblusky9.pocket.item.ModItems;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -15,6 +16,7 @@ import dev.simulated_team.simulated.util.SimColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -53,9 +55,12 @@ public final class CrossScaleWeldSeams {
 
         CELLS.keySet().removeIf(id -> welds.stream().noneMatch(w -> w.weldId().equals(id)));
 
-        UUID doomed = holdingKnife(player) || punchCuts(player) ? hoveredWeld(minecraft, level) : null;
+        boolean slimeMode = holdingSlimeball(player);
+        UUID doomed = holdingKnife(player) || punchCuts(player) || slimeMode
+                ? hoveredWeld(minecraft, level) : null;
 
         for (WeldRecord record : welds) {
+            if (slimeMode && !SlimeWeldMerge.eligible(level, record)) continue;
             SubLevel small = container.getSubLevel(record.smallSubLevel());
             SubLevel big = record.worldAnchored() ? null : container.getSubLevel(record.bigSubLevel());
             if (small == null || small.isRemoved()
@@ -157,6 +162,11 @@ public final class CrossScaleWeldSeams {
         return player.getMainHandItem().is(ModItems.GLUE_GUN.get()) && !HotGlueGunClient.placing();
     }
 
+    private static boolean holdingSlimeball(LocalPlayer player) {
+        return player.getMainHandItem().is(Items.SLIME_BALL)
+                || player.getOffhandItem().is(Items.SLIME_BALL);
+    }
+
     private static boolean isKnife(ItemStack stack) {
         return stack != null && !stack.isEmpty() && stack.is(ModItems.POCKET_KNIFE.get());
     }
@@ -164,7 +174,8 @@ public final class CrossScaleWeldSeams {
     private static boolean reveals(ItemStack stack) {
         return stack != null
                 && !stack.isEmpty()
-                && (stack.is(ModItems.GLUE_GUN.get()) || stack.is(ModItems.POCKET_KNIFE.get()));
+                && (stack.is(ModItems.GLUE_GUN.get()) || stack.is(ModItems.POCKET_KNIFE.get())
+                    || stack.is(Items.SLIME_BALL));
     }
 
     private CrossScaleWeldSeams() {}

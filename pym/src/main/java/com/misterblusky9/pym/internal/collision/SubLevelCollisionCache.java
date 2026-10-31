@@ -63,5 +63,9 @@ public final class SubLevelCollisionCache {
         return cached != null ? cached : accel.getBlockState(pos);
     }
 
+    public static void clear() {
+        STATES.get().clear();
+    }
+
     private SubLevelCollisionCache() {}
 }

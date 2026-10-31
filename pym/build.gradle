@@ -67,6 +67,7 @@ dependencies {
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
     compileOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
     gametestRuntimeOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    compileOnly "maven.modrinth:hNGBYvQN:hwxjOCxE"
 
     compileOnly(annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:0.3.3"))
     implementation(jarJar("com.github.bawnorton.mixinsquared:mixinsquared-neoforge:0.3.3"))

@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.collision;
 
+import com.misterblusky9.pym.internal.scale.ScaleState;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -67,15 +68,18 @@ public final class PlotScanBounds {
 
     @Nullable
     public static AABB clipEntityQuery(SubLevel subLevel, AABB query) {
+        if (!ScaleState.isScaled(subLevel)) return query;
+
         BoundingBox3ic plot = plotBounds(subLevel);
         if (plot == null) return null;
 
-        double minX = Math.max(query.minX, plot.minX());
-        double minY = Math.max(query.minY, plot.minY());
-        double minZ = Math.max(query.minZ, plot.minZ());
-        double maxX = Math.min(query.maxX, plot.maxX() + 1.0D);
-        double maxY = Math.min(query.maxY, plot.maxY() + 1.0D);
-        double maxZ = Math.min(query.maxZ, plot.maxZ() + 1.0D);
+        double padding = 1.0D;
+        double minX = Math.max(query.minX, plot.minX() - padding);
+        double minY = Math.max(query.minY, plot.minY() - padding);
+        double minZ = Math.max(query.minZ, plot.minZ() - padding);
+        double maxX = Math.min(query.maxX, plot.maxX() + 1.0D + padding);
+        double maxY = Math.min(query.maxY, plot.maxY() + 1.0D + padding);
+        double maxZ = Math.min(query.maxZ, plot.maxZ() + 1.0D + padding);
 
         if (!Double.isFinite(minX) || !Double.isFinite(minY) || !Double.isFinite(minZ)
                 || !Double.isFinite(maxX) || !Double.isFinite(maxY) || !Double.isFinite(maxZ)

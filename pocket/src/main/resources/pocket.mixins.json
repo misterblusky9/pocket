@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "LevelEntityGetterAccessor",
+    "HarnessResizePivotMixin",
     "ScaledSpawnSetMixin",
     "SableRespawnQueueMixin",
     "create.ControlledContraptionEntityControllerInvoker",
@@ -31,7 +32,8 @@
     "BoatPlacementScaleMixin",
     "CustomItemEntityScaleMixin",
     "create.ControlledContraptionEntityControllerPosAccessor",
-    "sable.SubLevelAssemblyWeldMoveMixin"
+    "sable.SubLevelAssemblyWeldMoveMixin",
+    "simulated.SlimeWeldDisassemblyMixin"
   ],
   "client": [
     "client.SchematicQuillSubLevelMixin",

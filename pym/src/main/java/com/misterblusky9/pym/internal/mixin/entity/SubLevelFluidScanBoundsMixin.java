@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.misterblusky9.pym.internal.collision.PlotScanBounds;
+import com.misterblusky9.pym.internal.scale.ScaleState;
 import com.misterblusky9.pym.internal.entity.FluidSectionCache;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
@@ -93,7 +94,17 @@ public abstract class SubLevelFluidScanBoundsMixin {
             @Local(name = "subLevel") SubLevel subLevel
     ) {
         BoundingBox3d local = original.call(global, pose, dest);
-        PlotScanBounds.clampCells(subLevel, dest);
+        if (ScaleState.isScaled(subLevel)) PlotScanBounds.clampCells(subLevel, dest);
+        if (!this.pym$useFastFluidScan) {
+            long sizeX = Math.max(0L, (long) Mth.ceil(dest.maxX) - Mth.floor(dest.minX));
+            long sizeY = Math.max(0L, (long) Mth.ceil(dest.maxY) - Mth.floor(dest.minY));
+            long sizeZ = Math.max(0L, (long) Mth.ceil(dest.maxZ) - Mth.floor(dest.minZ));
+            if (sizeX > 0L && sizeY > 0L && sizeZ > 0L
+                    && (double) sizeX * sizeY * sizeZ >= PYM_FLUID_CACHE_MIN_CELLS) {
+                this.pym$useFastFluidScan = true;
+                PYM_FLUID_SECTION_CACHE.get().clear();
+            }
+        }
         return local;
     }
 }

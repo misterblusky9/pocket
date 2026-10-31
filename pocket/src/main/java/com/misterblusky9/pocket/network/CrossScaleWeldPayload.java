@@ -41,7 +41,7 @@ public record CrossScaleWeldPayload(
         double hitY,
         double hitZ,
         int snapMode,
-        int rotationTurns
+        int rotationDegrees
 ) implements CustomPacketPayload {
     public static final Type<CrossScaleWeldPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "cross_scale_weld")
@@ -60,7 +60,7 @@ public record CrossScaleWeldPayload(
                         buf.writeDouble(packet.hitY());
                         buf.writeDouble(packet.hitZ());
                         buf.writeByte(packet.snapMode());
-                        buf.writeByte(packet.rotationTurns());
+                        buf.writeShort(packet.rotationDegrees());
                     },
                     buf -> new CrossScaleWeldPayload(
                             BlockPos.STREAM_CODEC.decode(buf),
@@ -72,7 +72,7 @@ public record CrossScaleWeldPayload(
                             buf.readDouble(),
                             buf.readDouble(),
                             buf.readUnsignedByte(),
-                            buf.readUnsignedByte())
+                            buf.readUnsignedShort())
             );
 
     @Override
@@ -84,6 +84,7 @@ public record CrossScaleWeldPayload(
         if (player == null || this.smallPos == null || this.bigPos == null
                 || this.smallFacing == null || this.bigFacing == null) return;
         if (!validHit(this.hitX) || !validHit(this.hitY) || !validHit(this.hitZ)) return;
+        if (this.rotationDegrees >= 360) return;
 
         ServerLevel level = player.serverLevel();
         ItemStack glue = player.getItemInHand(this.hand);
@@ -125,7 +126,7 @@ public record CrossScaleWeldPayload(
         }
 
         WeldRecord record = weld.toRecord(
-                UUID.randomUUID(), CrossScaleWelds.weldOrientation(weld, this.rotationTurns));
+                UUID.randomUUID(), CrossScaleWelds.weldOrientation(weld, this.rotationDegrees));
         WeldStore.get(level).add(record);
         WeldRuntime.markNew(level, record.weldId());
         CrossScaleWeldSync.broadcast(level);

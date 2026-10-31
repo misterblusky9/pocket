@@ -16,13 +16,15 @@ public abstract class PlacementMarginMixin {
     private void pym$scaleAwareCrossSubLevelGate(CallbackInfoReturnable<Boolean> cir) {
         BlockPlaceContext context = (BlockPlaceContext) (Object) this;
 
+        Boolean decision = ScaledPlacementGate.evaluate(context);
+        if (decision == null) return;
+
         if (!this.replaceClicked
                 && !context.getLevel().getBlockState(context.getClickedPos()).canBeReplaced(context)) {
             cir.setReturnValue(false);
             return;
         }
 
-        Boolean decision = ScaledPlacementGate.evaluate(context);
-        if (decision != null) cir.setReturnValue(decision);
+        cir.setReturnValue(decision);
     }
 }

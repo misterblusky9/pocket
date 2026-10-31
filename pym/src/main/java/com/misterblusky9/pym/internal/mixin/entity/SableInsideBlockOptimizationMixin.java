@@ -1,6 +1,7 @@
 package com.misterblusky9.pym.internal.mixin.entity;
 
 import com.bawnorton.mixinsquared.TargetHandler;
+import com.misterblusky9.pym.internal.scale.ScaleState;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
@@ -53,6 +54,15 @@ public abstract class SableInsideBlockOptimizationMixin {
         Entity entity = (Entity) (Object) this;
         AABB bounds = this.getBoundingBox();
         BoundingBox3d worldBounds = new BoundingBox3d(bounds);
+        boolean scaledIntersection = false;
+        for (SubLevel subLevel : Sable.HELPER.getAllIntersecting(this.level, worldBounds)) {
+            if (ScaleState.isScaled(subLevel)) {
+                scaledIntersection = true;
+                break;
+            }
+        }
+        if (!scaledIntersection) return;
+
         BoundingBox3d localBounds = new BoundingBox3d(bounds);
         LevelAccelerator accelerator = new LevelAccelerator(this.level);
 

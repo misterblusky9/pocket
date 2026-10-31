@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
+import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pym.api.Pym;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
@@ -10,81 +11,217 @@ import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
-final class PocketKnifeSplit {
-    private static final int MAX_BLOCKS = 32_768;
-    private static final int MAX_MOVED_BLOCKS = 16_384;
+public final class PocketKnifeSplit {
+    private static final int MAX_CUT_PIECES = 256;
 
-    static void cut(ServerLevel level, ServerSubLevel source, BlockPos clicked, Direction face,
-                    Player player, ItemStack knife, InteractionHand hand) {
-        if (player == null || source.isRemoved() || source.getPlot() == null
-                || face == null || !player.canInteractWithBlock(clicked, 1.0D)
-                || Sable.HELPER.getContaining(level, clicked) != source) return;
+    public static void cut(ServerPlayer player, UUID id, BlockPos origin,
+                           InteractionHand hand, BlockPos min, BlockPos max) {
+        ServerLevel level = player.serverLevel();
+        ItemStack knife = player.getItemInHand(hand);
+        if (!knife.is(ModItems.POCKET_KNIFE.get()) || player.isSpectator()) return;
+        if (!(Sable.HELPER.getContaining(level, origin) instanceof ServerSubLevel source)
+                || source.isRemoved() || source.getPlot() == null || !source.getUniqueId().equals(id)) return;
         if (!Pym.scale().isSettled(source)) {
             refuse(player, "Cannot cut while resizing");
             return;
         }
+        if (min.getX() > max.getX() || min.getY() > max.getY() || min.getZ() > max.getZ()) return;
+        BoundingBox3ic plot = source.getPlot().getBoundingBox();
+        if (plot == null) return;
+        min = new BlockPos(Math.max(min.getX(), plot.minX()), Math.max(min.getY(), plot.minY()),
+                Math.max(min.getZ(), plot.minZ()));
+        max = new BlockPos(Math.min(max.getX(), plot.maxX()), Math.min(max.getY(), plot.maxY()),
+                Math.min(max.getZ(), plot.maxZ()));
+        if (min.getX() > max.getX() || min.getY() > max.getY() || min.getZ() > max.getZ()) {
+            refuse(player, "Nothing selected");
+            return;
+        }
+        AABB selection = new AABB(min.getX(), min.getY(), min.getZ(),
+                max.getX() + 1.0D, max.getY() + 1.0D, max.getZ() + 1.0D);
+        double reach = player.blockInteractionRange() + 1.0D;
+        if (!inReach(player, source, selection, reach)
+                || !aimsAtSelection(player, source, selection)) return;
 
-        Direction.Axis axis = face.getAxis();
-        int plane = clicked.get(axis) + (face.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 0 : 1);
-        List<BlockPos> lower = new ArrayList<>();
-        List<BlockPos> upper = new ArrayList<>();
-        if (!gather(level, source, axis, plane, lower, upper)) {
+        int maxBlocks = DeviceRanges.knifeMaxBlocks();
+        List<BlockPos> blocks = gather(source, maxBlocks);
+        if (blocks == null) return;
+        if (maxBlocks > 0 && blocks.size() > maxBlocks) {
             refuse(player, "Sublevel is too large to cut safely");
             return;
         }
-        if (lower.isEmpty() || upper.isEmpty()) {
-            refuse(player, "Nothing to cut on that side");
+        List<BlockPos> selected = new ArrayList<>();
+        List<BlockPos> retained = new ArrayList<>();
+        for (BlockPos pos : blocks) {
+            (inside(pos, min, max) ? selected : retained).add(pos);
+        }
+        if (selected.isEmpty()) {
+            refuse(player, "Nothing selected");
+            return;
+        }
+        if (retained.isEmpty()) {
+            refuse(player, "The whole sublevel is selected");
+            return;
+        }
+        if (!ToolPermissions.mayAlter(player, level, selected.getFirst())) {
+            refuse(player, "You cannot cut here");
             return;
         }
 
-        Boolean keepUpper = anchoredSide(level, source, axis, plane);
-        if (keepUpper == null && !WeldStore.get(level).touching(source.getUniqueId()).isEmpty()) {
-            refuse(player, "Cut conflicting welds first");
+        Set<BlockPos> anchors = new HashSet<>();
+        for (WeldRecord weld : WeldStore.get(level).touching(id)) {
+            BlockPos anchor = id.equals(weld.smallSubLevel()) ? weld.smallPos() : weld.bigPos();
+            if (anchor == null || level.getBlockState(anchor).isAir()
+                    || Sable.HELPER.getContaining(level, anchor) != source
+                    || inside(anchor, min, max)) {
+                refuse(player, "Cut conflicting welds first");
+                return;
+            }
+            anchors.add(anchor);
+        }
+
+        List<List<BlockPos>> pieces = components(selected);
+        List<List<BlockPos>> remainder = components(retained);
+        List<BlockPos> keep = null;
+        if (anchors.isEmpty()) {
+            for (List<BlockPos> part : remainder) {
+                if (keep == null || part.size() > keep.size()) keep = part;
+            }
+        }
+        for (List<BlockPos> part : remainder) {
+            if (part != keep && part.stream().noneMatch(anchors::contains)) pieces.add(part);
+        }
+        if (pieces.size() > MAX_CUT_PIECES) {
+            refuse(player, "Too many pieces in one cut");
             return;
         }
-        List<BlockPos> moved = keepUpper != null
-                ? (keepUpper ? lower : upper)
-                : (lower.size() <= upper.size() ? lower : upper);
-        if (moved.size() > MAX_MOVED_BLOCKS) {
+        int maxMoved = DeviceRanges.knifeMaxMovedBlocks();
+        if (maxMoved > 0 && pieces.stream().mapToLong(List::size).sum() > maxMoved) {
             refuse(player, "Too many blocks on the cut side");
             return;
         }
 
-        BoundingBox3i bounds = BoundingBox3i.from(moved);
-        if (bounds == null) return;
+        List<CutPiece> plan = new ArrayList<>(pieces.size());
+        for (List<BlockPos> part : pieces) {
+            BoundingBox3i bounds = BoundingBox3i.from(part);
+            if (bounds == null || level.getBlockState(part.getFirst()).isAir()
+                    || Sable.HELPER.getContaining(level, part.getFirst()) != source) {
+                refuse(player, "Sublevel changed; select again");
+                return;
+            }
+            plan.add(new CutPiece(part, bounds.expand(1, 1, 1)));
+        }
+
         Vector3d sound = source.logicalPose().transformPosition(
-                new Vector3d(clicked.getX() + 0.5D, clicked.getY() + 0.5D, clicked.getZ() + 0.5D));
-
-        SubLevelAssemblyHelper.assembleBlocks(level, moved.getFirst(), moved, bounds.expand(1, 1, 1));
-
+                new Vector3d(origin.getX() + 0.5D, origin.getY() + 0.5D, origin.getZ() + 0.5D));
+        boolean cut = false;
+        boolean failed = false;
+        for (CutPiece piece : plan) {
+            try {
+                ServerSubLevel child = SubLevelAssemblyHelper.assembleBlocks(
+                        level, piece.blocks().getFirst(), piece.blocks(), piece.bounds());
+                if (child == null || child.isRemoved()) {
+                    failed = true;
+                    break;
+                }
+                cut = true;
+            } catch (RuntimeException exception) {
+                Sable.LOGGER.error("Pocket knife failed to assemble a cut piece from sublevel {}", id, exception);
+                failed = true;
+                break;
+            }
+        }
+        if (failed) refuse(player, "Cut incomplete; not all pieces could be assembled");
+        if (!cut) return;
         knife.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         level.playSound(null, sound.x, sound.y, sound.z,
                 SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.1F);
     }
 
-    private static boolean gather(ServerLevel level, ServerSubLevel source, Direction.Axis axis, int plane,
-                                  List<BlockPos> lower, List<BlockPos> upper) {
-        BoundingBox3ic bounds = source.getPlot().getBoundingBox();
-        if (bounds == null) return false;
+    private static List<List<BlockPos>> components(List<BlockPos> blocks) {
+        Set<BlockPos> remaining = new HashSet<>(blocks);
+        List<List<BlockPos>> parts = new ArrayList<>();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        for (BlockPos start : blocks) {
+            if (!remaining.remove(start)) continue;
+            List<BlockPos> part = new ArrayList<>();
+            queue.add(start);
+            while (!queue.isEmpty()) {
+                BlockPos pos = queue.removeFirst();
+                part.add(pos);
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            int distance = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+                            if (distance == 0 || distance == 3) continue;
+                            BlockPos neighbor = pos.offset(dx, dy, dz);
+                            if (remaining.remove(neighbor)) queue.addLast(neighbor);
+                        }
+                    }
+                }
+            }
+            parts.add(part);
+        }
+        return parts;
+    }
 
+    private static boolean inside(BlockPos pos, BlockPos min, BlockPos max) {
+        return pos.getX() >= min.getX() && pos.getX() <= max.getX()
+                && pos.getY() >= min.getY() && pos.getY() <= max.getY()
+                && pos.getZ() >= min.getZ() && pos.getZ() <= max.getZ();
+    }
+
+    private static boolean inReach(ServerPlayer player, ServerSubLevel source, AABB box, double reach) {
+        var eye = player.getEyePosition();
+        Vector3d local = source.logicalPose().transformPositionInverse(new Vector3d(eye.x, eye.y, eye.z));
+        Vector3d nearest = new Vector3d(
+                Math.clamp(local.x, box.minX, box.maxX),
+                Math.clamp(local.y, box.minY, box.maxY),
+                Math.clamp(local.z, box.minZ, box.maxZ));
+        source.logicalPose().transformPosition(nearest);
+        return eye.distanceToSqr(nearest.x, nearest.y, nearest.z) <= reach * reach;
+    }
+
+    private static boolean aimsAtSelection(ServerPlayer player, ServerSubLevel source, AABB box) {
+        Vec3 eye = player.getEyePosition();
+        Vec3 target = eye.add(player.getLookAngle().scale(player.blockInteractionRange() * 5.0D));
+        Vector3d localEye = source.logicalPose().transformPositionInverse(
+                new Vector3d(eye.x, eye.y, eye.z));
+        Vector3d localTarget = source.logicalPose().transformPositionInverse(
+                new Vector3d(target.x, target.y, target.z));
+        Vec3 from = new Vec3(localEye.x, localEye.y, localEye.z);
+        Vec3 to = new Vec3(localTarget.x, localTarget.y, localTarget.z);
+        AABB forgiving = box.inflate(0.125D);
+        return forgiving.contains(from) || forgiving.clip(from, to).isPresent();
+    }
+
+    private record CutPiece(List<BlockPos> blocks, BoundingBox3i bounds) {}
+
+    private static List<BlockPos> gather(ServerSubLevel source, int limit) {
+        BoundingBox3ic bounds = source.getPlot().getBoundingBox();
+        if (bounds == null) return null;
+        List<BlockPos> blocks = new ArrayList<>();
         for (PlotChunkHolder holder : source.getPlot().getLoadedChunks()) {
             LevelChunk chunk = holder.getChunk();
             ChunkPos chunkPos = chunk.getPos();
@@ -93,45 +230,26 @@ final class PocketKnifeSplit {
             int minZ = Math.max(bounds.minZ(), chunkPos.getMinBlockZ());
             int maxZ = Math.min(bounds.maxZ(), chunkPos.getMaxBlockZ());
             if (minX > maxX || minZ > maxZ) continue;
-
             LevelChunkSection[] sections = chunk.getSections();
             for (int i = 0; i < sections.length; i++) {
                 LevelChunkSection section = sections[i];
                 if (section.hasOnlyAir()) continue;
                 int sectionY = chunk.getSectionYFromSectionIndex(i) << 4;
-                int minY = Math.max(bounds.minY(), sectionY);
-                int maxY = Math.min(bounds.maxY(), sectionY + 15);
-                for (int y = minY; y <= maxY; y++) {
+                for (int y = Math.max(bounds.minY(), sectionY); y <= Math.min(bounds.maxY(), sectionY + 15); y++) {
                     for (int z = minZ; z <= maxZ; z++) {
                         for (int x = minX; x <= maxX; x++) {
                             if (section.getBlockState(x & 15, y & 15, z & 15).isAir()) continue;
-                            BlockPos pos = new BlockPos(x, y, z);
-                            (pos.get(axis) < plane ? lower : upper).add(pos);
-                            if (lower.size() + upper.size() > MAX_BLOCKS) return false;
+                            blocks.add(new BlockPos(x, y, z));
+                            if (limit > 0 && blocks.size() > limit) return blocks;
                         }
                     }
                 }
             }
         }
-        return true;
+        return blocks;
     }
 
-    private static Boolean anchoredSide(ServerLevel level, ServerSubLevel source,
-                                        Direction.Axis axis, int plane) {
-        UUID id = source.getUniqueId();
-        Boolean upper = null;
-        for (WeldRecord weld : WeldStore.get(level).touching(id)) {
-            BlockPos anchor = id.equals(weld.smallSubLevel()) ? weld.smallPos() : weld.bigPos();
-            if (anchor == null || level.getBlockState(anchor).isAir()
-                    || Sable.HELPER.getContaining(level, anchor) != source) return null;
-            boolean onUpper = anchor.get(axis) >= plane;
-            if (upper != null && upper != onUpper) return null;
-            upper = onUpper;
-        }
-        return upper;
-    }
-
-    private static void refuse(Player player, String message) {
+    private static void refuse(ServerPlayer player, String message) {
         player.displayClientMessage(Component.literal(message), true);
     }
 

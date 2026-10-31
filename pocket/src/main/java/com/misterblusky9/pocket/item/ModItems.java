@@ -7,6 +7,7 @@ import com.simibubi.create.content.equipment.armor.BacktankItem;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Rarity;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -81,7 +82,8 @@ public final class ModItems {
     );
 
     public static final DeferredItem<PocketKnifeItem> POCKET_KNIFE = ITEMS.register(
-            "pocket_knife", () -> new PocketKnifeItem(new Item.Properties().durability(100))
+            "pocket_knife", () -> new PocketKnifeItem(new Item.Properties()
+                    .attributes(SwordItem.createAttributes(PocketKnifeItem.TIER, 3, -2.4F)))
     );
 
     public static final DeferredItem<TheMoonItem> THE_MOON =

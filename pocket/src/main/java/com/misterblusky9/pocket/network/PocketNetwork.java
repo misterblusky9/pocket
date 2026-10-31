@@ -15,7 +15,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class PocketNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("22");
+        PayloadRegistrar registrar = event.registrar("23");
         registrar.playToClient(
                 CompressionSyncPayload.TYPE,
                 CompressionSyncPayload.STREAM_CODEC,
@@ -80,8 +80,26 @@ public final class PocketNetwork {
                 })
         );
         registrar.playToServer(
+                SlimeWeldMergePayload.TYPE,
+                SlimeWeldMergePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
                 HotGluePunchPayload.TYPE,
                 HotGluePunchPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
+                PocketKnifeCutPayload.TYPE,
+                PocketKnifeCutPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) {
                         payload.handle(player);

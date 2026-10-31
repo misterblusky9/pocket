@@ -9,9 +9,11 @@ import com.misterblusky9.pym.api.Pym;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.physics.force.ForceTotal;
 import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
+import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -48,6 +50,28 @@ public abstract class WheelMountForceContextMixin {
 
         localVelocity.y *= Math.sqrt(scale);
         return localVelocity;
+    }
+
+    @WrapOperation(
+            method = "sable$physicsTick(Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
+                    + "Ldev/ryanhcode/sable/api/physics/handle/RigidBodyHandle;D)V",
+            at = @At(
+                    value = "INVOKE",
+                    target = "Ldev/ryanhcode/sable/companion/math/Pose3d;"
+                            + "transformNormal(Lnet/minecraft/world/phys/Vec3;)Lnet/minecraft/world/phys/Vec3;"
+            ),
+            remap = false,
+            require = 0
+    )
+    private Vec3 pym$keepSpringForceLength(
+            Pose3d terrainPose,
+            Vec3 localForce,
+            Operation<Vec3> original
+    ) {
+        Vec3 rotated = original.call(terrainPose, localForce);
+        double rotatedLength = rotated.length();
+        if (rotatedLength <= 1.0E-12D) return rotated;
+        return rotated.scale(localForce.length() / rotatedLength);
     }
 
     @ModifyExpressionValue(

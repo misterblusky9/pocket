@@ -107,7 +107,7 @@ public final class ColliderCompiler {
             sections = compilePrism(subLevel, scale, bounds);
         }
 
-        if (sections.isEmpty() && shape != null) {
+        if (sections.isEmpty() && shape != null && !shape.boxes().isEmpty()) {
             PymTrace.warn(
                     "detailed collider compiled empty for {}; using prism fallback",
                     id);

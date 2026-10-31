@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.internal.collision.SubLevelIndexedCollision;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.companion.math.BoundingBox3d;
 import dev.ryanhcode.sable.mixinhelpers.CanFallAtleastHelper;
@@ -27,8 +28,8 @@ public abstract class PlayerPoseFitScaleMixin {
         if (skin <= 0.0D) return false;
         AABB box = self.getDimensions(pose).makeBoundingBox(self.position()).deflate(1.0E-7D);
         AABB raisedBox = box.setMinY(box.minY + skin);
-        return self.level().noCollision(self, raisedBox)
-                && CanFallAtleastHelper.canFallAtleastWithSubLevels(self.level(), raisedBox) == null;
+        return self.level().noCollision(self, raisedBox) && SubLevelIndexedCollision.probing(self,
+                () -> CanFallAtleastHelper.canFallAtleastWithSubLevels(self.level(), raisedBox) == null);
     }
 
     @Unique

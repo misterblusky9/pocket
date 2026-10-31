@@ -251,6 +251,11 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
     }
 
     @Override
+    public boolean propagatesJoints() {
+        return true;
+    }
+
+    @Override
     public ScaleBounds bounds() {
         return DeviceRanges.of(DeviceRanges.Device.COMPRESSORS);
     }

@@ -120,7 +120,14 @@ public final class SableColliderMirror {
             return true;
         }
 
-        return applyIncremental(level, subLevel, next, state);
+        try {
+            return applyIncremental(level, subLevel, next, state);
+        } catch (ShapeRegistry.CapacityExceededException capacity) {
+            PymTrace.warn("incremental collider retain exhausted packed handles; retrying full replacement uuid={} registry[{}]",
+                    id, ShapeRegistry.stats());
+            applyFull(level, subLevel, next, state);
+            return true;
+        }
     }
 
     public static synchronized void restoreOriginal(ServerSubLevel subLevel) {
