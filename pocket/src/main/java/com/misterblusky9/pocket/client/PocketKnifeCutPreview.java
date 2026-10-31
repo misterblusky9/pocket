@@ -48,18 +48,21 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 @EventBusSubscriber(modid = PocketSized.MOD_ID, value = Dist.CLIENT)
 public final class PocketKnifeCutPreview {
-    private static final int CUT_COPPER = 0xE0712F;
+    private static final int CUT_COPPER = 0xFF8A3D;
     private static final int TEXT_GREY = 0xC8C8C8;
     private static final long SCAN_LIMIT = 32768L;
     private static final RenderType GLUE = PonderRenderTypes.outlineTranslucent(
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "textures/misc/pocket_knife/cut_glue.png"), false);
     private static final List<int[]> faces = new ArrayList<>();
     private static final List<double[]> dashes = new ArrayList<>();
+    private static final List<double[]> gaps = new ArrayList<>();
+    private static final double EDGE_TOLERANCE = 1.0E-3D;
     private static AABB scanned;
     private static long scannedAt;
     private static int tint = CUT_COPPER;
@@ -122,7 +125,7 @@ public final class PocketKnifeCutPreview {
                 return;
             }
             AABB box = bounds();
-            if (box != null && hoveredFace(box.inflate(FRAME_HALF_WIDTH), player) != null) {
+            if (box != null && slices(box, player)) {
                 cut(player, event.getHand(), box);
                 clickHeld = true;
                 event.setCanceled(true);
@@ -166,11 +169,11 @@ public final class PocketKnifeCutPreview {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.screen != null || minecraft.player == null || minecraft.level == null
                 || !minecraft.player.getItemInHand(hand).is(ModItems.POCKET_KNIFE.get())) return;
+        event.setCanceled(true);
         AABB box = bounds();
         if (box == null) return;
         Direction face = hoveredFace(box, minecraft.player);
         if (face == null) return;
-        event.setCanceled(true);
         int delta = (int) event.getScrollDeltaY();
         if (delta == 0) return;
         Vec3 eye = minecraft.player.getEyePosition();
@@ -183,6 +186,26 @@ public final class PocketKnifeCutPreview {
         if (resized == null) offsets[slot] += delta;
     }
 
+    private static boolean slices(AABB box, LocalPlayer player) {
+        SubLevel source = anchor == null ? null : Sable.HELPER.getContaining(player.level(), anchor);
+        if (source == null) return false;
+        Vec3 eye = player.getEyePosition();
+        Vector3d local = source.logicalPose().transformPositionInverse(new Vector3d(eye.x, eye.y, eye.z));
+        Vector3d nearest = new Vector3d(
+                Mth.clamp(local.x, box.minX, box.maxX),
+                Mth.clamp(local.y, box.minY, box.maxY),
+                Mth.clamp(local.z, box.minZ, box.maxZ));
+        source.logicalPose().transformPosition(nearest);
+        double reach = player.blockInteractionRange() + 1.0D;
+        if (eye.distanceToSqr(nearest.x, nearest.y, nearest.z) > reach * reach) return false;
+        Vec3 target = eye.add(player.getLookAngle().scale(player.blockInteractionRange() * 5.0D));
+        Vector3d localTarget = source.logicalPose().transformPositionInverse(new Vector3d(target.x, target.y, target.z));
+        Vec3 from = new Vec3(local.x, local.y, local.z);
+        Vec3 to = new Vec3(localTarget.x, localTarget.y, localTarget.z);
+        AABB forgiving = box.inflate(0.125D);
+        return forgiving.contains(from) || forgiving.clip(from, to).isPresent();
+    }
+
     private static Direction hoveredFace(AABB bb, LocalPlayer player) {
         Vec3 eye = player.getEyePosition();
         Vec3 target = eye.add(player.getViewVector(1).scale(player.blockInteractionRange() * 5));
@@ -192,9 +215,9 @@ public final class PocketKnifeCutPreview {
             target = source.logicalPose().transformPositionInverse(target);
         }
         if (bb.contains(eye)) {
-            Vec3 swap = target;
+            Vec3 outside = eye.add(target.subtract(eye).normalize().scale(bb.getXsize() + bb.getYsize() + bb.getZsize()));
             target = eye;
-            eye = swap;
+            eye = outside;
         }
         var hit = bb.clip(eye, target);
         if (hit.isEmpty()) return null;
@@ -270,8 +293,12 @@ public final class PocketKnifeCutPreview {
             return;
         }
         if (!player.getItemInHand(hand).is(ModItems.POCKET_KNIFE.get())) {
-            clear();
-            return;
+            InteractionHand other = hand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
+            if (!player.getItemInHand(other).is(ModItems.POCKET_KNIFE.get())) {
+                clear();
+                return;
+            }
+            hand = other;
         }
         if (!locked) updateEnd(minecraft);
         SubLevel source = anchor == null ? null : Sable.HELPER.getContaining(minecraft.level, anchor);
@@ -307,6 +334,8 @@ public final class PocketKnifeCutPreview {
         Vec3 camera = event.getCamera().getPosition();
         PoseStack poses = event.getPoseStack();
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
+        AABB box = selected == null || sublevel == null || anchor == null ? null : bounds();
+        if (box != null) refresh(minecraft.level, box);
 
         if (frame == null) {
             shown = null;
@@ -332,19 +361,16 @@ public final class PocketKnifeCutPreview {
                         edge[v] = edge[3 + v] = b;
                         edge[along] = lo[along];
                         edge[3 + along] = hi[along];
-                        dash(poses, lines, framePose, camera, frameColor, edge);
+                        frameEdge(poses, lines, framePose, camera, frameColor, edge, along);
                     }
                 }
             }
             buffers.endBatch(RenderType.debugQuads());
         }
 
-        if (selected == null || sublevel == null || anchor == null) return;
+        if (box == null) return;
         if (!(Sable.HELPER.getContaining(minecraft.level, anchor) instanceof ClientSubLevel owner)
                 || owner.isRemoved()) return;
-        AABB box = bounds();
-        if (box == null) return;
-        refresh(minecraft.level, box);
         Pose3dc pose = owner.renderPose(partial);
         double lift = Math.max(0.002D, 0.004D / Math.max(1.0E-6D, Math.abs(pose.scale().x())));
         Color color = new Color(tint, false);
@@ -369,6 +395,7 @@ public final class PocketKnifeCutPreview {
         scannedAt = time;
         faces.clear();
         dashes.clear();
+        gaps.clear();
         BlockPos min = BlockPos.containing(box.minX, box.minY, box.minZ);
         BlockPos max = BlockPos.containing(box.maxX - 1, box.maxY - 1, box.maxZ - 1);
         long volume = (long) (max.getX() - min.getX() + 1) * (max.getY() - min.getY() + 1) * (max.getZ() - min.getZ() + 1);
@@ -394,7 +421,8 @@ public final class PocketKnifeCutPreview {
         for (Direction side : Direction.values()) {
             if (side.getAxis() == face.getAxis()) continue;
             BlockPos beside = pos.relative(side);
-            if (!contains(beside, min, max) || cut(level, beside, face)) continue;
+            boolean edge = !contains(beside, min, max);
+            if (!edge && cut(level, beside, face)) continue;
             double[] start = {pos.getX(), pos.getY(), pos.getZ()};
             double[] end = {pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1};
             for (Direction fixed : new Direction[]{face, side}) {
@@ -404,6 +432,11 @@ public final class PocketKnifeCutPreview {
                 end[axis] = value;
             }
             int along = 3 - face.getAxis().ordinal() - side.getAxis().ordinal();
+            if (edge) {
+                double[] gap = {start[0], start[1], start[2], start[0], start[1], start[2]};
+                gap[3 + along] += 1.0D;
+                gaps.add(gap);
+            }
             for (double offset = 0.125D; offset < 1.0D; offset += 0.5D) {
                 double[] dash = {start[0], start[1], start[2], start[0], start[1], start[2]};
                 dash[along] += offset;
@@ -456,6 +489,35 @@ public final class PocketKnifeCutPreview {
         }
     }
 
+    private static void frameEdge(PoseStack poses, VertexConsumer consumer, Pose3dc pose, Vec3 camera,
+                                  Color color, double[] edge, int along) {
+        int u = (along + 1) % 3;
+        int v = (along + 2) % 3;
+        List<double[]> hidden = new ArrayList<>();
+        for (double[] gap : gaps) {
+            if (Math.abs(gap[u] - edge[u]) < EDGE_TOLERANCE && Math.abs(gap[v] - edge[v]) < EDGE_TOLERANCE) {
+                hidden.add(new double[]{gap[along], gap[3 + along]});
+            }
+        }
+        hidden.sort(Comparator.comparingDouble(range -> range[0]));
+        double from = edge[along];
+        for (double[] range : hidden) {
+            if (range[0] > from + EDGE_TOLERANCE) framePiece(poses, consumer, pose, camera, color, edge, along, from, range[0]);
+            from = Math.max(from, range[1]);
+        }
+        if (edge[3 + along] > from + EDGE_TOLERANCE) {
+            framePiece(poses, consumer, pose, camera, color, edge, along, from, edge[3 + along]);
+        }
+    }
+
+    private static void framePiece(PoseStack poses, VertexConsumer consumer, Pose3dc pose, Vec3 camera,
+                                   Color color, double[] edge, int along, double from, double to) {
+        double[] piece = edge.clone();
+        piece[along] = from;
+        piece[3 + along] = to;
+        dash(poses, consumer, pose, camera, color, piece);
+    }
+
     private static void dash(PoseStack poses, VertexConsumer consumer, Pose3dc pose, Vec3 camera,
                              Color color, double[] dash) {
         double half = FRAME_HALF_WIDTH;
@@ -503,6 +565,7 @@ public final class PocketKnifeCutPreview {
         scanned = null;
         faces.clear();
         dashes.clear();
+        gaps.clear();
         java.util.Arrays.fill(offsets, 0);
     }
 

@@ -25,6 +25,8 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.ItemAbilities;
+import net.neoforged.neoforge.common.ItemAbility;
 import net.neoforged.neoforge.common.SimpleTier;
 
 public class PocketKnifeItem extends SwordItem implements PriorityInteractionItem {
@@ -99,6 +101,11 @@ public class PocketKnifeItem extends SwordItem implements PriorityInteractionIte
         level.playSound(
                 null, pos, SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.4F);
         return true;
+    }
+
+    @Override
+    public boolean canPerformAction(ItemStack stack, ItemAbility ability) {
+        return ability != ItemAbilities.SWORD_SWEEP && super.canPerformAction(stack, ability);
     }
 
     @Override

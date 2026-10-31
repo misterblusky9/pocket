@@ -44,20 +44,10 @@ public final class PocketKnifeSplit {
         if (!(Sable.HELPER.getContaining(level, origin) instanceof ServerSubLevel source)
                 || source.isRemoved() || source.getPlot() == null || !source.getUniqueId().equals(id)) return;
         if (!Pym.scale().isSettled(source)) {
-            refuse(player, "Cannot cut while resizing");
+            refuse(player, "Cannot cut while a craft is resizing");
             return;
         }
         if (min.getX() > max.getX() || min.getY() > max.getY() || min.getZ() > max.getZ()) return;
-        BoundingBox3ic plot = source.getPlot().getBoundingBox();
-        if (plot == null) return;
-        min = new BlockPos(Math.max(min.getX(), plot.minX()), Math.max(min.getY(), plot.minY()),
-                Math.max(min.getZ(), plot.minZ()));
-        max = new BlockPos(Math.min(max.getX(), plot.maxX()), Math.min(max.getY(), plot.maxY()),
-                Math.min(max.getZ(), plot.maxZ()));
-        if (min.getX() > max.getX() || min.getY() > max.getY() || min.getZ() > max.getZ()) {
-            refuse(player, "Nothing selected");
-            return;
-        }
         AABB selection = new AABB(min.getX(), min.getY(), min.getZ(),
                 max.getX() + 1.0D, max.getY() + 1.0D, max.getZ() + 1.0D);
         double reach = player.blockInteractionRange() + 1.0D;
@@ -68,7 +58,7 @@ public final class PocketKnifeSplit {
         List<BlockPos> blocks = gather(source, maxBlocks);
         if (blocks == null) return;
         if (maxBlocks > 0 && blocks.size() > maxBlocks) {
-            refuse(player, "Sublevel is too large to cut safely");
+            refuse(player, "Block count is too large!");
             return;
         }
         List<BlockPos> selected = new ArrayList<>();
@@ -84,11 +74,6 @@ public final class PocketKnifeSplit {
             refuse(player, "The whole sublevel is selected");
             return;
         }
-        if (!ToolPermissions.mayAlter(player, level, selected.getFirst())) {
-            refuse(player, "You cannot cut here");
-            return;
-        }
-
         Set<BlockPos> anchors = new HashSet<>();
         for (WeldRecord weld : WeldStore.get(level).touching(id)) {
             BlockPos anchor = id.equals(weld.smallSubLevel()) ? weld.smallPos() : weld.bigPos();
@@ -113,7 +98,7 @@ public final class PocketKnifeSplit {
             if (part != keep && part.stream().noneMatch(anchors::contains)) pieces.add(part);
         }
         if (pieces.size() > MAX_CUT_PIECES) {
-            refuse(player, "Too many pieces in one cut");
+            refuse(player, "Too many pieces would result");
             return;
         }
         int maxMoved = DeviceRanges.knifeMaxMovedBlocks();
@@ -121,13 +106,21 @@ public final class PocketKnifeSplit {
             refuse(player, "Too many blocks on the cut side");
             return;
         }
+        for (List<BlockPos> part : pieces) {
+            for (BlockPos pos : part) {
+                if (!ToolPermissions.mayAlter(player, level, pos)) {
+                    refuse(player, "You cannot cut here");
+                    return;
+                }
+            }
+        }
 
         List<CutPiece> plan = new ArrayList<>(pieces.size());
         for (List<BlockPos> part : pieces) {
             BoundingBox3i bounds = BoundingBox3i.from(part);
             if (bounds == null || level.getBlockState(part.getFirst()).isAir()
                     || Sable.HELPER.getContaining(level, part.getFirst()) != source) {
-                refuse(player, "Sublevel changed; select again");
+                refuse(player, "Selection target changed; select again");
                 return;
             }
             plan.add(new CutPiece(part, bounds.expand(1, 1, 1)));
@@ -152,7 +145,7 @@ public final class PocketKnifeSplit {
                 break;
             }
         }
-        if (failed) refuse(player, "Cut incomplete; not all pieces could be assembled");
+        if (failed) refuse(player, "Cut incomplete, not all pieces could be assembled");
         if (!cut) return;
         knife.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         level.playSound(null, sound.x, sound.y, sound.z,
