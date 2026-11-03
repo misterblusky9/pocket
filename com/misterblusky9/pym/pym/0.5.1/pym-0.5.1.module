@@ -1,0 +1,76 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.misterblusky9.pym",
+    "module": "pym",
+    "version": "0.5.1",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.10"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "pym-0.5.1.jar",
+          "url": "pym-0.5.1.jar",
+          "size": 980889,
+          "sha512": "c9398770424362ab00b53c3e81d4cf6b497dd527a601285fc45d32ce0cd29f526df48291aef37fd158f30305be2d163c63be3775fac6f75fca3d038d0029d111",
+          "sha256": "a059e9f046a217448b81ad8e666dc00c3d0811407530d1010f72014a68324423",
+          "sha1": "3bc3adbfc9b4231786884f4a61a9abc4b7927080",
+          "md5": "263e87555c34f548f6ff97323f4ffa00"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "maven.modrinth",
+          "module": "T9PomCSv",
+          "version": {
+            "requires": "NGuyFOeE"
+          }
+        },
+        {
+          "group": "com.github.bawnorton.mixinsquared",
+          "module": "mixinsquared-neoforge",
+          "version": {
+            "requires": "0.3.3"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "pym-0.5.1.jar",
+          "url": "pym-0.5.1.jar",
+          "size": 980889,
+          "sha512": "c9398770424362ab00b53c3e81d4cf6b497dd527a601285fc45d32ce0cd29f526df48291aef37fd158f30305be2d163c63be3775fac6f75fca3d038d0029d111",
+          "sha256": "a059e9f046a217448b81ad8e666dc00c3d0811407530d1010f72014a68324423",
+          "sha1": "3bc3adbfc9b4231786884f4a61a9abc4b7927080",
+          "md5": "263e87555c34f548f6ff97323f4ffa00"
+        }
+      ]
+    }
+  ]
+}
