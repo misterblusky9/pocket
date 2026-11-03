@@ -4,11 +4,14 @@
   "package": "com.misterblusky9.pocket.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "sable.PocketDummyProtectionMixin",
+    "sable.AttachedSubLevelReleaseMixin",
     "LevelEntityGetterAccessor",
     "HarnessResizePivotMixin",
     "ScaledSpawnSetMixin",
     "SableRespawnQueueMixin",
     "create.ControlledContraptionEntityControllerInvoker",
+    "create.DepotHatTickMixin",
     "create.SwitchBearingContraptionInteractionMixin",
     "create.SwitchPistonIdentityMixin",
     "create.SwitchContraptionOrphanMixin",
@@ -36,6 +39,10 @@
     "simulated.SlimeWeldDisassemblyMixin"
   ],
   "client": [
+    "client.HatItemRenderMixin",
+    "client.HatWornRenderMixin",
+    "client.HatHeadLayerMixin",
+    "client.HatSkinLayerMixin",
     "client.SchematicQuillSubLevelMixin",
     "create.VirtualRenderWorldAccessor",
     "create.WrappedBlockAndTintGetterAccessor",

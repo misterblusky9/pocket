@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.compat.simulated;
 
+import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.api.spi.ScaleCoupling;
@@ -113,13 +114,18 @@ public final class CrossScaleWelds {
             SubLevel first = Sable.HELPER.getContaining(level, firstPos);
             SubLevel second = Sable.HELPER.getContaining(level, secondPos);
             if ((first != null && first.isRemoved()) || (second != null && second.isRemoved())) return null;
-            if (first == null && second == null) return null;
+            boolean firstMount = Detached.isDetached(first);
+            boolean secondMount = Detached.isDetached(second);
+            if (firstMount && secondMount || first == null && second == null) return null;
+            if (firstMount && (second == null || !Detached.rules(first).interact())) return null;
+            if (secondMount && (first == null || !Detached.rules(second).interact())) return null;
+            boolean mount = firstMount || secondMount;
 
             boolean worldWeld = first == null || second == null;
             double firstScale = first == null ? 1.0D : Pym.scale().settled(first);
             double secondScale = second == null ? 1.0D : Pym.scale().settled(second);
             boolean sameScale = ScaleBounds.same(firstScale, secondScale);
-            boolean firstIsSmall = worldWeld
+            boolean firstIsSmall = mount ? secondMount : worldWeld
                     ? first != null
                     : sameScale || firstScale < secondScale;
             BlockPos smallPos = (firstIsSmall ? firstPos : secondPos).immutable();
@@ -132,7 +138,7 @@ public final class CrossScaleWelds {
             SubLevel big = worldWeld ? null : firstIsSmall ? second : first;
             if (small == null) return null;
 
-            boolean unsized = sameScale || smallScale > bigScale;
+            boolean unsized = mount || sameScale || smallScale > bigScale;
             int divisor = unsized ? WeldGeometry.UNSTEPPED : WeldGeometry.divisor(smallScale, bigScale);
             double footprint = unsized ? 1.0D : smallScale / bigScale;
             Vec3 rawHit = firstIsSmall ? secondHit : firstHit;
@@ -174,6 +180,10 @@ public final class CrossScaleWelds {
             return this.big == null;
         }
 
+        public boolean mounting() {
+            return Detached.isDetached(this.big);
+        }
+
         public Refusal check() {
             Level level = this.small.getLevel();
             if (level == null || this.divisor < 1) return Refusal.CANNOT_WELD;
@@ -199,7 +209,7 @@ public final class CrossScaleWelds {
             if (!worldAnchored() && !withinPlot(this.small, this.big, this.bigAnchor)) return Refusal.OUT_OF_PLOT;
 
             if (!Pym.scale().isSettled(this.small)
-                    || (!worldAnchored() && !Pym.scale().isSettled(this.big))) {
+                    || (!worldAnchored() && !mounting() && !Pym.scale().isSettled(this.big))) {
                 return Refusal.SCALE_CHANGING;
             }
 
@@ -337,6 +347,59 @@ public final class CrossScaleWelds {
             if (!Pym.scale().isSettled(id)) return false;
         }
         return true;
+    }
+
+    public static void remapAssemblyAnchors(ServerLevel level,
+                                            dev.ryanhcode.sable.api.SubLevelAssemblyHelper.AssemblyTransform transform,
+                                            Iterable<BlockPos> blocks) {
+        if (level == null || transform == null || blocks == null || transform.getLevel() != level) return;
+        Set<BlockPos> moved = new HashSet<>();
+        for (BlockPos pos : blocks) moved.add(pos.immutable());
+        SubLevelContainer container = SubLevelContainer.getContainer(level);
+        WeldStore store = WeldStore.get(level);
+        for (WeldRecord record : store.all()) {
+            boolean smallMoved = moved.contains(record.smallPos());
+            boolean bigMoved = moved.contains(record.bigPos());
+            if (!smallMoved && !bigMoved) continue;
+            BlockPos smallPos = smallMoved ? transform.apply(record.smallPos()) : record.smallPos();
+            BlockPos bigPos = bigMoved ? transform.apply(record.bigPos()) : record.bigPos();
+            SubLevel small = smallMoved ? Sable.HELPER.getContaining(level, smallPos)
+                    : container.getSubLevel(record.smallSubLevel());
+            SubLevel big = bigMoved ? Sable.HELPER.getContaining(level, bigPos)
+                    : record.worldAnchored() ? null : container.getSubLevel(record.bigSubLevel());
+            if (!smallMoved && small == null || !bigMoved && !record.worldAnchored() && big == null) continue;
+            WeldRuntime.drop(record.weldId());
+            if (small == big) {
+                store.remove(record.weldId());
+                continue;
+            }
+            Direction smallFacing = smallMoved ? transform.getRotation().rotate(record.smallFacing()) : record.smallFacing();
+            Direction bigFacing = bigMoved ? transform.getRotation().rotate(record.bigFacing()) : record.bigFacing();
+            Vector3d smallAnchor = smallMoved ? moved(transform, record.anchorFor(true)) : record.anchorFor(true);
+            Vector3d bigAnchor = bigMoved ? moved(transform, record.anchorFor(false)) : record.anchorFor(false);
+            if (small == null) {
+                store.add(remapped(record.weldId(), big, null, bigPos, smallPos, bigFacing, smallFacing, bigAnchor, smallAnchor));
+            } else {
+                store.add(remapped(record.weldId(), small, big, smallPos, bigPos, smallFacing, bigFacing, smallAnchor, bigAnchor));
+            }
+        }
+    }
+
+    private static Vector3d moved(dev.ryanhcode.sable.api.SubLevelAssemblyHelper.AssemblyTransform transform,
+                                  Vector3d anchor) {
+        Vec3 moved = transform.apply(new Vec3(anchor.x, anchor.y, anchor.z));
+        return new Vector3d(moved.x, moved.y, moved.z);
+    }
+
+    private static WeldRecord remapped(UUID weldId, SubLevel small, SubLevel big, BlockPos smallPos, BlockPos bigPos,
+                                       Direction smallFacing, Direction bigFacing,
+                                       Vector3d smallAnchor, Vector3d bigAnchor) {
+        double smallScale = Pym.scale().settled(small);
+        double bigScale = big == null ? ScaleBounds.FULL : Pym.scale().settled(big);
+        return new WeldRecord(weldId, small.getUniqueId(), big == null ? null : big.getUniqueId(),
+                smallPos, bigPos, smallFacing, bigFacing, smallAnchor, bigAnchor,
+                WeldGeometry.span(smallScale, bigScale), WeldGeometry.span(bigScale, smallScale),
+                relativeOrientation(small, big));
     }
 
     public static void beginAssemblyMove() {
@@ -530,7 +593,7 @@ public final class CrossScaleWelds {
 
     private static boolean live(SubLevelContainer container, UUID id) {
         SubLevel subLevel = container.getSubLevel(id);
-        return subLevel != null && !subLevel.isRemoved();
+        return subLevel != null && !subLevel.isRemoved() || Detached.find(id) != null;
     }
 
     public static Quaterniond relativeOrientation(SubLevel small, SubLevel big) {

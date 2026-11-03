@@ -1,9 +1,11 @@
 package com.misterblusky9.pym.internal.mixin.physics;
 
+import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintConfiguration;
 import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,6 +27,11 @@ public abstract class DegenerateConstraintGuardMixin {
             PhysicsConstraintConfiguration<?> configuration,
             CallbackInfoReturnable<PhysicsConstraintHandle> cir
     ) {
+        if (body1 instanceof SubLevel first && Detached.isDetached(first)
+                || body2 instanceof SubLevel second && Detached.isDetached(second)) {
+            cir.setReturnValue(null);
+            return;
+        }
         if (body1 != body2) return;
 
         if (body1 == null) {

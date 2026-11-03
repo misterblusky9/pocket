@@ -46,7 +46,11 @@
     "sable.SubLevelAssemblyRemovedBodyGuardMixin",
     "sable.PlotChangeCacheMixin",
     "sable.SubLevelEntityQueryBoundsMixin",
-    "sable.PunchStrengthScaleMixin"
+    "sable.PunchStrengthScaleMixin",
+    "sable.SubLevelContainerAccessor",
+    "sable.ServerChunkCacheAccessor",
+    "sable.DetachedBlockChangeMixin",
+    "sable.DetachedPlotLoadMixin"
   ],
   "client": [
     "client.ClientSubLevelMixin",
@@ -55,6 +59,11 @@
     "client.SubLevelNearPlaneScaleMixin",
     "client.VanillaChunkedSubLevelRenderDataMixin",
     "client.PortraitPoseMixin",
+    "client.PortraitVisualizationMixin",
+    "client.MirrorVisualizationMixin",
+    "client.MirrorVanillaRenderMixin",
+    "client.LightTextureAccessor",
+    "client.MirrorEvictionMixin",
     "client.SingleBlockSubLevelScaleMixin",
     "client.SubLevelOutlineCameraMixin",
     "client.SubLevelRenderOffsetScaleMixin",

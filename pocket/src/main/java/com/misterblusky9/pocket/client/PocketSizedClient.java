@@ -63,6 +63,8 @@ public final class PocketSizedClient {
         modBus.addListener(HotGlueParticle::register);
         modBus.addListener(PortableSubspaceCompressorRenderer::register);
         modBus.addListener(StaticSubspaceCompressorRenderer::register);
+        modBus.addListener(HatStandRenderer::register);
+        modBus.addListener(HatRendering::addLayers);
         modBus.addListener(SwitchBearingRenderer::register);
         modBus.addListener(SwitchBearingRenderer::registerVisual);
         modBus.addListener(HelmBearingRenderer::register);
@@ -89,6 +91,9 @@ public final class PocketSizedClient {
         DebugOverlay.showCollidersWhile(colliderWand);
         DebugOverlay.showPlayerLodWhile(colliderWand);
         NeoForge.EVENT_BUS.addListener(SwitchBearingOutlineRenderer::render);
+        NeoForge.EVENT_BUS.addListener(BuildMirrors::tick);
+        NeoForge.EVENT_BUS.addListener(HatStandControls::onScroll);
+        NeoForge.EVENT_BUS.addListener(BuildMirrors::clear);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassIndicator::render);
         NeoForge.EVENT_BUS.addListener(WeldFaceRenderer::render);
         NeoForge.EVENT_BUS.addListener(CopycatFacadeFrames::tick);

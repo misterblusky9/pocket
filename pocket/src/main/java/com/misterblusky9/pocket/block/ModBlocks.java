@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.block;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.build.PocketDummyBlock;
 import com.simibubi.create.content.decoration.encasing.CasingBlock;
 import com.simibubi.create.foundation.data.SharedProperties;
 import net.minecraft.core.registries.Registries;
@@ -10,6 +11,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -124,6 +126,20 @@ public final class ModBlocks {
             BLOCKS.register("blueprint_encased_large_cogwheel",
                     () -> new BlueprintEncasedCogwheelBlock(
                             BlockBehaviour.Properties.ofFullCopy(com.simibubi.create.AllBlocks.ANDESITE_ENCASED_LARGE_COGWHEEL.get()), true));
+
+    public static final DeferredHolder<Block, HatStandBlock> HAT_STAND =
+            BLOCKS.register("hat_stand", () -> new HatStandBlock(
+                    BlockBehaviour.Properties.ofFullCopy(Blocks.OAK_PLANKS).noOcclusion()));
+
+    public static final DeferredHolder<Block, PocketDummyBlock> POCKET_DUMMY =
+            BLOCKS.register("pocket_dummy", () -> new PocketDummyBlock(
+                    BlockBehaviour.Properties.ofFullCopy(Blocks.OAK_PLANKS).strength(-1.0F, 3600000.0F)
+                            .pushReaction(PushReaction.BLOCK)));
+
+    static {
+        BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());
+        BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_head_tile"), POCKET_DUMMY.getId());
+    }
 
     private ModBlocks() {}
 }

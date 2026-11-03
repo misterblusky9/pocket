@@ -1,5 +1,7 @@
 package com.misterblusky9.pym.internal.interaction;
 
+import com.google.common.collect.Iterables;
+import com.misterblusky9.pym.internal.PlacedSubLevels;
 import dev.ryanhcode.sable.ActiveSableCompanion;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
@@ -24,6 +26,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Vector3dc;
 
+import java.util.Collections;
 import java.util.function.Predicate;
 
 public final class ScaleAwareBlockClip {
@@ -112,7 +115,7 @@ public final class ScaleAwareBlockClip {
 
         double[] range = null;
 
-        for (SubLevel subLevel : container.getAllSubLevels()) {
+        for (SubLevel subLevel : candidates(container, level)) {
             if (subLevel == ignoredSubLevel) {
                 continue;
             }
@@ -178,6 +181,11 @@ public final class ScaleAwareBlockClip {
         }
 
         return bestResult;
+    }
+
+    private static Iterable<SubLevel> candidates(SubLevelContainer container, Level level) {
+        if (PlacedSubLevels.isEmpty()) return Collections.unmodifiableList(container.getAllSubLevels());
+        return Iterables.concat(container.getAllSubLevels(), PlacedSubLevels.in(level));
     }
 
     private static boolean segmentIntersectsWorldBounds(

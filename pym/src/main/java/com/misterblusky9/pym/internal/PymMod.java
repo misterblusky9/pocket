@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal;
 
+import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.internal.compat.pehkui.PehkuiEntityScaling;
 import com.misterblusky9.pym.internal.compat.photomancy.BlueprintScales;
 import com.misterblusky9.pym.internal.compat.simulated.SimulatedCompat;
@@ -10,6 +11,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
 
 @Mod(PymMod.MOD_ID)
 public final class PymMod {
@@ -18,6 +20,7 @@ public final class PymMod {
     public PymMod(IEventBus modBus, ModContainer modContainer) {
         PymConfig.register(modBus, modContainer);
         modBus.addListener(ScaleNetwork::register);
+        NeoForge.EVENT_BUS.addListener(Detached::tick);
 
         PehkuiEntityScaling.initialize();
         if (ModList.get().isLoaded("simulated")) SimulatedCompat.init();

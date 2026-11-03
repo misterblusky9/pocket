@@ -15,7 +15,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class PocketNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("23");
+        PayloadRegistrar registrar = event.registrar("24");
         registrar.playToClient(
                 CompressionSyncPayload.TYPE,
                 CompressionSyncPayload.STREAM_CODEC,
@@ -91,6 +91,15 @@ public final class PocketNetwork {
         registrar.playToServer(
                 HotGluePunchPayload.TYPE,
                 HotGluePunchPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
+                PocketKnifeAssemblePayload.TYPE,
+                PocketKnifeAssemblePayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) {
                         payload.handle(player);
@@ -200,6 +209,31 @@ public final class PocketNetwork {
                 (payload, context) -> context.enqueueWork(
                         () -> com.misterblusky9.pocket.client.CopycatFacadeFrames.acceptAlignment(
                                 payload.craft(), payload.offset())
+                )
+        );
+        registrar.playToServer(
+                HatNudgePayload.TYPE,
+                HatNudgePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
+                BuildMirrorRequestPayload.TYPE,
+                BuildMirrorRequestPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToClient(
+                BuildMirrorPayload.TYPE,
+                BuildMirrorPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.BuildMirrors.accept(payload)
                 )
         );
     }

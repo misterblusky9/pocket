@@ -1,6 +1,7 @@
 {
   "pocket.message.bed_too_small": "This bed is too small!",
   "pocket.message.anchor_too_small": "This respawn anchor is too small!",
+  "block.pocket.hat_stand": "Hat Stand",
   "block.pocket.golf_ball": "Golf Ball",
   "itemGroup.pocket": "Create: Pocket Sized",
   "pocket.tab_banner": "Pocket",
@@ -47,6 +48,8 @@
   "item.pocket.pocket_knife.tooltip.behaviour1": "_Breaks_ the weld.",
   "item.pocket.pocket_knife.tooltip.condition2": "R-Click a sealed Display Case",
   "item.pocket.pocket_knife.tooltip.behaviour2": "_Breaks_ the seal, if you are the _player_ who sealed it.",
+  "item.pocket.pocket_knife.tooltip.condition3": "R-Click to select blocks in the world",
+  "item.pocket.pocket_knife.tooltip.behaviour3": "_Assembles_ the selection into a new _sublevel_.",
   "item.pocket.glue_gun": "Hot Glue Gun",
   "item.pocket.glue_gun.tooltip.summary": "Sticks _Simulated Contraptions_ together, between _any_ scales.",
   "item.pocket.glue_gun.tooltip.condition1": "R-Click a Block Face",

@@ -115,5 +115,15 @@ public final class ModBlockEntities {
                                     ModBlockEntities.BLUEPRINT_ENCASED_LARGE_COGWHEEL.get(), pos, state),
                             ModBlocks.BLUEPRINT_ENCASED_LARGE_COGWHEEL.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HatStandBlockEntity>>
+            HAT_STAND = BLOCK_ENTITIES.register("hat_stand",
+                    () -> BlockEntityType.Builder.of(HatStandBlockEntity::new,
+                            ModBlocks.HAT_STAND.get()).build(null));
+
+    static {
+        BLOCK_ENTITIES.addAlias(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+                com.misterblusky9.pocket.PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());
+    }
+
     private ModBlockEntities() {}
 }

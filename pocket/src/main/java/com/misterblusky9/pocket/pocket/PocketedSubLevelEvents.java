@@ -6,6 +6,9 @@ import com.misterblusky9.pym.api.ScaleBounds;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.config.DeviceRanges;
+import com.misterblusky9.pocket.block.ModBlocks;
+import com.misterblusky9.pocket.build.BuildHostBlockEntity;
+import com.misterblusky9.pocket.build.BuildSites;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.debug.PocketTrace;
@@ -49,29 +52,38 @@ public final class PocketedSubLevelEvents {
         ItemStack held = event.getItemStack();
         if (!PocketCaseItem.isContainer(held)) return;
 
-        if (!fitsPocket(player, settled)) return;
+        boolean build = event.getLevel().getBlockState(found.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
+        if (!fitsPocket(player, build ? PocketCaseItem.POCKETABLE_SCALE : settled)) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
 
         if (!(event.getLevel() instanceof ServerLevel serverLevel)
-                || !(found instanceof ServerSubLevel subLevel)) return;
+                || !(found instanceof ServerSubLevel target)) return;
 
-        ServerSubLevelContainer container = SubLevelContainer.getContainer(serverLevel);
+        BuildHostBlockEntity host = BuildSites.hostOf(target);
+        ServerSubLevel subLevel = host == null ? ready(serverLevel, player, target) ? target : null
+                : host.release(player, candidate -> ready(serverLevel, player, candidate));
+        if (subLevel == null) return;
+        pocket(serverLevel, player, subLevel, held);
+    }
+
+    private static boolean ready(ServerLevel level, Player player, ServerSubLevel subLevel) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         if (container != null && CrossScaleWelds.isWelded(container, subLevel)) {
             player.displayClientMessage(Component.literal(CrossScaleWelds.POCKET_BLOCKED), true);
-            return;
+            return false;
         }
 
-        PocketedEntities.disassembleContraptions(serverLevel, subLevel);
+        PocketedEntities.disassembleContraptions(level, subLevel);
 
         int blocks = Pym.resize().contents(subLevel).blocks();
         int limit = Pym.resize().shrunkBlockLimit();
         if (blocks > limit) {
             player.displayClientMessage(Component.translatable("pocket.message.hard_limit_ratio", blocks, limit), true);
-            return;
+            return false;
         }
-        pocket(serverLevel, player, subLevel, held);
+        return true;
     }
 
     private static boolean creativePocketsAnything(Player player) {

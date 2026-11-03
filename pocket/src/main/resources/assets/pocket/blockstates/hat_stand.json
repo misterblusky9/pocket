@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": {"model": "pocket:block/hat_stand"},
+    "facing=east": {"model": "pocket:block/hat_stand", "y": 90},
+    "facing=south": {"model": "pocket:block/hat_stand", "y": 180},
+    "facing=west": {"model": "pocket:block/hat_stand", "y": 270}
+  }
+}

@@ -24,6 +24,16 @@ public final class ModDataComponents {
                     .persistent(Codec.intRange(0, 3))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SKIN_LAYER =
+            COMPONENTS.registerComponentType("skin_layer", builder -> builder
+                    .persistent(Codec.intRange(0, 2))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> HEADWEAR_LAYER =
+            COMPONENTS.registerComponentType("headwear_layer", builder -> builder
+                    .persistent(Codec.intRange(0, 2))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CaseSeal>> SEAL =
             COMPONENTS.registerComponentType("seal", builder -> builder
                     .persistent(CaseSeal.CODEC)

@@ -9,12 +9,15 @@ import java.math.RoundingMode;
 
 public final class HudScaleText {
     private static final double EXACT = 1.0E-4D;
+    private static final double HAT = 5.0D / 64.0D;
+    private static final String HAT_LABEL = "HAT";
 
     public static String of(double shown, double live) {
         return Screen.hasShiftDown() ? precise(live) : compact(shown);
     }
 
     public static String compact(double scale) {
+        if (same(scale, HAT)) return HAT_LABEL;
         String glyph = glyph(scale);
         if (glyph != null) return glyph + "×";
         BigDecimal rounded = rounded(scale);
@@ -30,6 +33,7 @@ public final class HudScaleText {
     }
 
     public static String bare(double scale) {
+        if (same(scale, HAT)) return HAT_LABEL;
         String glyph = glyph(scale);
         return glyph != null ? glyph : rounded(scale).stripTrailingZeros().toPlainString();
     }
@@ -42,6 +46,7 @@ public final class HudScaleText {
     }
 
     public static String precise(double scale) {
+        if (same(scale, HAT)) return HAT_LABEL;
         return BigDecimal.valueOf(scale)
                 .setScale(4, RoundingMode.HALF_UP)
                 .stripTrailingZeros()

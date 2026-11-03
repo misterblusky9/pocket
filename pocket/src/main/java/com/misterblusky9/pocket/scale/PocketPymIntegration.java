@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.scale;
 
+import com.misterblusky9.pocket.build.BuildSites;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWeldSync;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldAnchorCoupling;
@@ -9,12 +10,14 @@ import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.compression.CompressionSessions;
 import com.misterblusky9.pocket.compression.PersonalScale;
+import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.event.PhysicsSceneClosingEvent;
 import com.misterblusky9.pym.api.event.ResizeFollowedEvent;
 import com.misterblusky9.pym.api.event.ScaleTickEvent;
 import com.misterblusky9.pym.api.event.SubLevelScaleEvent;
 import com.misterblusky9.pym.api.spi.Participation;
+import com.misterblusky9.pym.api.spi.ResizePolicy;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.storage.SubLevelRemovalReason;
 import net.minecraft.server.level.ServerLevel;
@@ -29,6 +32,8 @@ public final class PocketPymIntegration {
     public static void register() {
         Pym.extensions().coupling(new WeldAnchorCoupling());
         Pym.extensions().register(new PocketParticipation());
+        Pym.extensions().register((ResizePolicy) (subLevel, from, to) ->
+                BuildSites.isAttached(subLevel) ? "Attached constructions cannot be resized" : null);
         Pym.extensions().register(new PortableCompressorLockPolicy());
         Pym.extensions().register(new CreateSeatResizeFollower());
         Pym.extensions().register(new TrackingResizeFollower());
@@ -62,7 +67,7 @@ public final class PocketPymIntegration {
 
     private static void releaseWelds(ServerSubLevel subLevel, UUID id) {
         if (!(subLevel.getLevel() instanceof ServerLevel serverLevel)) return;
-        if (WeldMergeMigration.isMoving(serverLevel, id)) return;
+        if (WeldMergeMigration.isMoving(serverLevel, id) || Detached.adopting(subLevel)) return;
         List<WeldRecord> cut = WeldStore.get(serverLevel).removeAllTouching(id);
         if (cut.isEmpty()) return;
         for (WeldRecord record : cut) WeldRuntime.drop(record.weldId());

@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.block;
 
+import com.misterblusky9.pocket.build.BuildSites;
 import com.misterblusky9.pocket.network.FacadeAlignmentSyncPayload;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
@@ -53,6 +54,7 @@ public final class FacadeAlignment {
 
         ServerLevel level = player.serverLevel();
         if (!(Sable.HELPER.getContaining(level, pos) instanceof ServerSubLevel craft) || craft.isRemoved()) return;
+        if (BuildSites.isAttached(craft)) return;
         if (!withinReach(player, craft, pos)) return;
         if (!level.getBlockState(pos).is(ModBlocks.COPYCAT_FACADE.get())) return;
         if (!(level.getBlockEntity(pos) instanceof CopycatBlockEntity copycat) || !copycat.hasCustomMaterial()) return;

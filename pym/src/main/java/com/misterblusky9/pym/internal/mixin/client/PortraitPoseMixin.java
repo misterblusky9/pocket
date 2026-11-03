@@ -21,4 +21,9 @@ public abstract class PortraitPoseMixin {
     private void pym$portraitPoseAt(final float partialTick, final CallbackInfoReturnable<Pose3dc> cir) {
         if (PortraitScope.isDrawing((ClientSubLevel) (Object) this)) cir.setReturnValue(PortraitScope.pose());
     }
+
+    @Inject(method = "getLatestSkyLightScale", at = @At("HEAD"), cancellable = true, remap = false)
+    private void pym$portraitSkyLight(final CallbackInfoReturnable<Integer> cir) {
+        if (PortraitScope.isDrawing((ClientSubLevel) (Object) this)) cir.setReturnValue(15);
+    }
 }

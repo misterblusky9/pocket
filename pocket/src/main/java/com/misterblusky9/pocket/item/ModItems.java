@@ -151,5 +151,12 @@ public final class ModItems {
                     SUBSPACE_HARNESS_PLACEABLE)
     );
 
+    public static final DeferredItem<HatStandItem> HAT_STAND = ITEMS.register(
+            "hat_stand", () -> new HatStandItem(ModBlocks.HAT_STAND.get(), new Item.Properties()));
+
+    static {
+        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());
+    }
+
     private ModItems() {}
 }

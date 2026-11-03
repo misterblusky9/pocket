@@ -5,8 +5,12 @@ import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.pocket.DeploymentClearance;
 import com.misterblusky9.pocket.pocket.NetherEvaporation;
 import com.misterblusky9.pym.api.PlotContents;
+import com.misterblusky9.pym.api.Plots;
+import com.misterblusky9.pym.api.PlotSources;
 import com.misterblusky9.pocket.pocket.PocketRenderSnapshot;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelSavedData;
+import com.misterblusky9.pocket.build.BuildSites;
+import com.misterblusky9.pocket.build.CarriedBuilds;
 import com.misterblusky9.pocket.pocket.CannonReleaseSource;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ResizeResult;
@@ -26,6 +30,7 @@ import dev.ryanhcode.sable.util.SableNBTUtils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.component.DataComponents;
@@ -200,6 +205,7 @@ public class PocketCaseItem extends PackageItem {
         CompoundTag tag = new CompoundTag();
         tag.putUUID(TOKEN_KEY, token);
         tag.putString(DIMENSION_KEY, sourceLevel.dimension().location().toString());
+        PlotSources.write(tag, sourceLevel.dimension().location());
         tag.putInt(BLOCKS_KEY, blocks);
         tag.putInt(BLOCK_ENTITIES_KEY, blockEntities);
         if (Double.isFinite(mass) && mass > 0.0D) tag.putDouble(MASS_KEY, mass);
@@ -396,8 +402,19 @@ public class PocketCaseItem extends PackageItem {
     }
 
     public static String sourceDimension(ItemStack stack) {
+        ResourceLocation source = PlotSources.dimension(storedTag(stack), DIMENSION_KEY);
+        return source == null ? "" : source.toString();
+    }
+
+    private static void updateSource(ItemStack stack, ServerLevel source) {
         CompoundTag tag = customTag(stack);
-        return tag == null ? "" : tag.getString(DIMENSION_KEY);
+        if (tag == null) return;
+        String dimension = source.dimension().location().toString();
+        if (dimension.equals(tag.getString(PlotSources.DIMENSION_KEY))
+                && dimension.equals(tag.getString(DIMENSION_KEY))) return;
+        PlotSources.write(tag, source.dimension().location());
+        tag.putString(DIMENSION_KEY, dimension);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
     }
 
     public static PocketRenderSnapshot renderSnapshot(ItemStack stack) {
@@ -430,18 +447,24 @@ public class PocketCaseItem extends PackageItem {
         if (!(level instanceof ServerLevel currentLevel)) return;
 
         UUID payloadToken = token(stack);
-        ResourceLocation sourceId = ResourceLocation.tryParse(sourceDimension(stack));
-        ServerLevel sourceLevel = sourceId == null ? null : currentLevel.getServer().getLevel(
-                ResourceKey.create(Registries.DIMENSION, sourceId));
-
-        if (sourceLevel == null) return;
-
-        PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(sourceLevel);
-        if (storage.contains(payloadToken)) {
+        ResourceLocation sourceId = PlotSources.dimension(storedTag(stack), DIMENSION_KEY);
+        ServerLevel sourceLevel = PlotSources.resolve(currentLevel, sourceId);
+        PocketedSubLevelSavedData storage = sourceLevel == null ? null
+                : PocketedSubLevelSavedData.getOrLoad(sourceLevel);
+        if (storage != null && storage.contains(payloadToken)) {
+            updateSource(stack, sourceLevel);
             clearOrphaned(stack, entity, payloadToken);
             return;
         }
 
+        ServerLevel relocated = BuildSites.storedIn(currentLevel, payloadToken);
+        if (relocated != null) {
+            updateSource(stack, relocated);
+            clearOrphaned(stack, entity, payloadToken);
+            return;
+        }
+
+        if (storage == null) return;
         if (storage.wasDeployed(payloadToken) && entity instanceof Player player
                 && replaceHeld(player, stack, new ItemStack(containerItem(stack), stack.getCount()))) {
             return;
@@ -869,6 +892,7 @@ public class PocketCaseItem extends PackageItem {
         UUID token = token(stack);
         if (token == null) return fail(feedbackPlayer, "This pocketed item is empty.");
         if (isSealed(stack)) return null;
+        CarriedBuilds.close(token);
 
         PayloadBackend backend = resolvePayloadBackend(
                 serverLevel, token, sourceDimension(stack), feedbackPlayer);
@@ -878,11 +902,12 @@ public class PocketCaseItem extends PackageItem {
         PlotTransfer transfer = preparePlotTransfer(serverLevel, backend, fullTag, token, feedbackPlayer);
         if (transfer == null) return null;
 
-        if (transfer.deltaBlocksX() != 0
+        if (backend.crossDimension()
+                || transfer.deltaBlocksX() != 0
                 || transfer.deltaBlocksY() != 0
                 || transfer.deltaBlocksZ() != 0) {
             RebaseStats stats = rebasePlotPayload(
-                    fullTag,
+                    fullTag, backend.sourceLevel(), serverLevel,
                     transfer.destinationPlotX(), transfer.destinationPlotZ(),
                     transfer.deltaBlocksX(), transfer.deltaBlocksY(), transfer.deltaBlocksZ());
             PocketTrace.debug(
@@ -1084,10 +1109,10 @@ public class PocketCaseItem extends PackageItem {
     }
 
     private static ServerLevel sourceLevel(ServerLevel targetLevel, ItemStack stack) {
-        ResourceLocation sourceId = ResourceLocation.tryParse(sourceDimension(stack));
-        if (sourceId == null) return null;
-        ResourceKey<Level> sourceKey = ResourceKey.create(Registries.DIMENSION, sourceId);
-        return targetLevel.getServer().getLevel(sourceKey);
+        UUID token = token(stack);
+        ServerLevel stored = token == null ? null : BuildSites.storedIn(targetLevel, token);
+        return stored != null ? stored : PlotSources.resolve(targetLevel,
+                PlotSources.dimension(storedTag(stack), DIMENSION_KEY));
     }
 
     public static void markDetachedPayload(CompoundTag fullTag) {
@@ -1100,7 +1125,9 @@ public class PocketCaseItem extends PackageItem {
             String sourceDimension,
             Player feedbackPlayer
     ) {
-        ResourceLocation sourceId = ResourceLocation.tryParse(sourceDimension);
+        ServerLevel actual = BuildSites.storedIn(targetLevel, token);
+        ResourceLocation sourceId = actual != null ? actual.dimension().location()
+                : ResourceLocation.tryParse(sourceDimension);
         if (sourceId == null) {
             PocketTrace.logger().error(
                     "[PocketTransfer] invalid source backend token={} sourceDimension={} reason=invalid id",
@@ -1149,7 +1176,7 @@ public class PocketCaseItem extends PackageItem {
             return null;
         }
 
-        boolean inBounds = plotInBounds(sourceContainer, sourcePlotX, sourcePlotZ);
+        boolean inBounds = Plots.inBounds(sourceContainer, sourcePlotX, sourcePlotZ);
         boolean occupied = inBounds
                 && sourceContainer.getOccupancy().get(sourceContainer.getIndex(sourcePlotX, sourcePlotZ));
         boolean live = inBounds && sourceContainer.getSubLevel(sourcePlotX, sourcePlotZ) != null;
@@ -1208,45 +1235,22 @@ public class PocketCaseItem extends PackageItem {
             return null;
         }
 
-        int destinationX = backend.sourcePlotX();
-        int destinationZ = backend.sourcePlotZ();
-        boolean originalAvailable = plotInBounds(targetContainer, destinationX, destinationZ)
-                && targetContainer.getSubLevel(destinationX, destinationZ) == null
-                && !targetContainer.getOccupancy().get(
-                        targetContainer.getIndex(destinationX, destinationZ));
-
-        if (!originalAvailable) {
-            int side = 1 << targetContainer.getLogSideLength();
-            boolean found = false;
-            for (int x = 0; x < side && !found; x++) {
-                for (int z = 0; z < side; z++) {
-                    int index = targetContainer.getIndex(x, z);
-                    if (targetContainer.getOccupancy().get(index)
-                            || targetContainer.getSubLevel(x, z) != null) continue;
-                    destinationX = x;
-                    destinationZ = z;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                PocketTrace.logger().error(
-                        "[PocketTransfer] invalid target backend token={} target={} reason=no free plots",
-                        token, targetLevel.dimension().location());
-                fail(feedbackPlayer, "The destination dimension has no free sublevel plots.");
-                return null;
-            }
+        int[] destination = Plots.free(targetContainer, backend.sourcePlotX(), backend.sourcePlotZ());
+        if (destination == null) {
+            PocketTrace.logger().error(
+                    "[PocketTransfer] invalid target backend token={} target={} reason=no free plots",
+                    token, targetLevel.dimension().location());
+            fail(feedbackPlayer, "The destination dimension has no free sublevel plots.");
+            return null;
         }
-
-        int plotBlockSize = 1 << (targetContainer.getLogPlotSize() + 4);
-        int sourceGlobalX = sourceContainer.getOrigin().x + backend.sourcePlotX();
-        int sourceGlobalZ = sourceContainer.getOrigin().y + backend.sourcePlotZ();
-        int targetGlobalX = targetContainer.getOrigin().x + destinationX;
-        int targetGlobalZ = targetContainer.getOrigin().y + destinationZ;
-        int deltaX = (targetGlobalX - sourceGlobalX) * plotBlockSize;
-
-        int deltaY = targetLevel.getMinBuildHeight() - backend.sourceLevel().getMinBuildHeight();
-        int deltaZ = (targetGlobalZ - sourceGlobalZ) * plotBlockSize;
+        int destinationX = destination[0];
+        int destinationZ = destination[1];
+        boolean originalAvailable = destinationX == backend.sourcePlotX() && destinationZ == backend.sourcePlotZ();
+        Vec3i delta = Plots.delta(backend.sourceLevel(), backend.sourcePlotX(), backend.sourcePlotZ(),
+                targetLevel, destinationX, destinationZ);
+        int deltaX = delta.getX();
+        int deltaY = delta.getY();
+        int deltaZ = delta.getZ();
 
         PocketTrace.debug(
                 "[PocketTransfer] target validation token={} target={} preferredPlot=({}, {}) "
@@ -1260,56 +1264,24 @@ public class PocketCaseItem extends PackageItem {
 
     private static RebaseStats rebasePlotPayload(
             CompoundTag fullTag,
+            ServerLevel sourceLevel,
+            ServerLevel targetLevel,
             int destinationPlotX,
             int destinationPlotZ,
             int deltaX,
             int deltaY,
             int deltaZ
     ) {
-        CompoundTag plotTag = fullTag.getCompound("plot");
-        plotTag.putInt("plot_x", destinationPlotX);
-        plotTag.putInt("plot_z", destinationPlotZ);
+        int[] shifted = Plots.rebase(fullTag.getCompound("plot"), sourceLevel, targetLevel,
+                destinationPlotX, destinationPlotZ);
 
         Pose3d storedPose = SableNBTUtils.readPose3d(fullTag.getCompound("pose"));
         storedPose.rotationPoint().add(deltaX, deltaY, deltaZ);
         fullTag.put("pose", SableNBTUtils.writePose3d(storedPose));
 
-        int blockEntities = 0;
-        int ticks = 0;
-        CompoundTag chunks = plotTag.getCompound("chunks");
-        for (String chunkKey : chunks.getAllKeys()) {
-            CompoundTag chunk = chunks.getCompound(chunkKey);
-            blockEntities += shiftPositionList(
-                    chunk.getList("block_entities", Tag.TAG_COMPOUND), deltaX, deltaY, deltaZ);
-            ticks += shiftPositionList(
-                    chunk.getList("block_ticks", Tag.TAG_COMPOUND), deltaX, deltaY, deltaZ);
-            ticks += shiftPositionList(
-                    chunk.getList("fluid_ticks", Tag.TAG_COMPOUND), deltaX, deltaY, deltaZ);
-        }
-
         int entities = com.misterblusky9.pocket.pocket.PocketedEntities
                 .rebase(fullTag, deltaX, deltaY, deltaZ);
-        return new RebaseStats(blockEntities, ticks, entities);
-    }
-
-    private static int shiftPositionList(
-            ListTag entries,
-            int deltaX,
-            int deltaY,
-            int deltaZ
-    ) {
-        int shifted = 0;
-        for (int i = 0; i < entries.size(); i++) {
-            CompoundTag entry = entries.getCompound(i);
-            if (!entry.contains("x", Tag.TAG_ANY_NUMERIC)
-                    || !entry.contains("y", Tag.TAG_ANY_NUMERIC)
-                    || !entry.contains("z", Tag.TAG_ANY_NUMERIC)) continue;
-            entry.putInt("x", entry.getInt("x") + deltaX);
-            entry.putInt("y", entry.getInt("y") + deltaY);
-            entry.putInt("z", entry.getInt("z") + deltaZ);
-            shifted++;
-        }
-        return shifted;
+        return new RebaseStats(shifted[0], shifted[1], entities);
     }
 
     private static PayloadIntegrity validateRestoredPayload(
@@ -1518,6 +1490,7 @@ public class PocketCaseItem extends PackageItem {
         if (sourceLevel == null) return null;
 
         UUID token = token(stack);
+        CarriedBuilds.close(token);
         PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(sourceLevel);
         CompoundTag fullTag = storage.getCopy(token);
         if (fullTag == null) return null;
@@ -1695,15 +1668,6 @@ public class PocketCaseItem extends PackageItem {
         return hash;
     }
 
-    private static boolean plotInBounds(
-            ServerSubLevelContainer container,
-            int plotX,
-            int plotZ
-    ) {
-        int side = 1 << container.getLogSideLength();
-        return plotX >= 0 && plotZ >= 0 && plotX < side && plotZ < side;
-    }
-
     private static void rollbackDestination(
             ServerLevel level,
             ServerSubLevelContainer container,
@@ -1826,9 +1790,9 @@ public class PocketCaseItem extends PackageItem {
         UUID token = token(stack);
         if (token == null) return PayloadState.MISSING;
 
-        ResourceLocation sourceId = ResourceLocation.tryParse(sourceDimension(stack));
-        ServerLevel sourceLevel = sourceId == null ? null : level.getServer().getLevel(
-                ResourceKey.create(Registries.DIMENSION, sourceId));
+        ServerLevel sourceLevel = BuildSites.storedIn(level, token);
+        if (sourceLevel == null) sourceLevel = PlotSources.resolve(level,
+                PlotSources.dimension(storedTag(stack), DIMENSION_KEY));
         if (sourceLevel == null) return PayloadState.MISSING;
 
         PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(sourceLevel);
@@ -1848,9 +1812,9 @@ public class PocketCaseItem extends PackageItem {
         UUID token = token(stack);
         if (token == null) return false;
 
-        ResourceLocation sourceId = ResourceLocation.tryParse(sourceDimension(stack));
-        ServerLevel sourceLevel = sourceId == null ? null : level.getServer().getLevel(
-                ResourceKey.create(Registries.DIMENSION, sourceId));
+        ServerLevel sourceLevel = BuildSites.storedIn(level, token);
+        if (sourceLevel == null) sourceLevel = PlotSources.resolve(level,
+                PlotSources.dimension(storedTag(stack), DIMENSION_KEY));
         if (sourceLevel == null) return true;
 
         return PocketedSubLevelSavedData.getOrLoad(sourceLevel).contains(token);

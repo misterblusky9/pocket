@@ -19,6 +19,9 @@ enumExtensions="META-INF/enumextensions.json"
 [[mixins]]
 config="pocket.mixins.json"
 
+[[mixins]]
+config="pocket.photomancy.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"
