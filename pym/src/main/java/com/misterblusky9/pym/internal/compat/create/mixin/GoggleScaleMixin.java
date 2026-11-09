@@ -44,7 +44,7 @@ public abstract class GoggleScaleMixin {
         if (subLevel == null || !Pym.scale().isScaled(subLevel)) return;
 
         if (!tooltip.isEmpty()) tooltip.add(CommonComponents.EMPTY);
-        CreateLang.builder().text(" Pym").style(ChatFormatting.GOLD).forGoggles(tooltip);
-        CreateLang.builder().text("Scale: " + ScaleReadout.of(subLevel)).style(ChatFormatting.AQUA).forGoggles(tooltip, 1);
+        CreateLang.builder().add(Component.translatable("pym.goggles.title")).style(ChatFormatting.GOLD).forGoggles(tooltip);
+        CreateLang.builder().add(Component.translatable("pym.goggles.scale", String.valueOf(ScaleReadout.of(subLevel)))).style(ChatFormatting.AQUA).forGoggles(tooltip, 1);
     }
 }

@@ -47,7 +47,7 @@ final class CompressionGunStateModel {
         private Vec3 muzzle;
     }
 
-    private static final int MAX_ENTRIES = 4;
+    private static final int MAX_ENTRIES = 6;
     private static final Map<BakedModel, Entry> ENTRIES = new java.util.LinkedHashMap<>(8, 0.75F, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<BakedModel, Entry> eldest) {

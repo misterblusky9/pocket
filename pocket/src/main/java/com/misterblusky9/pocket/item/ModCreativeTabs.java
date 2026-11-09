@@ -32,6 +32,9 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.DISPLAY_BOTTLE.get());
                         output.accept(ModItems.BRASS_DISPLAY_CASE.get());
                         output.accept(ModItems.BRASS_DISPLAY_PLATE.get());
+                        output.accept(ModItems.HAT_STAND.get());
+                        output.accept(ModItems.TALL_HAT_STAND.get());
+                        output.accept(ModItems.SKULL_CAP.get());
 
                         output.accept(ModItems.PORTABLE_SUBSPACE_COMPRESSOR.get());
                         output.accept(ModItems.STATIC_SUBSPACE_COMPRESSOR.get());

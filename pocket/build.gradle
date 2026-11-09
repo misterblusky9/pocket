@@ -19,6 +19,10 @@ sourceSets {
         compileClasspath += main.output + main.compileClasspath
         runtimeClasspath += main.output + main.runtimeClasspath
     }
+    gametest {
+        compileClasspath += main.output + main.compileClasspath
+        runtimeClasspath += main.output + main.runtimeClasspath
+    }
 }
 
 evaluationDependsOn(':pym')
@@ -65,6 +69,13 @@ neoForge {
             gameDirectory = rootProject.file("runs/server")
         }
 
+        gameTestServer {
+            type = "gameTestServer"
+            sourceSet = sourceSets.gametest
+            gameDirectory = rootProject.file("runs/pocket-gametest")
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'pocket_test'
+        }
+
         data {
             data()
             programArguments.addAll(
@@ -102,7 +113,12 @@ neoForge {
         pocketdebug {
             sourceSet(sourceSets.debug)
         }
+        pocket_test {
+            sourceSet(sourceSets.gametest)
+        }
     }
+
+    addModdingDependenciesTo sourceSets.gametest
 }
 
 configurations {
@@ -113,6 +129,7 @@ configurations {
 tasks.register('extractSimulated', Copy) {
     from({ zipTree(configurations.aeronauticsBundle.singleFile) }) {
         include 'META-INF/jarjar/dev.simulated_team.simulated.*.jar'
+        include 'META-INF/jarjar/dev.eriksonn.aeronautics.*.jar'
     }
     into layout.buildDirectory.dir('simulated')
     eachFile { it.path = it.name }
@@ -145,6 +162,9 @@ dependencies {
 
     compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}:api"
     localRuntime "top.theillusivec4.curios:curios-neoforge:${curios_version}"
+
+    compileOnly "maven.modrinth:jade:15.10.6+neoforge"
+    localRuntime "maven.modrinth:jade:15.10.6+neoforge"
 
     localRuntime "maven.modrinth:spark:v5qtqRQi"
 }

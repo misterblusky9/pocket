@@ -3,7 +3,7 @@ package com.misterblusky9.pym.internal.compat.simulated;
 import com.misterblusky9.pym.internal.extension.PymExtensions;
 
 public final class SimulatedCompat {
-    public static final String ROPE_BLOCKS_SCALING = "Remove rope before scaling";
+    public static final String ROPE_BLOCKS_SCALING = "pym.refusal.remove_rope";
 
     public static void init() {
         PymExtensions.register((subLevel, from, to) ->

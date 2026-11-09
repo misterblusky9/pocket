@@ -1,8 +1,11 @@
 package com.misterblusky9.pocket.item;
 
+import com.misterblusky9.pocket.build.BuildSites;
 import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.config.DeviceRanges;
+import com.misterblusky9.pym.api.Detached;
+import com.misterblusky9.pym.api.Plots;
 import com.misterblusky9.pym.api.Pym;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
@@ -20,13 +23,14 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +39,7 @@ import java.util.UUID;
 
 public final class PocketKnifeSplit {
     private static final int MAX_CUT_PIECES = 256;
+    private static final long MAX_ASSEMBLE_VOLUME = 1L << 20;
 
     public static void cut(ServerPlayer player, UUID id, BlockPos origin,
                            InteractionHand hand, BlockPos min, BlockPos max) {
@@ -43,10 +48,13 @@ public final class PocketKnifeSplit {
         if (!knife.is(ModItems.POCKET_KNIFE.get()) || player.isSpectator()) return;
         if (!(Sable.HELPER.getContaining(level, origin) instanceof ServerSubLevel source)
                 || source.isRemoved() || source.getPlot() == null || !source.getUniqueId().equals(id)) return;
+        if (!Detached.rules(source).split()) return;
         if (!Pym.scale().isSettled(source)) {
-            refuse(player, "Cannot cut while a craft is resizing");
+            refuse(player, "pocket.cut.craft_resizing");
             return;
         }
+        source = BuildSites.unfold(source);
+        if (source == null) return;
         if (min.getX() > max.getX() || min.getY() > max.getY() || min.getZ() > max.getZ()) return;
         AABB selection = new AABB(min.getX(), min.getY(), min.getZ(),
                 max.getX() + 1.0D, max.getY() + 1.0D, max.getZ() + 1.0D);
@@ -58,7 +66,7 @@ public final class PocketKnifeSplit {
         List<BlockPos> blocks = gather(source, maxBlocks);
         if (blocks == null) return;
         if (maxBlocks > 0 && blocks.size() > maxBlocks) {
-            refuse(player, "Block count is too large!");
+            refuse(player, "pocket.cut.block_count_too_large");
             return;
         }
         List<BlockPos> selected = new ArrayList<>();
@@ -67,11 +75,11 @@ public final class PocketKnifeSplit {
             (inside(pos, min, max) ? selected : retained).add(pos);
         }
         if (selected.isEmpty()) {
-            refuse(player, "Nothing selected");
+            refuse(player, "pocket.cut.nothing_selected");
             return;
         }
         if (retained.isEmpty()) {
-            refuse(player, "The whole sublevel is selected");
+            refuse(player, "pocket.cut.whole_sublevel");
             return;
         }
         Set<BlockPos> anchors = new HashSet<>();
@@ -80,14 +88,23 @@ public final class PocketKnifeSplit {
             if (anchor == null || level.getBlockState(anchor).isAir()
                     || Sable.HELPER.getContaining(level, anchor) != source
                     || inside(anchor, min, max)) {
-                refuse(player, "Cut conflicting welds first");
+                refuse(player, "pocket.cut.conflicting_welds");
                 return;
             }
             anchors.add(anchor);
         }
 
-        List<List<BlockPos>> pieces = components(selected);
-        List<List<BlockPos>> remainder = components(retained);
+        BlockPos core = Detached.anchor(source);
+        if (core != null) {
+            if (inside(core, min, max)) {
+                refuse(player, "pocket.cut.core");
+                return;
+            }
+            anchors.add(core);
+        }
+
+        List<List<BlockPos>> pieces = Plots.components(selected);
+        List<List<BlockPos>> remainder = Plots.components(retained);
         List<BlockPos> keep = null;
         if (anchors.isEmpty()) {
             for (List<BlockPos> part : remainder) {
@@ -98,18 +115,18 @@ public final class PocketKnifeSplit {
             if (part != keep && part.stream().noneMatch(anchors::contains)) pieces.add(part);
         }
         if (pieces.size() > MAX_CUT_PIECES) {
-            refuse(player, "Too many pieces would result");
+            refuse(player, "pocket.cut.too_many_pieces");
             return;
         }
         int maxMoved = DeviceRanges.knifeMaxMovedBlocks();
         if (maxMoved > 0 && pieces.stream().mapToLong(List::size).sum() > maxMoved) {
-            refuse(player, "Too many blocks on the cut side");
+            refuse(player, "pocket.cut.too_many_blocks_cut_side");
             return;
         }
         for (List<BlockPos> part : pieces) {
             for (BlockPos pos : part) {
                 if (!ToolPermissions.mayAlter(player, level, pos)) {
-                    refuse(player, "You cannot cut here");
+                    refuse(player, "pocket.cut.cannot_cut_here");
                     return;
                 }
             }
@@ -120,7 +137,7 @@ public final class PocketKnifeSplit {
             BoundingBox3i bounds = BoundingBox3i.from(part);
             if (bounds == null || level.getBlockState(part.getFirst()).isAir()
                     || Sable.HELPER.getContaining(level, part.getFirst()) != source) {
-                refuse(player, "Selection target changed; select again");
+                refuse(player, "pocket.cut.selection_changed");
                 return;
             }
             plan.add(new CutPiece(part, bounds.expand(1, 1, 1)));
@@ -145,38 +162,79 @@ public final class PocketKnifeSplit {
                 break;
             }
         }
-        if (failed) refuse(player, "Cut incomplete, not all pieces could be assembled");
+        if (failed) refuse(player, "pocket.cut.incomplete");
         if (!cut) return;
         knife.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         level.playSound(null, sound.x, sound.y, sound.z,
                 SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.1F);
     }
 
-    private static List<List<BlockPos>> components(List<BlockPos> blocks) {
-        Set<BlockPos> remaining = new HashSet<>(blocks);
-        List<List<BlockPos>> parts = new ArrayList<>();
-        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
-        for (BlockPos start : blocks) {
-            if (!remaining.remove(start)) continue;
-            List<BlockPos> part = new ArrayList<>();
-            queue.add(start);
-            while (!queue.isEmpty()) {
-                BlockPos pos = queue.removeFirst();
-                part.add(pos);
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dy = -1; dy <= 1; dy++) {
-                        for (int dz = -1; dz <= 1; dz++) {
-                            int distance = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
-                            if (distance == 0 || distance == 3) continue;
-                            BlockPos neighbor = pos.offset(dx, dy, dz);
-                            if (remaining.remove(neighbor)) queue.addLast(neighbor);
-                        }
-                    }
-                }
-            }
-            parts.add(part);
+    public static void assemble(ServerPlayer player, InteractionHand hand, BlockPos min, BlockPos max) {
+        ServerLevel level = player.serverLevel();
+        ItemStack knife = player.getItemInHand(hand);
+        if (!knife.is(ModItems.POCKET_KNIFE.get()) || player.isSpectator()) return;
+        if (min.getX() > max.getX() || min.getY() > max.getY() || min.getZ() > max.getZ()) return;
+        AABB selection = new AABB(min.getX(), min.getY(), min.getZ(),
+                max.getX() + 1.0D, max.getY() + 1.0D, max.getZ() + 1.0D);
+        Vec3 eye = player.getEyePosition();
+        double reach = player.blockInteractionRange() + 1.0D;
+        AABB forgiving = selection.inflate(0.125D);
+        Vec3 target = eye.add(player.getLookAngle().scale(player.blockInteractionRange() * 5.0D));
+        if (selection.distanceToSqr(eye) > reach * reach
+                || !(forgiving.contains(eye) || forgiving.clip(eye, target).isPresent())) return;
+        long volume = (long) (max.getX() - min.getX() + 1) * (max.getY() - min.getY() + 1) * (max.getZ() - min.getZ() + 1);
+        if (volume > MAX_ASSEMBLE_VOLUME) {
+            refuse(player, "pocket.cut.selection_too_large");
+            return;
         }
-        return parts;
+        if (!level.hasChunksAt(min, max)) {
+            refuse(player, "pocket.cut.selection_not_loaded");
+            return;
+        }
+
+        int maxMoved = DeviceRanges.knifeMaxMovedBlocks();
+        List<BlockPos> blocks = new ArrayList<>();
+        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir() || state.getBlock() instanceof LiquidBlock) continue;
+            if (Sable.HELPER.getContaining(level, pos) != null) return;
+            if (state.getDestroySpeed(level, pos) < 0.0F) {
+                refuse(player, "pocket.cut.selection_unmovable");
+                return;
+            }
+            blocks.add(pos.immutable());
+            if (maxMoved > 0 && blocks.size() > maxMoved) {
+                refuse(player, "pocket.cut.too_many_selected");
+                return;
+            }
+        }
+        if (blocks.isEmpty()) {
+            refuse(player, "pocket.cut.nothing_selected");
+            return;
+        }
+        for (BlockPos pos : blocks) {
+            if (!ToolPermissions.mayAlter(player, level, pos)) {
+                refuse(player, "pocket.cut.cannot_assemble_here");
+                return;
+            }
+        }
+        BoundingBox3i bounds = BoundingBox3i.from(blocks);
+        if (bounds == null) return;
+
+        try {
+            ServerSubLevel assembled = SubLevelAssemblyHelper.assembleBlocks(
+                    level, blocks.getFirst(), blocks, bounds.expand(1, 1, 1));
+            if (assembled == null || assembled.isRemoved()) {
+                refuse(player, "pocket.cut.selection_failed");
+                return;
+            }
+        } catch (RuntimeException exception) {
+            Sable.LOGGER.error("Pocket knife failed to assemble a world selection", exception);
+            refuse(player, "pocket.cut.selection_failed");
+            return;
+        }
+        knife.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
+        level.playSound(null, min, SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.1F);
     }
 
     private static boolean inside(BlockPos pos, BlockPos min, BlockPos max) {
@@ -242,8 +300,8 @@ public final class PocketKnifeSplit {
         return blocks;
     }
 
-    private static void refuse(ServerPlayer player, String message) {
-        player.displayClientMessage(Component.literal(message), true);
+    private static void refuse(ServerPlayer player, String key) {
+        player.displayClientMessage(Component.translatable(key), true);
     }
 
     private PocketKnifeSplit() {}

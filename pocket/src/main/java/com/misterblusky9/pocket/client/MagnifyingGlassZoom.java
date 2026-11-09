@@ -53,6 +53,13 @@ public final class MagnifyingGlassZoom {
         return Math.exp(Math.log(candidate) * start);
     }
 
+    public static float focusStrength() {
+        animate();
+        float zoom = (float) Mth.clamp((opticalZoom() - 1.0D) / 1.0D, 0.0D, 1.0D);
+        float settled = (float) Mth.clamp((approach - 0.85D) / 0.15D, 0.0D, 1.0D);
+        return smooth(zoom) * smooth(settled);
+    }
+
     private static float nearClipProgress() {
         float settled = smooth((float) Mth.clamp((approach - 0.975D) / 0.025D, 0.0D, 1.0D));
         float zooming = smooth((float) Mth.clamp((opticalZoom() - 1.0D) / 0.35D, 0.0D, 1.0D));

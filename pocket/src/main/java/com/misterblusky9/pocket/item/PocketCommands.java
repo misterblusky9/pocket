@@ -33,17 +33,17 @@ public final class PocketCommands {
     private static int setHandScale(CommandSourceStack source, double scale) {
         ServerPlayer player = source.getPlayer();
         if (player == null || !ScaleBounds.isValid(scale)) {
-            source.sendFailure(Component.literal("Needs a player and a positive scale, e.g. 0.0625 or 1/16"));
+            source.sendFailure(Component.translatable("pocket.command.sethandscale.invalid"));
             return 0;
         }
         ItemStack held = player.getMainHandItem();
         if (!(held.getItem() instanceof CreativeShrinkRayItem
                 || held.getItem() instanceof SelfResizeDeviceItem)) {
-            source.sendFailure(Component.literal("Hold a creative shrink ray or personal compressor"));
+            source.sendFailure(Component.translatable("pocket.command.sethandscale.wrong_item"));
             return 0;
         }
         CreativeShrinkRayItem.setSelectedScale(held, scale);
-        source.sendSuccess(() -> Component.literal("Set held scale to " + scale), true);
+        source.sendSuccess(() -> Component.translatable("pocket.command.sethandscale.set", scale), true);
         return 1;
     }
 

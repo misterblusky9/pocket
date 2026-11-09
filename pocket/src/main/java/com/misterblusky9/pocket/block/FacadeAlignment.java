@@ -1,14 +1,18 @@
 package com.misterblusky9.pocket.block;
 
+import com.misterblusky9.pocket.build.BuildSites;
 import com.misterblusky9.pocket.network.FacadeAlignmentSyncPayload;
+import com.misterblusky9.pocket.item.ToolPermissions;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
+import com.simibubi.create.AllItems;
 import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
@@ -53,6 +57,7 @@ public final class FacadeAlignment {
 
         ServerLevel level = player.serverLevel();
         if (!(Sable.HELPER.getContaining(level, pos) instanceof ServerSubLevel craft) || craft.isRemoved()) return;
+        if (BuildSites.isAttached(craft)) return;
         if (!withinReach(player, craft, pos)) return;
         if (!level.getBlockState(pos).is(ModBlocks.COPYCAT_FACADE.get())) return;
         if (!(level.getBlockEntity(pos) instanceof CopycatBlockEntity copycat) || !copycat.hasCustomMaterial()) return;
@@ -74,11 +79,39 @@ public final class FacadeAlignment {
         int[] offset = FacadeTiling.alignment(block, scale);
         if (offset == null) return;
 
+        save(craft, offset);
+        level.playSound(null, pos, SoundEvents.ITEM_FRAME_ROTATE_ITEM, SoundSource.BLOCKS, 0.75F, 1.2F);
+    }
+
+    public static void nudge(ServerPlayer player, BlockPos pos, int faceId, int step) {
+        if (player == null || pos == null || faceId < 0 || faceId >= 6 || Math.abs(step) != 1) return;
+        if (!AllItems.WRENCH.isIn(player.getMainHandItem())
+                && !AllItems.WRENCH.isIn(player.getOffhandItem())) return;
+
+        ServerLevel level = player.serverLevel();
+        if (!(Sable.HELPER.getContaining(level, pos) instanceof ServerSubLevel craft) || craft.isRemoved()) return;
+        if (BuildSites.isAttached(craft) || !withinReach(player, craft, pos)
+                || !level.getBlockState(pos).is(ModBlocks.COPYCAT_FACADE.get())
+                || !(level.getBlockEntity(pos) instanceof CopycatBlockEntity copycat)
+                || !copycat.hasCustomMaterial() || !ToolPermissions.mayAlter(player, level, pos)) return;
+
+        double scale = Pym.scale().settled(craft);
+        if (!shrunk(scale)) return;
+
+        Direction face = Direction.from3DDataValue(faceId);
+        int[] offset = FacadeTiling.reduce(of(craft), scale);
+        int axis = face.getAxis().ordinal();
+        offset[axis] = Math.floorMod(offset[axis] + step * face.getAxisDirection().getStep(),
+                FacadeTiling.blocksPerTile(scale));
+        save(craft, offset);
+        level.playSound(null, pos, SoundEvents.ITEM_FRAME_ROTATE_ITEM, SoundSource.BLOCKS, 0.35F, 1.4F);
+    }
+
+    private static void save(ServerSubLevel craft, int[] offset) {
         CompoundTag data = craft.getUserDataTag() == null ? new CompoundTag() : craft.getUserDataTag();
         data.putIntArray(OFFSET_KEY, offset);
         craft.setUserDataTag(data);
         SENT.remove(craft.getUniqueId());
-        level.playSound(null, pos, SoundEvents.ITEM_FRAME_ROTATE_ITEM, SoundSource.BLOCKS, 0.75F, 1.2F);
     }
 
     public static void onServerTick(ServerTickEvent.Post event) {

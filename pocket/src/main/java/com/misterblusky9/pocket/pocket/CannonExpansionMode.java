@@ -6,22 +6,22 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
 public enum CannonExpansionMode {
-    NONE("None"),
+    NONE("pocket.cannon_expansion.none"),
 
-    IMMEDIATE("Immediate"),
+    IMMEDIATE("pocket.cannon_expansion.immediate"),
 
-    IMPACT("Impact");
+    IMPACT("pocket.cannon_expansion.impact");
 
     private static final String KEY = "PocketCannonExpand";
 
-    private final String label;
+    private final String translationKey;
 
-    CannonExpansionMode(String label) {
-        this.label = label;
+    CannonExpansionMode(String translationKey) {
+        this.translationKey = translationKey;
     }
 
-    public String label() {
-        return this.label;
+    public String translationKey() {
+        return this.translationKey;
     }
 
     public CannonExpansionMode next() {

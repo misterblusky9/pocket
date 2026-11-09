@@ -3,6 +3,7 @@ package com.misterblusky9.pocket.client;
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.item.ModItems;
+import com.misterblusky9.pocket.network.PocketKnifeAssemblePayload;
 import com.misterblusky9.pocket.network.PocketKnifeCutPayload;
 import com.misterblusky9.pym.api.Pym;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -24,6 +25,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
@@ -72,6 +74,7 @@ public final class PocketKnifeCutPreview {
     private static BlockPos anchor;
     private static InteractionHand hand;
     private static boolean locked;
+    private static boolean world;
     private static boolean clickHeld;
     private static final int[] offsets = new int[6];
     private static final double FRAME_HALF_WIDTH = 1.0D / 32.0D;
@@ -115,6 +118,7 @@ public final class PocketKnifeCutPreview {
             if (!locked) {
                 if (updateEnd(minecraft)) {
                     locked = true;
+                    world = sublevel == null;
                     SimSoundEvents.HONEY_ADDED.playAt(player.level(), end, 0.5F, 0.95F, false);
                     player.level().playSound(player, end, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, 0.75F, 1.0F);
                     player.swing(hand);
@@ -136,10 +140,12 @@ public final class PocketKnifeCutPreview {
         if (!(minecraft.hitResult instanceof BlockHitResult hit)) return;
         SubLevel target = hit.getType() == HitResult.Type.BLOCK
                 ? Sable.HELPER.getContaining(minecraft.level, hit.getBlockPos()) : null;
-        if (target == null && !(AllKeys.altDown() && hit.getType() == HitResult.Type.MISS)) return;
-        if (target != null && (target.isRemoved() || !Pym.scale().isSettled(target)
-                || CrossScaleWelds.weldNear(minecraft.level, hit.getLocation()) != null)) return;
+        boolean block = hit.getType() == HitResult.Type.BLOCK;
+        if (!block && !AllKeys.altDown()) return;
+        if (block && CrossScaleWelds.weldNear(minecraft.level, hit.getLocation()) != null) return;
+        if (target != null && (target.isRemoved() || !Pym.scale().isSettled(target))) return;
         clear();
+        world = block && target == null;
         selected = hit.getBlockPos().immutable();
         end = selected;
         anchor = target == null ? null : selected;
@@ -155,10 +161,11 @@ public final class PocketKnifeCutPreview {
     }
 
     private static void cut(LocalPlayer player, InteractionHand used, AABB box) {
-        if (sublevel == null || anchor == null || hand != used) return;
+        if (hand != used || (!world && (sublevel == null || anchor == null))) return;
         BlockPos min = BlockPos.containing(box.minX, box.minY, box.minZ);
         BlockPos max = BlockPos.containing(box.maxX - 1, box.maxY - 1, box.maxZ - 1);
-        PacketDistributor.sendToServer(new PocketKnifeCutPayload(sublevel, anchor, hand, min, max));
+        if (world) PacketDistributor.sendToServer(new PocketKnifeAssemblePayload(hand, min, max));
+        else PacketDistributor.sendToServer(new PocketKnifeCutPayload(sublevel, anchor, hand, min, max));
         player.swing(hand);
         clear();
     }
@@ -175,9 +182,9 @@ public final class PocketKnifeCutPreview {
         Direction face = hoveredFace(box, minecraft.player);
         if (face == null) return;
         int delta = (int) event.getScrollDeltaY();
-        if (delta == 0) return;
+        if (delta == 0 || (!world && anchor == null)) return;
         Vec3 eye = minecraft.player.getEyePosition();
-        SubLevel owner = Sable.HELPER.getContaining(minecraft.level, anchor);
+        SubLevel owner = anchor == null ? null : Sable.HELPER.getContaining(minecraft.level, anchor);
         if (owner != null) eye = owner.logicalPose().transformPositionInverse(eye);
         if (box.contains(eye)) delta = -delta;
         int slot = face.get3DDataValue();
@@ -188,18 +195,20 @@ public final class PocketKnifeCutPreview {
 
     private static boolean slices(AABB box, LocalPlayer player) {
         SubLevel source = anchor == null ? null : Sable.HELPER.getContaining(player.level(), anchor);
-        if (source == null) return false;
+        if (source == null && !world) return false;
         Vec3 eye = player.getEyePosition();
-        Vector3d local = source.logicalPose().transformPositionInverse(new Vector3d(eye.x, eye.y, eye.z));
+        Vector3d local = new Vector3d(eye.x, eye.y, eye.z);
+        if (source != null) source.logicalPose().transformPositionInverse(local);
         Vector3d nearest = new Vector3d(
                 Mth.clamp(local.x, box.minX, box.maxX),
                 Mth.clamp(local.y, box.minY, box.maxY),
                 Mth.clamp(local.z, box.minZ, box.maxZ));
-        source.logicalPose().transformPosition(nearest);
+        if (source != null) source.logicalPose().transformPosition(nearest);
         double reach = player.blockInteractionRange() + 1.0D;
         if (eye.distanceToSqr(nearest.x, nearest.y, nearest.z) > reach * reach) return false;
         Vec3 target = eye.add(player.getLookAngle().scale(player.blockInteractionRange() * 5.0D));
-        Vector3d localTarget = source.logicalPose().transformPositionInverse(new Vector3d(target.x, target.y, target.z));
+        Vector3d localTarget = new Vector3d(target.x, target.y, target.z);
+        if (source != null) source.logicalPose().transformPositionInverse(localTarget);
         Vec3 from = new Vec3(local.x, local.y, local.z);
         Vec3 to = new Vec3(localTarget.x, localTarget.y, localTarget.z);
         AABB forgiving = box.inflate(0.125D);
@@ -250,7 +259,7 @@ public final class PocketKnifeCutPreview {
             if (!AllKeys.altDown()) return false;
             if (sublevel == null) {
                 end = hit.getBlockPos().immutable();
-                return false;
+                return true;
             }
             SubLevel source = Sable.HELPER.getContaining(minecraft.level, anchor);
             if (source == null) return false;
@@ -260,7 +269,11 @@ public final class PocketKnifeCutPreview {
             return true;
         }
         SubLevel target = Sable.HELPER.getContaining(minecraft.level, hit.getBlockPos());
-        if (target == null || target.isRemoved() || !Pym.scale().isSettled(target)) return false;
+        if (target == null && sublevel == null) {
+            end = hit.getBlockPos().immutable();
+            return true;
+        }
+        if (world || target == null || target.isRemoved() || !Pym.scale().isSettled(target)) return false;
         if (sublevel == null) {
             Vector3d local = new Vector3d(selected.getX() + 0.5D, selected.getY() + 0.5D, selected.getZ() + 0.5D);
             target.logicalPose().transformPositionInverse(local);
@@ -312,10 +325,10 @@ public final class PocketKnifeCutPreview {
         showFrame(box, anchor == null ? selected : anchor, locked,
                 invalid || player.isShiftKeyDown());
         tint = player.isShiftKeyDown() || invalid ? SimColors.DISCARDABLE_ORANGE : CUT_COPPER;
-        if (invalid) CreateLang.text("Cannot cut while resizing").color(TEXT_GREY).sendStatus(player);
+        if (invalid) CreateLang.builder().add(Component.translatable("pocket.cut.resizing")).color(TEXT_GREY).sendStatus(player);
         else if (player.isShiftKeyDown()) CreateLang.translate("super_glue.click_to_discard").color(TEXT_GREY).sendStatus(player);
-        else if (!locked) CreateLang.text("Click to confirm selection").color(TEXT_GREY).sendStatus(player);
-        else CreateLang.text("Click to confirm slice").color(TEXT_GREY).sendStatus(player);
+        else if (!locked || world) CreateLang.builder().add(Component.translatable("pocket.cut.confirm_selection")).color(TEXT_GREY).sendStatus(player);
+        else CreateLang.builder().add(Component.translatable("pocket.cut.confirm_slice")).color(TEXT_GREY).sendStatus(player);
     }
 
     private static void showFrame(AABB box, BlockPos reference, boolean locked, boolean invalid) {
@@ -334,7 +347,7 @@ public final class PocketKnifeCutPreview {
         Vec3 camera = event.getCamera().getPosition();
         PoseStack poses = event.getPoseStack();
         MultiBufferSource.BufferSource buffers = minecraft.renderBuffers().bufferSource();
-        AABB box = selected == null || sublevel == null || anchor == null ? null : bounds();
+        AABB box = selected == null || (!world && (sublevel == null || anchor == null)) ? null : bounds();
         if (box != null) refresh(minecraft.level, box);
 
         if (frame == null) {
@@ -369,10 +382,13 @@ public final class PocketKnifeCutPreview {
         }
 
         if (box == null) return;
-        if (!(Sable.HELPER.getContaining(minecraft.level, anchor) instanceof ClientSubLevel owner)
-                || owner.isRemoved()) return;
-        Pose3dc pose = owner.renderPose(partial);
-        double lift = Math.max(0.002D, 0.004D / Math.max(1.0E-6D, Math.abs(pose.scale().x())));
+        Pose3dc pose = null;
+        if (!world) {
+            if (!(Sable.HELPER.getContaining(minecraft.level, anchor) instanceof ClientSubLevel owner)
+                    || owner.isRemoved()) return;
+            pose = owner.renderPose(partial);
+        }
+        double lift = pose == null ? 0.004D : Math.max(0.002D, 0.004D / Math.max(1.0E-6D, Math.abs(pose.scale().x())));
         Color color = new Color(tint, false);
 
         VertexConsumer glue = buffers.getBuffer(GLUE);
@@ -467,7 +483,7 @@ public final class PocketKnifeCutPreview {
         int u = (axis + 1) % 3;
         int v = (axis + 2) % 3;
         Vector3d normal = new Vector3d(direction.getStepX(), direction.getStepY(), direction.getStepZ());
-        pose.transformNormal(normal).normalize();
+        if (pose != null) pose.transformNormal(normal).normalize();
         double[][] corners = {{lo[u], lo[v]}, {lo[u], hi[v]}, {hi[u], hi[v]}, {hi[u], lo[v]}};
         for (double[] corner : corners) {
             double[] point = new double[3];
@@ -475,7 +491,7 @@ public final class PocketKnifeCutPreview {
             point[u] = corner[0];
             point[v] = corner[1];
             Vector3d world = new Vector3d(point[0], point[1], point[2]);
-            pose.transformPosition(world);
+            if (pose != null) pose.transformPosition(world);
             world.sub(camera.x, camera.y, camera.z);
             PoseStack.Pose last = poses.last();
             Vector3f n = new Vector3f((float) normal.x, (float) normal.y, (float) normal.z)
@@ -560,6 +576,7 @@ public final class PocketKnifeCutPreview {
         sublevel = null;
         hand = null;
         locked = false;
+        world = false;
         frame = null;
         shown = null;
         scanned = null;

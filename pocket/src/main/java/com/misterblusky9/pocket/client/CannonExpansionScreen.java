@@ -71,7 +71,7 @@ public class CannonExpansionScreen extends AbstractSimiScreen {
                 button.green = true;
                 this.selected = mode;
             });
-            button.setToolTip(Component.literal(mode.label()));
+            button.setToolTip(Component.translatable(mode.translationKey()));
             this.modeButtons.add(button);
         }
 

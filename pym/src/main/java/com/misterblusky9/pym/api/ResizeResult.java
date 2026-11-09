@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.api;
 
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 public record ResizeResult(Status status, double scale, @Nullable String message) {
@@ -31,7 +32,13 @@ public record ResizeResult(Status status, double scale, @Nullable String message
         return new ResizeResult(status, Double.NaN, message);
     }
 
+    public Component describeComponent() {
+        return this.message == null
+                ? Component.literal(this.status.name())
+                : Component.literal(this.status.name() + ": ").append(RefusalText.component(this.message));
+    }
+
     public String describe() {
-        return this.message == null ? this.status.name() : this.status.name() + ": " + this.message;
+        return describeComponent().getString();
     }
 }

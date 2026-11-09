@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.block.HatStandBlockEntity;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
@@ -23,6 +24,26 @@ public final class ModDataComponents {
             COMPONENTS.registerComponentType("model_quarter_turns", builder -> builder
                     .persistent(Codec.intRange(0, 3))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SKIN_LAYER =
+            COMPONENTS.registerComponentType("skin_layer", builder -> builder
+                    .persistent(Codec.intRange(0, 2))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<HatStandBlockEntity.NameEgg>> NAME_EGG =
+            COMPONENTS.registerComponentType("name_egg", builder -> builder
+                    .persistent(HatStandBlockEntity.NameEgg.CODEC)
+                    .networkSynchronized(HatStandBlockEntity.NameEgg.STREAM_CODEC));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> HEADWEAR_LAYER =
+            COMPONENTS.registerComponentType("headwear_layer", builder -> builder
+                    .persistent(Codec.intRange(0, 2))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> FIRST_PERSON_RENDERED =
+            COMPONENTS.registerComponentType("first_person_rendered", builder -> builder
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL));
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CaseSeal>> SEAL =
             COMPONENTS.registerComponentType("seal", builder -> builder

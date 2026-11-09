@@ -2,7 +2,6 @@ package com.misterblusky9.pocket.compression;
 
 import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.block.PortableSubspaceCompressorBlockEntity;
-import com.misterblusky9.pocket.block.StaticSubspaceCompressorBlockEntity;
 import com.misterblusky9.pocket.network.PersonalLockPayload;
 import com.misterblusky9.pocket.scale.ResizeActor;
 import com.misterblusky9.pym.api.ScaleDriver;
@@ -71,7 +70,7 @@ public final class PersonalLock {
     public static boolean blocksResize(ScaleDriver driver, Player target) {
         Player actor = ResizeActor.current();
         if (actor != null) return blocks(actor, target);
-        boolean compressor = driver instanceof StaticSubspaceCompressorBlockEntity
+        boolean compressor = driver instanceof com.misterblusky9.pocket.scale.MachineScaleSource
                 || driver instanceof PortableSubspaceCompressorBlockEntity;
         return compressor && target != null && protects(target);
     }

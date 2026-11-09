@@ -39,25 +39,15 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         this.levititeModel = pearlescent ? LEVITITE_PEARLESCENT : LEVITITE;
     }
 
-    private static final float MAX_SPIN_SPEED = 62.0F;
-
-    private static final float COAST_RATE = 0.045F;
-
     private static BakedModel cogSource;
     private static float cogPivotX;
     private static float cogPivotY;
-
-    private static final float GLOW_THRESHOLD = 0.55F;
-
-    private static final float IDLE_SPIN_SPEED = 1.0F;
 
     private static final float STATE_EXPIRY_TICKS = 200.0F;
 
     private static final int STATE_SOFT_LIMIT = 64;
 
-    private static final float FILL_EASE = 0.2F;
-
-    private static final java.util.Map<Object, Spin> SPINS = new java.util.HashMap<>();
+    private static final java.util.Map<Object, CompressionCogSpin> SPINS = new java.util.HashMap<>();
 
     private record LocalSlot(int slot) {}
 
@@ -81,7 +71,7 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         CompressionGunMuzzleTracker.capture(stack, transformType, ms, CompressionGunStateModel.muzzle(body));
         renderer.render(CompressionGunStateModel.get(body, panelState(holder), growing), light);
 
-        Spin state = advanceSpin(stack, holder, body);
+        CompressionCogSpin state = advanceSpin(stack, holder, body);
         if (state.fill > 0.001F) {
             BakedModel tank = levititeModel.get();
             float top = Mth.lerp(Math.min(1.0F, state.fill), tankMesh.min(tank), tankMesh.max(tank));
@@ -92,7 +82,7 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         ms.pushPose();
         spinCog(ms, state.angle);
 
-        renderer.render(cogModel.get(), glowingLight(light, state.speed));
+        renderer.render(cogModel.get(), state.glowingLight(light));
         ms.popPose();
 
         CompressionGunSweep.render(
@@ -134,34 +124,12 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         cogPivotY = quads.isEmpty() ? 0.0F : (minY + maxY) * 0.5F - 0.5F;
     }
 
-    private static int glowingLight(int light, float speed) {
-        float heat = heat(speed);
-        if (heat <= 0.0F) return light;
-
-        int block = net.minecraft.client.renderer.LightTexture.block(light);
-        int sky = net.minecraft.client.renderer.LightTexture.sky(light);
-        int lit = Math.round(Mth.lerp(heat, block, 15.0F));
-        return net.minecraft.client.renderer.LightTexture.pack(Math.max(block, lit), sky);
-    }
-
-    private static float heat(float speed) {
-        float fraction = Math.abs(speed) / MAX_SPIN_SPEED;
-        return Mth.clamp((fraction - GLOW_THRESHOLD) / (1.0F - GLOW_THRESHOLD), 0.0F, 1.0F);
-    }
-
-    private static Spin advanceSpin(ItemStack rendered, Holder holder, BakedModel body) {
+    private static CompressionCogSpin advanceSpin(ItemStack rendered, Holder holder, BakedModel body) {
         ItemStack stack = holder.live();
-        Spin state = stateFor(stack, holder);
+        CompressionCogSpin state = stateFor(stack, holder);
         float targetFill = CompressionGunTank.amount(stack) / (float) CompressionGunTank.capacity(stack);
-        float now = AnimationTickHolder.getRenderTime();
-        float delta = Float.isNaN(state.lastTime)
-                ? 0.0F
-                : Math.max(0.0F, Math.min(4.0F, now - state.lastTime));
-
-        state.lastTime = now;
-        state.fill = Float.isNaN(state.fill)
-                ? targetFill
-                : state.fill + (targetFill - state.fill) * Math.min(1.0F, FILL_EASE * delta);
+        float delta = state.frame(AnimationTickHolder.getRenderTime());
+        state.easeFill(targetFill, delta);
 
         Player holderPlayer = holder.player();
         boolean powered = CompressionGunTank.hasPower(holderPlayer, stack);
@@ -173,33 +141,17 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         state.source = CompressionGunSweep.advanceSource(state.source, spooling, ticksUsing, delta);
         state.sweep = CompressionGunSweep.advance(body, state.sweep, spooling, ticksUsing, delta);
 
-        if (delta <= 0.0F) return state;
-
-        float direction = com.misterblusky9.pocket.item.CompressionGunItem.isGrowing(stack)
-                ? 1.0F : -1.0F;
-
-        boolean kickOnly = !powered
-                && ticksUsing >= com.misterblusky9.pocket.item.CompressionGunItem.SPIN_KICK_TICKS;
-
-        if (isDriving(holder) && !kickOnly) {
-            float curve = MAX_SPIN_SPEED * com.misterblusky9.pocket.item.CompressionGunItem.spinFraction(ticksUsing);
-            float coasting = state.speed * direction > 0.0F ? Math.abs(state.speed) : 0.0F;
-            state.speed = direction * Math.max(curve, coasting);
-        } else {
-            float rest = CompressionGunTank.hasPower(holder.player(), holder.live()) ? IDLE_SPIN_SPEED * direction : 0.0F;
-            state.speed += (rest - state.speed) * COAST_RATE * delta;
-            if (Math.abs(state.speed - rest) < 0.05F) state.speed = rest;
-        }
-        state.angle = (state.angle + state.speed * delta) % 360.0F;
+        state.turn(delta, isDriving(holder), powered,
+                com.misterblusky9.pocket.item.CompressionGunItem.isGrowing(stack), ticksUsing);
         return state;
     }
 
-    private static Spin stateFor(ItemStack stack, Holder holder) {
+    private static CompressionCogSpin stateFor(ItemStack stack, Holder holder) {
         Object key = holder.slot() >= 0 ? new LocalSlot(holder.slot()) : stack;
-        Spin state = SPINS.get(key);
+        CompressionCogSpin state = SPINS.get(key);
         if (state == null) {
             if (SPINS.size() >= STATE_SOFT_LIMIT) prune();
-            state = new Spin();
+            state = new CompressionCogSpin();
             SPINS.put(key, state);
         }
         return state;
@@ -239,15 +191,6 @@ public final class CompressionGunRenderer extends CustomRenderedItemModelRendere
         float now = AnimationTickHolder.getRenderTime();
         SPINS.values().removeIf(state ->
                 !Float.isNaN(state.lastTime) && now - state.lastTime > STATE_EXPIRY_TICKS);
-    }
-
-    private static final class Spin {
-        private float angle;
-        private float speed;
-        private float lastTime = Float.NaN;
-        private float fill = Float.NaN;
-        private float source;
-        private float sweep;
     }
 
     private static CompressionGunStateModel.State panelState(Holder holder) {

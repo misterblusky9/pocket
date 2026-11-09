@@ -1,5 +1,7 @@
 package com.misterblusky9.pym.internal.interaction;
 
+import com.misterblusky9.pym.api.Hosted;
+import com.misterblusky9.pym.internal.PlacedSubLevels;
 import com.misterblusky9.pym.internal.scale.ScaleState;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.math.LevelReusedVectors;
@@ -36,6 +38,7 @@ public final class ScaledPlacementGate {
         Level level = context.getLevel();
         BlockPos clicked = context.getClickedPos();
         SubLevel containing = Sable.HELPER.getContaining(level, clicked);
+        if (containing != null && (Hosted.isHosted(containing) || PlacedSubLevels.isPlaced(containing))) return Boolean.TRUE;
 
         double selfScale = scaleOf(containing);
 

@@ -1,6 +1,9 @@
 package com.misterblusky9.pocket.pocket;
 
+import com.misterblusky9.pocket.build.BuildSites;
+import com.misterblusky9.pocket.build.CarriedBuilds;
 import com.misterblusky9.pocket.item.PocketCaseItem;
+import com.misterblusky9.pym.api.PlotSources;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -52,9 +55,10 @@ public final class PocketedSubLevelRecycling {
         UUID token = PocketCaseItem.token(carrier);
         if (token == null || !PocketCaseItem.isUnique(carrier))
             throw new IllegalStateException("Not a filled pocketed sublevel");
-        ResourceLocation dimension = ResourceLocation.tryParse(PocketCaseItem.sourceDimension(carrier));
-        if (dimension == null) throw new IllegalStateException("Invalid pocket source dimension");
-        ServerLevel source = current.getServer().getLevel(ResourceKey.create(Registries.DIMENSION, dimension));
+        CarriedBuilds.close(token);
+        ServerLevel source = BuildSites.storedIn(current, token);
+        if (source == null) source = PlotSources.resolve(current,
+                ResourceLocation.tryParse(PocketCaseItem.sourceDimension(carrier)));
         if (source == null) throw new IllegalStateException("Pocket source dimension is not loaded");
         PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(source);
         CompoundTag payload = storage.getCopy(token);

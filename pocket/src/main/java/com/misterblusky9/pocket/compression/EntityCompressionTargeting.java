@@ -70,18 +70,25 @@ public final class EntityCompressionTargeting {
     }
 
     private static @Nullable Target findUncached(Player player, double range, boolean decorations) {
-        Level level = player.level();
-        Vec3 start = player.getEyePosition(1.0F);
-        Vec3 look = player.getViewVector(1.0F);
+        return findAlong(player.level(), player.getEyePosition(1.0F), player.getViewVector(1.0F),
+                range, player, decorations);
+    }
+
+    public static @Nullable Target findAlong(
+            Level level, Vec3 start, Vec3 look, double range, @Nullable Entity exclude, boolean decorations
+    ) {
+        if (level == null || range <= 0.0D || !Pym.entities().available()) return null;
         Vec3 end = start.add(look.scale(range));
 
-        BlockHitResult blockHit = level.clip(new ClipContext(
-                start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+        BlockHitResult blockHit = level.clip(exclude == null
+                ? new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
+                        net.minecraft.world.phys.shapes.CollisionContext.empty())
+                : new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, exclude));
         Search search = new Search(blockHit == null || blockHit.getType() == HitResult.Type.MISS
                 ? range * range
                 : start.distanceToSqr(worldPoint(level, blockHit)));
 
-        Predicate<Entity> eligible = entity -> entity != player
+        Predicate<Entity> eligible = entity -> entity != exclude
                 && entity.isAlive()
                 && !entity.isSpectator()
                 && entity instanceof LivingEntity

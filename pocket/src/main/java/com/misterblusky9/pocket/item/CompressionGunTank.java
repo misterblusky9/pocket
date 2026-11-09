@@ -24,6 +24,8 @@ import net.neoforged.neoforge.fluids.SimpleFluidContent;
 import net.neoforged.neoforge.fluids.capability.templates.FluidHandlerItemStack;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.CustomData;
 
 public final class CompressionGunTank {
     public static final int CAPACITY = 3000;
@@ -69,6 +71,11 @@ public final class CompressionGunTank {
         return enchantment.is(AllEnchantments.CAPACITY);
     }
 
+    public static boolean isInfinite(ItemStack stack) {
+        CustomData data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+        return data.copyTag().getBoolean("pocket_infinite_fuel");
+    }
+
     public static Fluid levitite() {
         return BuiltInRegistries.FLUID.get(LEVITITE_BLEND);
     }
@@ -84,6 +91,8 @@ public final class CompressionGunTank {
     }
 
     public static int amount(ItemStack stack) {
+        if (isInfinite(stack)) return capacity(stack);
+
         FluidStack fluid = stack.getOrDefault(CONTENTS.get(), SimpleFluidContent.EMPTY).copy();
         return isLevitite(fluid) ? Math.min(fluid.getAmount(), capacity(stack)) : 0;
     }
@@ -99,6 +108,7 @@ public final class CompressionGunTank {
 
     public static int drain(ItemStack stack, int requested) {
         if (requested <= 0) return 0;
+        if (isInfinite(stack)) return requested;
         int held = amount(stack);
         int drained = Math.min(held, requested);
         if (drained <= 0) return 0;
@@ -157,6 +167,7 @@ public final class CompressionGunTank {
             ServerPlayer player, ItemStack stack, int levititeCost, int fullDurabilityCost
     ) {
         if (player.isCreative()) return true;
+        if (isInfinite(stack)) return true;
         LevititeUseCost.Charge charge = LevititeUseCost.plan(
                 amount(stack), levititeCost, fullDurabilityCost);
 

@@ -18,11 +18,17 @@ sourceSets {
         compileClasspath += sourceSets.main.output
         runtimeClasspath += sourceSets.main.output
     }
+    createtest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
 }
 
 configurations {
     gametestImplementation.extendsFrom implementation
     gametestCompileOnly.extendsFrom compileOnly
+    createtestImplementation.extendsFrom implementation
+    createtestCompileOnly.extendsFrom compileOnly
     aeronauticsBundle
 }
 
@@ -43,23 +49,35 @@ neoForge {
         minecraftVersion = project.parchment_minecraft_version
     }
 
+    mods {
+        "${pym_mod_id}" {
+            sourceSet(sourceSets.main)
+            sourceSet(sourceSets.gametest)
+        }
+        pym_create {
+            sourceSet(sourceSets.createtest)
+        }
+    }
+
     runs {
         gameTestServer {
             type = "gameTestServer"
             sourceSet = sourceSets.gametest
             gameDirectory = rootProject.file("runs/pym-gametest")
             systemProperty 'neoforge.enabledGameTestNamespaces', pym_mod_id
+            loadedMods = [mods.getByName(pym_mod_id)]
         }
-    }
-
-    mods {
-        "${pym_mod_id}" {
-            sourceSet(sourceSets.main)
-            sourceSet(sourceSets.gametest)
+        createGameTestServer {
+            type = "gameTestServer"
+            sourceSet = sourceSets.createtest
+            gameDirectory = rootProject.file("runs/pym-gametest-create")
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'pym_create'
+            loadedMods = [mods.getByName(pym_mod_id), mods.getByName('pym_create')]
         }
     }
 
     addModdingDependenciesTo sourceSets.gametest
+    addModdingDependenciesTo sourceSets.createtest
 }
 
 dependencies {
@@ -67,6 +85,11 @@ dependencies {
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-${minecraft_version}:${sable_companion_version}"
     compileOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
     gametestRuntimeOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    createtestRuntimeOnly "maven.modrinth:t5W7Jfwy:nKHizsl6"
+    createtestRuntimeOnly("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") { transitive = false }
+    createtestRuntimeOnly "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
+    createtestRuntimeOnly "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+    createtestRuntimeOnly "com.tterrag.registrate:Registrate:${registrate_version}"
     compileOnly "maven.modrinth:hNGBYvQN:hwxjOCxE"
 
     compileOnly(annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:0.3.3"))

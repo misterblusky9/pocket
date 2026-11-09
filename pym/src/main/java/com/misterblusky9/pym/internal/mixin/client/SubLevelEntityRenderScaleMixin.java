@@ -2,6 +2,7 @@ package com.misterblusky9.pym.internal.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.misterblusky9.pym.api.ScaleBounds;
+import com.misterblusky9.pym.internal.client.PortraitScope;
 import com.misterblusky9.pym.internal.entity.EntityScaleTracker;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -70,6 +71,7 @@ public abstract class SubLevelEntityRenderScaleMixin {
     @Unique
     private static double pym$containingScale(Entity entity, float partialTick) {
         if (!(entity instanceof ArmorStand || entity instanceof HangingEntity || entity instanceof Display)) return 1.0D;
+        if (PortraitScope.active()) return 1.0D;
         if (!(Sable.HELPER.getContaining(entity) instanceof ClientSubLevel subLevel) || subLevel.isRemoved()) {
             return 1.0D;
         }

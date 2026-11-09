@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.scale;
 
 import com.misterblusky9.pym.api.PlotContents;
+import com.misterblusky9.pym.api.RefusalText;
 import com.misterblusky9.pym.api.ResizeResult;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -11,8 +12,8 @@ public final class ResizeFeedback {
     public static String reason(ResizeResult result) {
         if (result.message() != null) return result.message();
         return switch (result.status()) {
-            case UNAVAILABLE -> "That sublevel is no longer there";
-            default -> "Resize refused: " + result.status();
+            case UNAVAILABLE -> "pocket.message.sublevel_gone";
+            default -> RefusalText.of("pocket.message.resize_refused", result.status());
         };
     }
 
@@ -20,14 +21,14 @@ public final class ResizeFeedback {
         if (result.accepted()) return true;
         if (player == null) return false;
         String reason = reason(result);
-        MutableComponent message = Component.translatableWithFallback(reason, reason);
+        MutableComponent message = RefusalText.component(reason);
         if (result.status() == ResizeResult.Status.OUT_OF_BOUNDS) message.withStyle(ChatFormatting.RED);
         player.displayClientMessage(message, true);
         return false;
     }
 
     public static String cannotShrink(PlotContents contents) {
-        return contents.hasNoShrinkBlock() ? "Cannot shrink: contains " + contents.noShrink() : null;
+        return contents.hasNoShrinkBlock() ? RefusalText.of("pym.refusal.cannot_shrink", contents.noShrink()) : null;
     }
 
     private ResizeFeedback() {}

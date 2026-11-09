@@ -19,6 +19,9 @@ config="pym.mixins.json"
 config="pym.create.mixins.json"
 
 [[mixins]]
+config="pym.create_connected.mixins.json"
+
+[[mixins]]
 config="pym.simulated.mixins.json"
 
 [[mixins]]

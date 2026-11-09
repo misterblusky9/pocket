@@ -38,11 +38,11 @@ public final class PlacementLimit {
         int limit = PlotScan.shrunkBlockLimit();
         if (added > 0 && (long) PlotScan.of(subLevel).blocks() + added > limit) {
             event.setCanceled(true);
-            if (player != null) player.displayClientMessage(Component.literal("A shrunk sublevel holds at most " + limit + " blocks"), true);
+            if (player != null) player.displayClientMessage(Component.translatable("pym.message.shrunk_limit", limit), true);
             return;
         }
         if (noShrink != null && player != null) {
-            player.displayClientMessage(Component.literal("A sublevel holding this block cannot be shrunk any further"), true);
+            player.displayClientMessage(Component.translatable("pym.message.no_shrink_block"), true);
         }
     }
 

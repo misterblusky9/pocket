@@ -8,7 +8,10 @@
     "ContraptionColliderScaleMixin",
     "ContinuousOBBColliderScaleMixin",
     "ContinuousOBBManifoldScaleMixin",
-    "ContraptionInteractionPacketScaleMixin"
+    "ContraptionInteractionPacketScaleMixin",
+    "SchematicPrinterPlotChunksMixin",
+    "HostedLinkRangeMixin",
+    "HostedLinkSlotMixin"
   ],
   "client": [
     "ContraptionVisualScaleMixin",

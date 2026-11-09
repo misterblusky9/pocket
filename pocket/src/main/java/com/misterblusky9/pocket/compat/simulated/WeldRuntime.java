@@ -1,7 +1,7 @@
 package com.misterblusky9.pocket.compat.simulated;
 
-import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.Hosted;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
 import dev.ryanhcode.sable.api.physics.constraint.ConstraintJointAxis;
 import dev.ryanhcode.sable.api.physics.constraint.FixedConstraintConfiguration;
@@ -30,15 +30,12 @@ import java.util.UUID;
 public final class WeldRuntime {
     private static final double SETTLE_TICKS = 10.0D;
     private static final double SETTLE_CURVE = 5.0D;
-    private static final int CONTACT_CHECK_INTERVAL = 5;
-    private static final int CONTACT_MISS_LIMIT = 2;
 
     private static final Map<ResourceKey<Level>, Map<UUID, PhysicsConstraintHandle>> LIVE =
             new HashMap<>();
     private static final Map<ResourceKey<Level>, Map<UUID, PhysicsConstraintHandle>> ASSIST = new HashMap<>();
 
     private static final Map<ResourceKey<Level>, Map<UUID, Settle>> SETTLING = new HashMap<>();
-    private static final Map<ResourceKey<Level>, Map<UUID, Integer>> EMPTY_CONTACT = new HashMap<>();
     private static final Map<ResourceKey<Level>, Map<BodyPair, PhysicsConstraintHandle>> NO_CONTACT = new HashMap<>();
     private static final Map<ResourceKey<Level>, Set<UUID>> NEW_WELDS = new HashMap<>();
 
@@ -51,8 +48,6 @@ public final class WeldRuntime {
                 ASSIST.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
         Map<UUID, Settle> settling =
                 SETTLING.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
-        Map<UUID, Integer> emptyContact =
-                EMPTY_CONTACT.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
         Map<BodyPair, PhysicsConstraintHandle> noContact =
                 NO_CONTACT.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
         Set<UUID> newWelds =
@@ -66,7 +61,6 @@ public final class WeldRuntime {
             }
             releaseAll(assist);
             settling.clear();
-            emptyContact.clear();
             newWelds.clear();
             releaseAll(noContact);
             return;
@@ -76,38 +70,36 @@ public final class WeldRuntime {
         boolean changed = false;
 
         for (WeldRecord record : store.all()) {
-            wanted.add(record.weldId());
-
             ServerSubLevel small = liveSubLevel(container, record.smallSubLevel());
             ServerSubLevel big = record.worldAnchored() ? null : liveSubLevel(container, record.bigSubLevel());
 
             if (small == null || !record.worldAnchored() && big == null) {
+                wanted.add(record.weldId());
                 release(live.remove(record.weldId()));
                 settling.remove(record.weldId());
-                emptyContact.remove(record.weldId());
                 newWelds.remove(record.weldId());
                 continue;
             }
 
-            boolean resizing = !Pym.scale().isSettled(small)
-                    || (big != null && !Pym.scale().isSettled(big));
-            if (resizing) {
-                emptyContact.remove(record.weldId());
-            } else if (contactCheck(level.getGameTime(), record.weldId())) {
-                if (WeldContact.hasContact(level, small, big, record)) {
-                    emptyContact.remove(record.weldId());
-                } else {
-                    int misses = emptyContact.merge(record.weldId(), 1, Integer::sum);
-                    if (misses >= CONTACT_MISS_LIMIT) {
-                        release(live.remove(record.weldId()));
-                        settling.remove(record.weldId());
-                        emptyContact.remove(record.weldId());
-                        newWelds.remove(record.weldId());
-                        store.remove(record.weldId());
-                        changed = true;
-                        continue;
+            if (glueLost(level, record)) {
+                store.remove(record.weldId());
+                changed = true;
+                continue;
+            }
+            wanted.add(record.weldId());
+
+            if (hostedPair(small, big)) {
+                PhysicsConstraintHandle fixed = live.get(record.weldId());
+                if (fixed == null || !fixed.isValid()) {
+                    release(live.remove(record.weldId()));
+                    if (createHosted(live, container, record, small, big)) {
+                        Hosted.jointAttached(small);
+                        Hosted.jointAttached(big);
+                        if (newWelds.remove(record.weldId())) finishEffect(level, record);
                     }
                 }
+                settling.remove(record.weldId());
+                continue;
             }
 
             Settle settle = settling.get(record.weldId());
@@ -136,14 +128,8 @@ public final class WeldRuntime {
                     .normalize();
 
             if (!create(live, container, record, small, big, anchor, orientation)) {
-                PocketTrace.logger().warn(
-                        "[Pocket] dropping cross-scale weld {}, the physics anchor left its plot",
-                        record.weldId());
-                store.remove(record.weldId());
                 settling.remove(record.weldId());
-                emptyContact.remove(record.weldId());
-                newWelds.remove(record.weldId());
-                changed = true;
+                continue;
             } else if (progress >= 1.0D && newWelds.remove(record.weldId())) {
                 finishEffect(level, record);
             }
@@ -157,11 +143,16 @@ public final class WeldRuntime {
             iterator.remove();
         }
         settling.keySet().retainAll(wanted);
-        emptyContact.keySet().retainAll(wanted);
         newWelds.retainAll(wanted);
         syncComponentContacts(container, noContact);
         syncAssist(container, store, live, assist, settling, level.getGameTime());
         if (changed) CrossScaleWeldSync.broadcast(level);
+    }
+
+    public static boolean glueLost(ServerLevel level, WeldRecord record) {
+        return level.getBlockState(record.smallPos()).isAir()
+                || (!record.worldAnchored() || level.isLoaded(record.bigPos()))
+                && level.getBlockState(record.bigPos()).isAir();
     }
 
     public static void markNew(ServerLevel level, UUID weldId) {
@@ -237,6 +228,12 @@ public final class WeldRuntime {
         }
     }
 
+    private static boolean hostedPair(ServerSubLevel first, ServerSubLevel second) {
+        if (first == null || second == null) return false;
+        ServerSubLevel owner = Hosted.rootOf(first);
+        return owner != null && owner == Hosted.rootOf(second);
+    }
+
     private static Vector3d plotAnchor(ServerSubLevel subLevel) {
         BlockPos center = subLevel.getPlot().getCenterBlock();
         return new Vector3d(
@@ -245,7 +242,7 @@ public final class WeldRuntime {
                 center.getZ() + 0.5D);
     }
 
-    private static void finishEffect(ServerLevel level, WeldRecord record) {
+    public static void finishEffect(ServerLevel level, WeldRecord record) {
         finishEffect(level, record.smallPos(), record.smallFacing());
         finishEffect(level, record.bigPos(), record.bigFacing());
     }
@@ -271,10 +268,6 @@ public final class WeldRuntime {
         handles.clear();
     }
 
-    private static boolean contactCheck(long gameTime, UUID weldId) {
-        return Math.floorMod(gameTime + weldId.hashCode(), CONTACT_CHECK_INTERVAL) == 0;
-    }
-
     private static Vector3d startAnchor(
             WeldRecord record,
             ServerSubLevel small,
@@ -293,6 +286,20 @@ public final class WeldRuntime {
         Quaterniond orientation = new Quaterniond(small.logicalPose().orientation()).invert();
         if (big != null) orientation.mul(big.logicalPose().orientation());
         return orientation.normalize();
+    }
+
+    private static boolean createHosted(
+            Map<UUID, PhysicsConstraintHandle> live,
+            ServerSubLevelContainer container,
+            WeldRecord record,
+            ServerSubLevel small,
+            ServerSubLevel big
+    ) {
+        Vector3d inBig = small.logicalPose().transformPosition(record.anchorFor(true));
+        big.logicalPose().transformPositionInverse(inBig);
+        if (!finite(inBig)) return false;
+        return create(live, container, record, small, big, inBig,
+                CrossScaleWelds.relativeOrientation(small, big));
     }
 
     private static boolean create(
@@ -332,12 +339,13 @@ public final class WeldRuntime {
         Set<UUID> wanted = new HashSet<>();
         for (WeldRecord record : store.all()) {
             if (record.worldAnchored()) continue;
+            ServerSubLevel small = liveSubLevel(container, record.smallSubLevel());
+            ServerSubLevel big = liveSubLevel(container, record.bigSubLevel());
+            if (hostedPair(small, big)) continue;
             PhysicsConstraintHandle fixed = live.get(record.weldId());
             Settle state = settling.get(record.weldId());
             if (fixed == null || !fixed.isValid() || state == null || tick - state.startTick() <= SETTLE_TICKS) continue;
 
-            ServerSubLevel small = liveSubLevel(container, record.smallSubLevel());
-            ServerSubLevel big = liveSubLevel(container, record.bigSubLevel());
             if (small == null || big == null) continue;
             wanted.add(record.weldId());
 
@@ -398,7 +406,6 @@ public final class WeldRuntime {
         Map<UUID, PhysicsConstraintHandle> assist = ASSIST.remove(level.dimension());
         if (assist != null) releaseAll(assist);
         SETTLING.remove(level.dimension());
-        EMPTY_CONTACT.remove(level.dimension());
         NEW_WELDS.remove(level.dimension());
         Map<BodyPair, PhysicsConstraintHandle> noContact = NO_CONTACT.remove(level.dimension());
         if (noContact != null) releaseAll(noContact);
@@ -407,7 +414,6 @@ public final class WeldRuntime {
     public static void drop(UUID weldId) {
         if (weldId == null) return;
         for (Map<UUID, Settle> settling : SETTLING.values()) settling.remove(weldId);
-        for (Map<UUID, Integer> emptyContact : EMPTY_CONTACT.values()) emptyContact.remove(weldId);
         for (Set<UUID> newWelds : NEW_WELDS.values()) newWelds.remove(weldId);
         for (Map<UUID, PhysicsConstraintHandle> live : LIVE.values()) {
             PhysicsConstraintHandle handle = live.remove(weldId);

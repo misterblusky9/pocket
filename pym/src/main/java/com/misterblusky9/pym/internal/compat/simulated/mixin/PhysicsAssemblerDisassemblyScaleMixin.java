@@ -1,7 +1,12 @@
 package com.misterblusky9.pym.internal.compat.simulated.mixin;
 
+import com.misterblusky9.pym.api.Detached;
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.internal.compat.simulated.DisassemblyScaleAlignment;
+import com.simibubi.create.content.contraptions.AssemblyException;
 import dev.ryanhcode.sable.api.physics.constraint.FreeConstraintHandle;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -25,6 +30,11 @@ public abstract class PhysicsAssemblerDisassemblyScaleMixin {
     @Unique private UUID pym$expanding;
     @Unique private int pym$expansionTicks;
     @Unique private boolean pym$slack;
+
+    @Inject(method = "throwDisassemblyExceptions", at = @At("HEAD"), remap = false)
+    private void pym$refuseDetached(ServerSubLevel subLevel, CallbackInfo ci) throws AssemblyException {
+        if (Detached.isDetached(subLevel) || Hosted.isHosted(subLevel)) throw new AssemblyException(Component.translatable("pym.assembly.detached"));
+    }
 
     @Inject(method = "assembleOrDisassemble", at = @At("RETURN"), remap = false)
     private void pym$expandBeforeDisassembly(CallbackInfo ci) {

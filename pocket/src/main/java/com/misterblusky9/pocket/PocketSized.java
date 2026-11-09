@@ -4,6 +4,7 @@ import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.compat.photomancy.PhotomancyCompat;
 import com.misterblusky9.pocket.block.ModBlockEntities;
 import com.misterblusky9.pocket.block.ModBlocks;
+import com.misterblusky9.pocket.block.HatStandBlockEntity;
 import com.misterblusky9.pocket.block.SubspaceRecyclerBlockEntity;
 import com.misterblusky9.pocket.create.PocketContraptionTypes;
 import com.misterblusky9.pocket.create.PocketCreateIntegration;
@@ -38,13 +39,18 @@ public final class PocketSized {
         modBus.addListener(PocketContraptionTypes::register);
 
         PocketPymIntegration.register();
+        com.misterblusky9.pym.api.Hosted.wearables(com.misterblusky9.pocket.build.CarriedBuilds::worn,
+                com.misterblusky9.pocket.build.CarriedBuilds::replaced,
+                com.misterblusky9.pocket.build.CarriedBuilds::openRiders);
         if (ModList.get().isLoaded("sable_schematic_api")) PhotomancyCompat.register();
+        if (ModList.get().isLoaded("curios")) com.misterblusky9.pocket.compat.curios.CuriosHats.register();
 
         ScaledRespawn.registerRespawnTicket();
 
         ModBlocks.BLOCKS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
         modBus.addListener(SubspaceRecyclerBlockEntity::registerCapabilities);
+        modBus.addListener(HatStandBlockEntity::registerCapabilities);
         ModItems.ITEMS.register(modBus);
         com.misterblusky9.pocket.item.ModDataComponents.COMPONENTS.register(modBus);
         com.misterblusky9.pocket.item.CompressionGunTank.COMPONENTS.register(modBus);
@@ -64,6 +70,17 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onEntityInteract);
         NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onEntityInteractSpecific);
         NeoForge.EVENT_BUS.addListener(PocketedSubLevelEvents::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onRightClickItem);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onAnvilUpdate);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onAnvilTake);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onLevelSave);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onServerStopping);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onPlayerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onLevelSave);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onServerStopping);
         NeoForge.EVENT_BUS.addListener(CannonDeploymentQueue::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.FacadeAlignment::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.FacadeAlignment::onServerStopped);

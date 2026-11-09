@@ -2,6 +2,7 @@ package com.misterblusky9.pym.internal.scale;
 
 import com.misterblusky9.pym.api.PlotContents;
 import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.RefusalText;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
@@ -64,9 +65,9 @@ public final class PlotScan {
     static String refuseShrink(ServerSubLevel subLevel, double from, double to) {
         if (to >= 1.0D || to >= from) return null;
         PlotContents contents = of(subLevel);
-        if (contents.hasNoShrinkBlock()) return "Cannot shrink: contains " + contents.noShrink();
+        if (contents.hasNoShrinkBlock()) return RefusalText.of("pym.refusal.cannot_shrink", contents.noShrink());
         if (contents.blocks() > shrunkBlockLimit) {
-            return "Too many blocks to shrink: " + contents.blocks() + " (limit " + shrunkBlockLimit + ")";
+            return RefusalText.of("pym.refusal.too_many_blocks", contents.blocks(), shrunkBlockLimit);
         }
         return null;
     }

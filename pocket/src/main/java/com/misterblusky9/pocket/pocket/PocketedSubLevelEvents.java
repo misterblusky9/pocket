@@ -6,6 +6,11 @@ import com.misterblusky9.pym.api.ScaleBounds;
 
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.config.DeviceRanges;
+import com.misterblusky9.pocket.block.ModBlocks;
+import com.misterblusky9.pocket.build.BuildHostBlockEntity;
+import com.misterblusky9.pocket.build.BuildSites;
+import com.misterblusky9.pym.api.Detached;
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.debug.PocketTrace;
@@ -49,29 +54,45 @@ public final class PocketedSubLevelEvents {
         ItemStack held = event.getItemStack();
         if (!PocketCaseItem.isContainer(held)) return;
 
-        if (!fitsPocket(player, settled)) return;
+        ServerSubLevel root = Hosted.rootOf(found);
+        BuildHostBlockEntity host = found instanceof ServerSubLevel server
+                ? BuildSites.hostOf(root != null ? root : server) : null;
+        boolean build = host != null
+                || event.getLevel().getBlockState(found.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
+        if (!fitsPocket(player, build ? PocketCaseItem.POCKETABLE_SCALE : settled)) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
 
         if (!(event.getLevel() instanceof ServerLevel serverLevel)
-                || !(found instanceof ServerSubLevel subLevel)) return;
+                || !(found instanceof ServerSubLevel target)) return;
 
-        ServerSubLevelContainer container = SubLevelContainer.getContainer(serverLevel);
-        if (container != null && CrossScaleWelds.isWelded(container, subLevel)) {
-            player.displayClientMessage(Component.literal(CrossScaleWelds.POCKET_BLOCKED), true);
+        if (host == null && (Detached.isOpen(target) || Hosted.isHosted(target))) {
+            player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_mounted"), true);
             return;
         }
+        ServerSubLevel subLevel = host == null ? ready(serverLevel, player, target) ? target : null
+                : host.release(player, candidate -> ready(serverLevel, player, candidate));
+        if (subLevel == null) return;
+        pocket(serverLevel, player, subLevel, held);
+    }
 
-        PocketedEntities.disassembleContraptions(serverLevel, subLevel);
+    private static boolean ready(ServerLevel level, Player player, ServerSubLevel subLevel) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container != null && CrossScaleWelds.isWelded(container, subLevel)) {
+            player.displayClientMessage(Component.translatable(CrossScaleWelds.POCKET_BLOCKED), true);
+            return false;
+        }
+
+        PocketedEntities.disassembleContraptions(level, subLevel);
 
         int blocks = Pym.resize().contents(subLevel).blocks();
         int limit = Pym.resize().shrunkBlockLimit();
         if (blocks > limit) {
             player.displayClientMessage(Component.translatable("pocket.message.hard_limit_ratio", blocks, limit), true);
-            return;
+            return false;
         }
-        pocket(serverLevel, player, subLevel, held);
+        return true;
     }
 
     private static boolean creativePocketsAnything(Player player) {
@@ -101,13 +122,12 @@ public final class PocketedSubLevelEvents {
         if (container == null) return;
 
         if (CrossScaleWelds.isWelded(container, subLevel)) {
-            player.displayClientMessage(Component.literal(CrossScaleWelds.POCKET_BLOCKED), true);
+            player.displayClientMessage(Component.translatable(CrossScaleWelds.POCKET_BLOCKED), true);
             return;
         }
 
         if (Pym.connections().isJoinedToAnother(subLevel)) {
-            player.displayClientMessage(Component.literal(
-                    "Cannot pocket a sublevel while it is joined to another sublevel."), true);
+            player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_joined"), true);
             return;
         }
 
@@ -184,9 +204,9 @@ public final class PocketedSubLevelEvents {
             } else if (!resultGiven) {
                 giveResult(player, result);
             }
-            player.displayClientMessage(Component.literal(
-                    "Pocket capture interrupted: " + exception.getClass().getSimpleName()
-                            + (removedFromWorld ? " (payload preserved in case)" : "")
+            player.displayClientMessage(Component.translatable(
+                    removedFromWorld ? "pocket.message.capture_interrupted.preserved" : "pocket.message.capture_interrupted",
+                    exception.getClass().getSimpleName()
             ), true);
             PocketTrace.logger().error(
                     "[PocketTransfer] capture failed token={} source={} plot=({}, {}) removedFromWorld={} "

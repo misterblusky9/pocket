@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.scale;
 
+import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.api.ScaleBounds;
 import dev.ryanhcode.sable.api.sublevel.ClientSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
@@ -70,12 +71,14 @@ public final class ScaleState {
 
     public static double getScale(SubLevel subLevel) {
         if (subLevel == null || subLevel.getUniqueId() == null) return 1.0D;
+        if (Detached.isDetached(subLevel)) return subLevel.logicalPose().scale().x();
         if (subLevel instanceof ClientSubLevel client) return getClientScale(client);
         if (subLevel instanceof ServerSubLevel server) return getServerScale(server);
         return subLevel.logicalPose().scale().x();
     }
 
     public static double getSettledScale(SubLevel subLevel) {
+        if (Detached.isDetached(subLevel)) return subLevel.logicalPose().scale().x();
         if (subLevel instanceof ServerSubLevel server) {
             ScaleRecord record = recordOf(server.getUniqueId());
             return record == null ? getServerScale(server) : record.settled();
@@ -94,6 +97,7 @@ public final class ScaleState {
 
     public static double getServerScale(ServerSubLevel subLevel) {
         if (subLevel == null) return 1.0D;
+        if (Detached.isDetached(subLevel)) return subLevel.logicalPose().scale().x();
         ScaleRecord record = recordOf(subLevel.getUniqueId());
         return record == null ? subLevel.logicalPose().scale().x() : record.current();
     }

@@ -8,6 +8,7 @@ import com.simibubi.create.content.logistics.box.PackageEntity;
 import dev.simulated_team.simulated.util.SimColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.EntityHitResult;
@@ -50,7 +51,7 @@ public record CaseSealAim(PackageEntity pocketed, @Nullable CaseSeal seal, boole
     }
 
     public String label() {
-        if (this.seal == null) return "Unsealed";
-        return this.canCut ? "Sealed" : "Sealed by: " + this.seal.ownerName();
+        if (this.seal == null) return I18n.get("pocket.hud.unsealed");
+        return this.canCut ? I18n.get("pocket.hud.sealed") : I18n.get("pocket.tooltip.sealed_by", this.seal.ownerName());
     }
 }

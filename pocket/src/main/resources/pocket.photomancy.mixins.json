@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pocket.compat.photomancy.mixin",
+  "plugin": "com.misterblusky9.pocket.compat.photomancy.PhotomancyMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlueprintExporterHatMixin",
+    "CameraCaptureHatMixin",
+    "BlueprintToolLookedHatMixin",
+    "SubLevelDirectoryHatMixin"
+  ],
+  "client": [
+    "CameraViewfinderHatMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -5,6 +5,8 @@ import com.misterblusky9.pocket.block.ModBlocks;
 import com.simibubi.create.content.equipment.armor.AllArmorMaterials;
 import com.simibubi.create.content.equipment.armor.BacktankItem;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.ArmorMaterials;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.SwordItem;
@@ -150,6 +152,21 @@ public final class ModItems {
                     ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "subspace_harness"),
                     SUBSPACE_HARNESS_PLACEABLE)
     );
+
+    public static final DeferredItem<HatStandItem> HAT_STAND = ITEMS.register(
+            "hat_stand", () -> new HatStandItem(ModBlocks.HAT_STAND.get(), new Item.Properties()));
+
+    public static final DeferredItem<HatStandItem> TALL_HAT_STAND = ITEMS.register(
+            "tall_hat_stand", () -> new HatStandItem(ModBlocks.TALL_HAT_STAND.get(), new Item.Properties()));
+
+    public static final DeferredItem<ArmorItem> SKULL_CAP = ITEMS.register(
+            "skull_cap", () -> new ArmorItem(ArmorMaterials.LEATHER, ArmorItem.Type.HELMET,
+                    new Item.Properties().durability(ArmorItem.Type.HELMET.getDurability(5))));
+
+    static {
+        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());
+        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hat_sleeve"), SKULL_CAP.getId());
+    }
 
     private ModItems() {}
 }

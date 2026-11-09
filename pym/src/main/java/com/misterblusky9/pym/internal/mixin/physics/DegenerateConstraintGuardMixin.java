@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.mixin.physics;
 
+import com.misterblusky9.pym.api.PhysicsBodies;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintConfiguration;
@@ -25,6 +26,10 @@ public abstract class DegenerateConstraintGuardMixin {
             PhysicsConstraintConfiguration<?> configuration,
             CallbackInfoReturnable<PhysicsConstraintHandle> cir
     ) {
+        if (!PhysicsBodies.available(body1) || !PhysicsBodies.available(body2)) {
+            cir.setReturnValue(null);
+            return;
+        }
         if (body1 != body2) return;
 
         if (body1 == null) {

@@ -10,7 +10,10 @@ import com.misterblusky9.pocket.pocket.PocketCopycatPreview;
 import com.misterblusky9.pocket.pocket.PocketRenderSnapshot;
 import com.misterblusky9.pocket.pocket.PocketWheelPreview;
 import com.misterblusky9.pocket.pocket.ShellVoxels;
+import com.misterblusky9.pym.api.client.Portrait;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
+import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
+import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModel;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModelRenderer;
 import com.simibubi.create.foundation.item.render.PartialItemModelRenderer;
@@ -47,6 +50,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.joml.Vector3d;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -147,6 +151,43 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     }
 
     public static void renderCraftInBox(
+            ItemStack stack,
+            PoseStack poseStack,
+            MultiBufferSource bufferSource,
+            int packedLight,
+            int packedOverlay
+    ) {
+        ClientSubLevel mirror = BuildMirrors.get(stack);
+        if (mirror == null) return;
+        BoundingBox3ic bounds = mirror.getPlot().getBoundingBox();
+        if (bounds == null) return;
+
+        PocketContainer container = PocketContainer.of(stack);
+        int sizeX = bounds.maxX() - bounds.minX() + 1;
+        int sizeY = bounds.maxY() - bounds.minY() + 1;
+        int sizeZ = bounds.maxZ() - bounds.minZ() + 1;
+        int turns = PocketCaseItem.modelQuarterTurns(stack);
+        boolean sideways = (turns & 1) != 0;
+        int footprintX = sideways ? sizeZ : sizeX;
+        int footprintZ = sideways ? sizeX : sizeZ;
+        float fit = (float) Math.min(
+                Math.min(COMPRESSED_SCALE, container.clearHeight() / Math.max(1, sizeY)),
+                Math.min(container.clearWidthX() / Math.max(1, footprintX),
+                        container.clearWidthZ() / Math.max(1, footprintZ)));
+
+        poseStack.pushPose();
+        poseStack.translate(container.centreX(), container.floorY(), container.centreZ());
+        poseStack.scale(fit, fit, fit);
+        if (turns != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F * turns));
+        Portrait.draw(mirror, new Vector3d(
+                (bounds.minX() + bounds.maxX() + 1) * 0.5D,
+                bounds.minY(),
+                (bounds.minZ() + bounds.maxZ() + 1) * 0.5D),
+                poseStack, bufferSource, packedLight, packedOverlay);
+        poseStack.popPose();
+    }
+
+    private static void renderCraftSnapshot(
             ItemStack stack,
             PoseStack poseStack,
             MultiBufferSource bufferSource,

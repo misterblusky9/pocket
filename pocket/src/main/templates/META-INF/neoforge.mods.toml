@@ -19,6 +19,9 @@ enumExtensions="META-INF/enumextensions.json"
 [[mixins]]
 config="pocket.mixins.json"
 
+[[mixins]]
+config="pocket.photomancy.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"
@@ -36,7 +39,7 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="pym"
 type="required"
-versionRange="[${pym_mod_version},0.6.0)"
+versionRange="[${pym_mod_version},0.7.0)"
 ordering="AFTER"
 side="BOTH"
 

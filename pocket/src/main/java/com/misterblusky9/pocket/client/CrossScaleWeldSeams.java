@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import com.misterblusky9.pym.api.client.Mirrors;
 @EventBusSubscriber(modid = PocketSized.MOD_ID, value = Dist.CLIENT)
 public final class CrossScaleWeldSeams {
     private static final long RETRACE_INTERVAL = 5L;
@@ -61,8 +62,8 @@ public final class CrossScaleWeldSeams {
 
         for (WeldRecord record : welds) {
             if (slimeMode && !SlimeWeldMerge.eligible(level, record)) continue;
-            SubLevel small = container.getSubLevel(record.smallSubLevel());
-            SubLevel big = record.worldAnchored() ? null : container.getSubLevel(record.bigSubLevel());
+            SubLevel small = resolve(container, record.smallSubLevel());
+            SubLevel big = record.worldAnchored() ? null : resolve(container, record.bigSubLevel());
             if (small == null || small.isRemoved()
                     || (!record.worldAnchored() && (big == null || big.isRemoved()))) continue;
             boolean drawOnSmall = scaleOf(small) <= scaleOf(big);
@@ -96,6 +97,11 @@ public final class CrossScaleWeldSeams {
         CELLS.clear();
         hoverStamp = Long.MIN_VALUE;
         hovered = null;
+    }
+
+    private static SubLevel resolve(SubLevelContainer container, UUID id) {
+        SubLevel found = container.getSubLevel(id);
+        return found != null ? found : Mirrors.find(id);
     }
 
     private static double scaleOf(SubLevel subLevel) {

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "S",
+    "A",
+    "A"
+  ],
+  "key": {
+    "S": { "tag": "minecraft:skulls" },
+    "A": { "item": "minecraft:armor_stand" }
+  },
+  "result": {
+    "id": "pocket:tall_hat_stand",
+    "count": 1
+  }
+}

@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.network;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.build.BuildSites;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWeldSync;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldGeometry;
@@ -8,6 +9,7 @@ import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.item.ModItems;
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.api.Pym;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
@@ -29,6 +31,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 
+import java.util.Set;
 import java.util.UUID;
 
 public record CrossScaleWeldPayload(
@@ -101,7 +104,10 @@ public record CrossScaleWeldPayload(
                 this.bigFacing,
                 new Vec3(this.hitX, this.hitY, this.hitZ),
                 mode());
-        if (weld == null) return;
+        if (weld == null) {
+            message(player, CrossScaleWelds.Refusal.CANNOT_WELD);
+            return;
+        }
 
         CrossScaleWelds.Refusal refusal = weld.check();
         if (!refusal.allowed()) {
@@ -119,16 +125,23 @@ public record CrossScaleWeldPayload(
             message(player, CrossScaleWelds.Refusal.ALREADY_CONNECTED);
             return;
         }
+        boolean mounting = weld.mounting();
         if (!CrossScaleWelds.componentSettled(container, small.getUniqueId())
-                || (big != null && !CrossScaleWelds.componentSettled(container, big.getUniqueId()))) {
+                || (big != null && !mounting && !CrossScaleWelds.componentSettled(container, big.getUniqueId()))) {
             message(player, CrossScaleWelds.Refusal.SCALE_CHANGING);
             return;
         }
+        if (mounting && CrossScaleWelds.snapshot(container).worldAnchored(small.getUniqueId())) {
+            player.displayClientMessage(Component.translatable("pocket.weld.welded_to_world"), true);
+            return;
+        }
+        Set<UUID> riders = mounting ? CrossScaleWelds.componentIds(container, small.getUniqueId()) : Set.of();
 
         WeldRecord record = weld.toRecord(
                 UUID.randomUUID(), CrossScaleWelds.weldOrientation(weld, this.rotationDegrees));
         WeldStore.get(level).add(record);
         WeldRuntime.markNew(level, record.weldId());
+        if (mounting) BuildSites.mount(level, big, riders, record);
         CrossScaleWeldSync.broadcast(level);
 
         glue.hurtAndBreak(1, player, LivingEntity.getSlotForHand(this.hand));
@@ -140,7 +153,10 @@ public record CrossScaleWeldPayload(
         Vec3 center = Vec3.atCenterOf(pos);
         Vector3d world = new Vector3d(center.x, center.y, center.z);
         SubLevel subLevel = Sable.HELPER.getContaining(level, pos);
-        if (subLevel != null) subLevel.logicalPose().transformPosition(world);
+        if (subLevel != null) {
+            var shown = Hosted.presented(subLevel);
+            (shown != null ? shown : subLevel.logicalPose()).transformPosition(world);
+        }
         Vec3 playerPos = player.position();
         double dx = world.x - playerPos.x;
         double dy = world.y - playerPos.y;
