@@ -1,0 +1,23 @@
+{
+  "values": [
+    "#minecraft:wool",
+    { "id": "create:cardboard_block", "required": false },
+    { "id": "create:bound_cardboard_block", "required": false },
+    { "id": "aeronautics:white_envelope", "required": false },
+    { "id": "aeronautics:orange_envelope", "required": false },
+    { "id": "aeronautics:magenta_envelope", "required": false },
+    { "id": "aeronautics:light_blue_envelope", "required": false },
+    { "id": "aeronautics:yellow_envelope", "required": false },
+    { "id": "aeronautics:lime_envelope", "required": false },
+    { "id": "aeronautics:pink_envelope", "required": false },
+    { "id": "aeronautics:gray_envelope", "required": false },
+    { "id": "aeronautics:light_gray_envelope", "required": false },
+    { "id": "aeronautics:cyan_envelope", "required": false },
+    { "id": "aeronautics:purple_envelope", "required": false },
+    { "id": "aeronautics:blue_envelope", "required": false },
+    { "id": "aeronautics:brown_envelope", "required": false },
+    { "id": "aeronautics:green_envelope", "required": false },
+    { "id": "aeronautics:red_envelope", "required": false },
+    { "id": "aeronautics:black_envelope", "required": false }
+  ]
+}

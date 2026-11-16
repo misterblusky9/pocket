@@ -18,14 +18,15 @@ public abstract class SubLevelNearPlaneScaleMixin {
             ),
             index = 2
     )
-    private float pym$composeCameraNearPlane(float nearFromOtherMods) {
+    private float pym$composeCameraNearPlane(float fovRadians, float aspect, float nearFromOtherMods, float far) {
         double subLevelScale = CameraSubLevelScale.current(CameraSubLevelScale.partialTick());
         float composedNear = ProjectionNearPlanePolicy.compose(nearFromOtherMods, subLevelScale);
+        float resultingNear = ProjectionNearPlanePolicy.fovCorrected(composedNear, fovRadians, aspect);
         PymTrace.render(
                 "camera-near-plane",
-                "cameraProjection nearFromOtherMods={} subLevelScale={} resultingNear={}",
-                nearFromOtherMods, subLevelScale, composedNear
+                "cameraProjection nearFromOtherMods={} subLevelScale={} fov={} aspect={} composedNear={} resultingNear={}",
+                nearFromOtherMods, subLevelScale, Math.toDegrees(fovRadians), aspect, composedNear, resultingNear
         );
-        return composedNear;
+        return resultingNear;
     }
 }

@@ -1,6 +1,7 @@
 package com.misterblusky9.pym.internal.interaction;
 
 import com.google.common.collect.Iterables;
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.internal.PlacedSubLevels;
 import dev.ryanhcode.sable.ActiveSableCompanion;
 import dev.ryanhcode.sable.Sable;
@@ -123,11 +124,12 @@ public final class ScaleAwareBlockClip {
                 continue;
             }
 
-            if (!segmentIntersectsWorldBounds(rayFrom, rayTo, subLevel)) {
+            Pose3dc shown = Hosted.presented(subLevel);
+            if (shown == null && !segmentIntersectsWorldBounds(rayFrom, rayTo, subLevel)) {
                 continue;
             }
 
-            Pose3dc pose = poseFor(level, subLevel);
+            Pose3dc pose = shown != null ? shown : poseFor(level, subLevel);
 
             Vector3dc localFromJoml =
                     pose.transformPositionInverse(JOMLConversion.toJOML(context.getFrom()));
@@ -299,6 +301,8 @@ public final class ScaleAwareBlockClip {
             Level level,
             SubLevel subLevel
     ) {
+        Pose3dc shown = Hosted.presented(subLevel);
+        if (shown != null) return shown;
         if (level instanceof LevelPoseProviderExtension extension) {
             return extension.sable$getPose(subLevel);
         }

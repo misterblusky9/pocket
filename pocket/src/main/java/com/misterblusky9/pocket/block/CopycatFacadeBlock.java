@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.block;
 
+import com.simibubi.create.AllBlocks;
 import com.simibubi.create.content.decoration.copycat.CopycatBlock;
 import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -153,6 +154,7 @@ public class CopycatFacadeBlock extends CopycatBlock {
             Direction dir
     ) {
         BlockState material = getMaterial(level, pos);
+        if (AllBlocks.COPYCAT_BASE.has(material)) return false;
         BlockState neighbour = neighborState.getBlock() instanceof CopycatBlock
                 ? getMaterial(level, pos.relative(dir))
                 : neighborState;

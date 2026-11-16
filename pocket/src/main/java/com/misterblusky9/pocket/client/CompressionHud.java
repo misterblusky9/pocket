@@ -3,6 +3,8 @@ package com.misterblusky9.pocket.client;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.client.ScaleReadout;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelEvents;
+import com.misterblusky9.pocket.block.ModBlocks;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.misterblusky9.pocket.item.CompressionGunItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
@@ -153,7 +155,12 @@ public final class CompressionHud {
     }
 
     private static boolean tooBigToPocket(LocalPlayer player, CompressionAim.Aim aim) {
-        return !PocketedSubLevelEvents.fitsPocket(player, Pym.scale().settled(aim.subLevel()));
+        SubLevel target = aim.subLevel();
+        boolean build = BuildMirrors.isStandingHatPart(target)
+                || player.level().getBlockState(target.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
+        return build
+                ? !PocketedSubLevelEvents.fitsPocket(player, PocketCaseItem.POCKETABLE_SCALE)
+                : !PocketedSubLevelEvents.groupFitsPocket(player, target);
     }
 
     private static boolean canScaleMoon(LocalPlayer player) {

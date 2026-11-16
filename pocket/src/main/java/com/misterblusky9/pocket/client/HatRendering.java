@@ -5,15 +5,12 @@ import com.misterblusky9.pocket.block.HatStandBlock;
 import com.misterblusky9.pocket.block.HatStandBlockEntity;
 import com.misterblusky9.pocket.build.BuildHostBlockEntity;
 import com.misterblusky9.pocket.build.BuildSites;
-import com.misterblusky9.pocket.compat.curios.CuriosHats;
+import com.misterblusky9.pocket.compat.WornHats;
 import com.misterblusky9.pocket.item.ModDataComponents;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pym.api.client.Portrait;
 import dev.ryanhcode.sable.companion.math.Pose3d;
-import net.minecraft.util.FastColor;
 import java.util.UUID;
-import net.minecraft.world.item.component.DyedItemColor;
-import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -35,7 +32,6 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.ClientHooks;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.minecraft.world.level.block.AbstractSkullBlock;
@@ -45,7 +41,6 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 
 public final class HatRendering {
-    private static final boolean CURIOS = ModList.get().isLoaded("curios");
     private static final float PLOT_BLOCK = 1.0F / 16.0F;
     private static final float HEADWEAR_SIZE = 8.2F;
     private static final double HEADWEAR_REACH = 4.0;
@@ -61,8 +56,8 @@ public final class HatRendering {
 
     public static ItemStack headwear(LivingEntity entity) {
         ItemStack head = entity.getItemBySlot(EquipmentSlot.HEAD);
-        if (!CURIOS || CuriosHats.isCustomHat(head)) return head;
-        ItemStack cosmetic = CuriosHats.find(entity);
+        if (WornHats.isCustomHat(head)) return head;
+        ItemStack cosmetic = WornHats.find(entity);
         return cosmetic == null ? head : cosmetic;
     }
 
@@ -104,11 +99,6 @@ public final class HatRendering {
         ItemStack head = headwear(entity);
         if (head.is(ModItems.SKULL_CAP.get())) return HatStandBlockEntity.headwearLayer(head);
         return worn(entity) == null ? 0 : HatStandBlockEntity.headwearLayer(head);
-    }
-
-    public static void registerItemColours(RegisterColorHandlersEvent.Item event) {
-        event.register((stack, tint) -> tint > 0 ? -1
-                : FastColor.ARGB32.opaque(DyedItemColor.getOrDefault(stack, -6265536)), ModItems.SKULL_CAP.get());
     }
 
     public static float skinFlat(LivingEntity entity) {
@@ -155,6 +145,10 @@ public final class HatRendering {
 
     private static void drawParts(@Nullable UUID token, ClientSubLevel mirror, Vector3d head, HatStandBlockEntity.NameEgg egg,
                                   PoseStack pose, MultiBufferSource buffers, int light, int overlay, float partialTick) {
+        if (egg == HatStandBlockEntity.NameEgg.MELONS) {
+            FacadeSkin.show(mirror);
+            if (token != null) for (BuildMirrors.Rider rider : BuildMirrors.riders(token)) FacadeSkin.show(rider.mirror());
+        }
         boolean rootDrawn = Portrait.draw(mirror, head, pose, buffers, light, overlay,
                 entity -> token != null && HatNativeContraptionRender.drawnByPreview(token, entity));
         if (rootDrawn && token != null)
@@ -182,7 +176,10 @@ public final class HatRendering {
     public static boolean renderItem(ItemStack stack, ItemDisplayContext context, boolean leftHand, PoseStack pose,
                                      MultiBufferSource buffers, int light, int overlay) {
         if (!HatStandBlock.isHeadwear(stack)) return false;
+        if (context != ItemDisplayContext.HEAD && !stack.getOrDefault(ModDataComponents.CUSTOM_SPRITE.get(), true))
+            return false;
         ClientSubLevel mirror = BuildMirrors.get(stack);
+        if (mirror == null) mirror = BuildMirrors.interim(stack);
         if (mirror == null) return BuildMirrors.pending(stack);
         int layer = HatStandBlockEntity.headwearLayer(stack);
         boolean headwear = layer != HatStandBlockEntity.LAYER_REMOVED;
@@ -212,10 +209,36 @@ public final class HatRendering {
             pose.popPose();
         }
         pose.pushPose();
-        if (stack.is(ModItems.SKULL_CAP.get())) pullToCamera(pose);
+        pullToCamera(pose);
         drawHat(BuildHostBlockEntity.token(stack), mirror, frame, egg, stack.hasFoil(), pose, buffers, light, overlay,
                 Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false));
         pose.popPose();
+        pose.popPose();
+        return true;
+    }
+
+    public static boolean renderOnDepot(ItemStack stack, int angle, PoseStack pose, MultiBufferSource buffers,
+                                        int light, int overlay) {
+        if (!HatStandBlock.isHeadwear(stack)) return false;
+        if (!stack.getOrDefault(ModDataComponents.CUSTOM_SPRITE.get(), true)) return false;
+        ClientSubLevel mirror = BuildMirrors.get(stack);
+        if (mirror == null) mirror = BuildMirrors.interim(stack);
+        if (mirror == null) return BuildMirrors.pending(stack);
+        Vector3d head = BuildSites.head(mirror, BuildSites.offsetVector(stack), stack);
+        BoundingBox3ic bounds = mirror.getPlot().getBoundingBox();
+        double bottom = bounds == null ? head.y : bounds.minY();
+        double top = bounds == null ? head.y : bounds.maxY() + 1;
+        float scale = (float) BuildSites.scale(stack);
+        HatStandBlockEntity.NameEgg egg = HatStandBlockEntity.NameEgg.of(stack);
+        pose.pushPose();
+        pose.mulPose(Axis.YP.rotationDegrees(angle));
+        pose.scale(scale, scale, scale);
+        pose.translate(0.0, (top - bottom) / 2.0, 0.0);
+        if (egg == HatStandBlockEntity.NameEgg.UPSIDE_DOWN) pose.mulPose(Axis.ZP.rotationDegrees(180.0F));
+        pose.translate(0.0, head.y - (top + bottom) / 2.0, 0.0);
+        pullToCamera(pose);
+        drawHat(BuildHostBlockEntity.token(stack), mirror, head, egg, stack.hasFoil(), pose, buffers, light, overlay,
+                Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false));
         pose.popPose();
         return true;
     }

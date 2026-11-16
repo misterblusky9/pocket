@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:hats",
+  "display": {
+    "icon": {
+      "id": "pocket:dummy_head"
+    },
+    "title": {
+      "text": "Dummy²"
+    },
+    "description": {
+      "text": "Place a Dummy Head on a Hat Stand"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

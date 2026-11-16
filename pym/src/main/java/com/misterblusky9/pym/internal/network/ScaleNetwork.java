@@ -2,7 +2,9 @@ package com.misterblusky9.pym.internal.network;
 
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.api.client.DebugOverlay;
+import com.misterblusky9.pym.internal.compat.create.SchematicScales;
 import com.misterblusky9.pym.internal.debug.PymTrace;
+import net.minecraft.world.phys.Vec3;
 import com.misterblusky9.pym.internal.scale.ScaleState;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -56,6 +58,15 @@ public final class ScaleNetwork {
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) {
                         answerScaleRequest(player, payload.subLevelId());
+                    }
+                })
+        );
+        registrar.playToServer(
+                SchematicFinePayload.TYPE,
+                SchematicFinePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        SchematicScales.fine(player, payload.slot(), new Vec3(payload.x(), payload.y(), payload.z()));
                     }
                 })
         );

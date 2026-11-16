@@ -1,6 +1,9 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.block.HatStandBlockEntity;
+import com.misterblusky9.pocket.build.HatSeals;
 import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
+import com.misterblusky9.pocket.item.PocketedSubLevelSealHandler;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.network.ShrinkRayBeamColourPayload;
 import com.simibubi.create.AllSpecialTextures;
@@ -24,6 +27,7 @@ import java.util.UUID;
 
 public final class ShrinkRayHoverOutline {
     private static final String SLOT = "pocketShrinkRayHover";
+    private static final String STAND_SLOT = "pocketHatStandSeal";
     private static final int INERT_ENTITY_COLOUR = 0xBFBFBF;
     private static final Map<UUID, CompressionGlow> compressionGlows = new HashMap<>();
     private static Level clientLevel;
@@ -87,6 +91,7 @@ public final class ShrinkRayHoverOutline {
         LocalPlayer player = Minecraft.getInstance().player;
         revealCases = player != null && CaseSealAim.holdingTool(player);
         if (player == null) return;
+        if (revealCases) outlineStandSeal(player);
 
         ItemStack ray = player.getMainHandItem().getItem() instanceof CreativeShrinkRayItem
                 ? player.getMainHandItem()
@@ -117,6 +122,17 @@ public final class ShrinkRayHoverOutline {
                 .disableLineNormals()
                 .lineWidth(1 / 32f)
                 .withFaceTexture(AllSpecialTextures.CHECKERED);
+    }
+
+    private static void outlineStandSeal(LocalPlayer player) {
+        if (!(Minecraft.getInstance().hitResult instanceof BlockHitResult hit)) return;
+        HatStandBlockEntity stand = HatSeals.base(player.level(), hit);
+        CaseSealAim aim = CaseSealAim.of(player, stand);
+        if (aim == null || aim.colour() == CaseSealAim.NO_COLOUR) return;
+        Outliner.getInstance().showAABB(STAND_SLOT, PocketedSubLevelSealHandler.baseBox(stand))
+                .colored(aim.colour())
+                .disableLineNormals()
+                .lineWidth(1 / 32f);
     }
 
     private ShrinkRayHoverOutline() {}

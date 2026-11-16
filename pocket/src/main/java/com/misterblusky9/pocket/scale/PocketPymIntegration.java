@@ -37,6 +37,8 @@ public final class PocketPymIntegration {
         Pym.extensions().register(new PortableCompressorLockPolicy());
         Pym.extensions().register(new CreateSeatResizeFollower());
         Pym.extensions().register(new TrackingResizeFollower());
+        Pym.extensions().register(new com.misterblusky9.pocket.compat.create.SchematicWelds());
+        Pym.extensions().register(new com.misterblusky9.pocket.compat.create.SchematicLimits());
         Pym.extensions().massCoupling(CrossScaleWelds::snapshot);
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, true, PlayerSpawnScale::onJoin);
 

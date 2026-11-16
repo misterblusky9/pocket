@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.item;
 
+import com.misterblusky9.pocket.build.HatSeals;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.BlockPos;
@@ -12,7 +13,8 @@ import org.joml.Vector3d;
 
 public final class ToolPermissions {
     public static boolean mayAlter(Player player, ServerLevel level, BlockPos pos) {
-        if (!(player instanceof ServerPlayer server) || !server.mayBuild() || pos == null) return false;
+        if (!(player instanceof ServerPlayer server) || !server.mayBuild() || pos == null
+                || HatSeals.locked(level, pos, server)) return false;
         BlockPos world = worldPos(level, pos);
         if (!level.mayInteract(server, pos) || !level.mayInteract(server, world)) return false;
         return !NeoForge.EVENT_BUS.post(

@@ -15,7 +15,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class PocketNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("26");
+        PayloadRegistrar registrar = event.registrar("28");
         registrar.playToClient(
                 CompressionSyncPayload.TYPE,
                 CompressionSyncPayload.STREAM_CODEC,
@@ -219,6 +219,43 @@ public final class PocketNetwork {
                         () -> com.misterblusky9.pocket.client.CopycatFacadeFrames.acceptAlignment(
                                 payload.craft(), payload.offset())
                 )
+        );
+        registrar.playToServer(
+                LostAndFoundSearchPayload.TYPE,
+                LostAndFoundSearchPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) payload.handle(player);
+                })
+        );
+        registrar.playToServer(
+                CaseClonePayload.TYPE,
+                CaseClonePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) payload.handle(player);
+                })
+        );
+        registrar.playToServer(
+                CaseCloneDiscardPayload.TYPE,
+                CaseCloneDiscardPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) CaseClonePayload.discard(player, payload.token());
+                })
+        );
+        registrar.playToClient(
+                CaseClonedPayload.TYPE,
+                CaseClonedPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.CaseCloning.accept(payload.stack())
+                )
+        );
+        registrar.playToServer(
+                HatCasePlacePayload.TYPE,
+                HatCasePlacePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
         );
         registrar.playToServer(
                 BuildMirrorRequestPayload.TYPE,

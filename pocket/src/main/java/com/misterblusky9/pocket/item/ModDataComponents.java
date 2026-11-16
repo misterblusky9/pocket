@@ -45,6 +45,11 @@ public final class ModDataComponents {
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> CUSTOM_SPRITE =
+            COMPONENTS.registerComponentType("custom_sprite", builder -> builder
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL));
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CaseSeal>> SEAL =
             COMPONENTS.registerComponentType("seal", builder -> builder
                     .persistent(CaseSeal.CODEC)

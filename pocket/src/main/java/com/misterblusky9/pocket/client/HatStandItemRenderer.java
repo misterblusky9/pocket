@@ -26,7 +26,8 @@ public final class HatStandItemRenderer extends CustomRenderedItemModelRenderer 
         ResolvableProfile profile = stack.get(DataComponents.PROFILE);
         HatStandBlockEntity.NameEgg egg = HatStandBlockEntity.NameEgg.of(profile);
         if (profile != null && !profile.properties().containsKey("textures")
-                && egg != HatStandBlockEntity.NameEgg.HEROBRINE && egg != HatStandBlockEntity.NameEgg.RAINBOW) profile = null;
+                && egg != HatStandBlockEntity.NameEgg.HEROBRINE && egg != HatStandBlockEntity.NameEgg.RAINBOW
+                && egg != HatStandBlockEntity.NameEgg.MELONS) profile = null;
         pose.pushPose();
         pose.translate(-0.5F, -0.5F, -0.5F);
         float rise = stack.is(ModItems.TALL_HAT_STAND.get()) ? TallHatStandBlock.RISE : 0.0F;

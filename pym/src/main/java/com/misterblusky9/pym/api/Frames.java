@@ -2,6 +2,8 @@ package com.misterblusky9.pym.api;
 
 import com.misterblusky9.pym.internal.physics.ScaleFrame;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
+import dev.ryanhcode.sable.companion.math.Pose3d;
+import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaterniond;
@@ -63,12 +65,75 @@ public final class Frames {
         return subLevel == null ? worldLength : worldLength / poseScale(subLevel);
     }
 
+    public Pose3d presentedPose(SubLevel subLevel) {
+        if (subLevel == null) return new Pose3d();
+        Pose3d hosted = Hosted.presented(subLevel);
+        return hosted != null ? hosted : new Pose3d(subLevel.logicalPose());
+    }
+
+    public Vector3d presentedToWorld(SubLevel subLevel, Vector3dc local) {
+        Vector3d result = new Vector3d(local);
+        return subLevel == null ? result : presentedPose(subLevel).transformPosition(result);
+    }
+
+    public Vec3 presentedToWorld(SubLevel subLevel, Vec3 local) {
+        return subLevel == null ? local : presentedPose(subLevel).transformPosition(local);
+    }
+
+    public Vector3d presentedToLocal(SubLevel subLevel, Vector3dc world) {
+        Vector3d result = new Vector3d(world);
+        return subLevel == null ? result : presentedPose(subLevel).transformPositionInverse(result);
+    }
+
+    public Vec3 presentedToLocal(SubLevel subLevel, Vec3 world) {
+        return subLevel == null ? world : presentedPose(subLevel).transformPositionInverse(world);
+    }
+
+    public Vector3d presentedVectorToWorld(SubLevel subLevel, Vector3dc local) {
+        Vector3d result = new Vector3d(local);
+        if (subLevel == null) return result;
+        Pose3d pose = presentedPose(subLevel);
+        result.mul(poseScale(pose));
+        return pose.orientation().transform(result);
+    }
+
+    public Vector3d presentedVectorToLocal(SubLevel subLevel, Vector3dc world) {
+        Vector3d result = new Vector3d(world);
+        if (subLevel == null) return result;
+        Pose3d pose = presentedPose(subLevel);
+        new Quaterniond(pose.orientation()).conjugate().transform(result);
+        return result.div(poseScale(pose));
+    }
+
+    public Vector3d presentedDirectionToWorld(SubLevel subLevel, Vector3dc local) {
+        Vector3d result = new Vector3d(local);
+        return subLevel == null ? result : presentedPose(subLevel).orientation().transform(result);
+    }
+
+    public Vector3d presentedDirectionToLocal(SubLevel subLevel, Vector3dc world) {
+        Vector3d result = new Vector3d(world);
+        return subLevel == null ? result
+                : new Quaterniond(presentedPose(subLevel).orientation()).conjugate().transform(result);
+    }
+
+    public double presentedLengthToWorld(SubLevel subLevel, double localLength) {
+        return subLevel == null ? localLength : localLength * poseScale(presentedPose(subLevel));
+    }
+
+    public double presentedLengthToLocal(SubLevel subLevel, double worldLength) {
+        return subLevel == null ? worldLength : worldLength / poseScale(presentedPose(subLevel));
+    }
+
     public Vector3dc toBodyMetric(PhysicsPipelineBody body, Vector3dc plotPoint) {
         return ScaleFrame.toBodyMetric(body, plotPoint);
     }
 
     private static double poseScale(SubLevel subLevel) {
-        double scale = subLevel.logicalPose().scale().x();
+        return poseScale(subLevel.logicalPose());
+    }
+
+    private static double poseScale(Pose3dc pose) {
+        double scale = pose.scale().x();
         return Double.isFinite(scale) && scale > 0.0D ? scale : ScaleBounds.FULL;
     }
 }

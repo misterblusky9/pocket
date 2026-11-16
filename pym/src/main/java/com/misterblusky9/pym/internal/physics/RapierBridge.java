@@ -116,7 +116,8 @@ public final class RapierBridge {
                     "volume=" + volume, "boxes=" + shape.faces().size(), "material=" + shape.material());
             ColliderMaterial material = shape.material();
             Object collider = CREATE_VOXEL_COLLIDER_ENTRY.invoke(
-                    null, material.friction(), volume, material.restitution(), false, null);
+                    null, material.friction(), volume, material.restitution(), false,
+                    material.callback() ? ScaledBlockCallbacks.INSTANCE : null);
             PymTrace.exit("Rapier3D.createVoxelColliderEntry");
 
             addBoxes(collider, shape);

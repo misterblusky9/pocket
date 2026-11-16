@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:hats",
+  "display": {
+    "icon": {
+      "id": "minecraft:lightning_rod"
+    },
+    "title": {
+      "text": "Smartest Minecraft Player"
+    },
+    "description": {
+      "text": "Place a Lightning Rod on a Hat"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

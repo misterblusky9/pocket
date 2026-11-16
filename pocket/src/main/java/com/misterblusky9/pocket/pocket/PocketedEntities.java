@@ -86,6 +86,15 @@ public final class PocketedEntities {
         return restored;
     }
 
+    public static boolean ridesInWorld(CompoundTag source) {
+        if (source == null) return false;
+        ListTag saved = source.getList(ENTITIES_KEY, Tag.TAG_COMPOUND);
+        for (int i = 0; i < saved.size(); i++) {
+            if (saved.getCompound(i).getBoolean(WORLD_SPACE_KEY)) return true;
+        }
+        return false;
+    }
+
     public static int count(CompoundTag source) {
         if (source == null || !source.contains(ENTITIES_KEY, Tag.TAG_LIST)) return 0;
         return source.getList(ENTITIES_KEY, Tag.TAG_COMPOUND).size();

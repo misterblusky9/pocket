@@ -49,6 +49,8 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.COPYCAT_FACADE.get());
 
                         output.accept(ModItems.SUBSPACE_RECYCLER.get());
+
+                        output.accept(ModItems.DUMMY_HEAD.get());
                     })
                     .build()
     );

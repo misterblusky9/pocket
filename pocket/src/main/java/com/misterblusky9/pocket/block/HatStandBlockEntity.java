@@ -375,7 +375,7 @@ public final class HatStandBlockEntity extends BuildHostBlockEntity {
     }
 
     public enum NameEgg implements StringRepresentable {
-        NONE, UPSIDE_DOWN, JEB, HEROBRINE, RAINBOW, VOID;
+        NONE, UPSIDE_DOWN, JEB, HEROBRINE, RAINBOW, VOID, MELONS;
 
         public static final Codec<NameEgg> CODEC = StringRepresentable.fromEnum(NameEgg::values);
         public static final StreamCodec<FriendlyByteBuf, NameEgg> STREAM_CODEC = NeoForgeStreamCodecs.enumCodec(NameEgg.class);
@@ -386,6 +386,7 @@ public final class HatStandBlockEntity extends BuildHostBlockEntity {
                 case "Dinnerbone", "Grumm" -> UPSIDE_DOWN;
                 case "jeb_" -> JEB;
                 case "Herobrine" -> HEROBRINE;
+                case "melons" -> MELONS;
                 default -> name.equals("KEYGEN") ? RAINBOW : name.equalsIgnoreCase("MisterBluSky") ? VOID : NONE;
             };
         }

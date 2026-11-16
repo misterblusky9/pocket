@@ -140,7 +140,8 @@ public final class PlotSource {
                 }
             }
         }
-        return exposed.isEmpty() ? volume.winner() : exposed.winner();
+        short winner = exposed.isEmpty() ? volume.winner() : exposed.winner();
+        return volume.callback() ? ColliderMaterial.withCallback(winner) : winner;
     }
 
     private double overlap(int cell, double min, double max, int blockMin, int blockMax) {

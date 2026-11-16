@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pym.api.ScaleBounds;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -8,6 +9,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import com.misterblusky9.pocket.block.HatStandBlock;
+import com.misterblusky9.pocket.build.BuildHostBlockEntity;
 
 public final class PocketCommands {
     public static void register(RegisterCommandsEvent event) {
@@ -16,7 +19,31 @@ public final class PocketCommands {
                 .then(Commands.literal("sethandscale")
                         .then(Commands.argument("scale", StringArgumentType.word())
                                 .executes(context -> setHandScale(context.getSource(),
-                                        parse(StringArgumentType.getString(context, "scale")))))));
+                                        parse(StringArgumentType.getString(context, "scale"))))))
+                .then(Commands.literal("usecustomsprite")
+                        .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                .executes(context -> useCustomSprite(context.getSource(),
+                                        BoolArgumentType.getBool(context, "enabled")))))
+                .then(Commands.literal("recover")
+                        .executes(context -> PocketRecovery.open(context.getSource(), PocketRecovery.Kind.ALL))
+                        .then(Commands.literal("hats")
+                                .executes(context -> PocketRecovery.open(context.getSource(), PocketRecovery.Kind.HATS)))
+                        .then(Commands.literal("cases")
+                                .executes(context -> PocketRecovery.open(context.getSource(), PocketRecovery.Kind.CASES)))));
+    }
+
+    private static int useCustomSprite(CommandSourceStack source, boolean on) {
+        ServerPlayer player = source.getPlayer();
+        ItemStack held = player == null ? ItemStack.EMPTY : player.getMainHandItem();
+        if (!HatStandBlock.isHeadwear(held) || BuildHostBlockEntity.token(held) == null) {
+            source.sendFailure(Component.translatable("pocket.command.usecustomsprite.wrong_item"));
+            return 0;
+        }
+        if (on) held.remove(ModDataComponents.CUSTOM_SPRITE.get());
+        else held.set(ModDataComponents.CUSTOM_SPRITE.get(), false);
+        source.sendSuccess(() -> Component.translatable(
+                on ? "pocket.command.usecustomsprite.on" : "pocket.command.usecustomsprite.off"), false);
+        return 1;
     }
 
     private static double parse(String text) {

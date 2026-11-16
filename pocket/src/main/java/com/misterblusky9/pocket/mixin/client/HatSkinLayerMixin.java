@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.misterblusky9.pocket.block.HatStandBlockEntity.NameEgg;
 import com.misterblusky9.pocket.client.HatEggs;
 import com.misterblusky9.pocket.client.HatRendering;
+import com.misterblusky9.pocket.client.HeadLayerClip;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.EntityModel;
@@ -57,6 +58,13 @@ public abstract class HatSkinLayerMixin {
                                   int entityLight) {
         int mode = model instanceof HumanoidModel<?> humanoid && humanoid.hat.visible
                 ? HatRendering.layerMode(entity) : 0;
+        if (model instanceof HumanoidModel<?> clipped && clipped.hat.visible && HeadLayerClip.hides(entity,
+                HeadLayerClip.SKIN_LAYER * (mode == 1 ? HatRendering.skinFlat(entity) : 1.0F))) {
+            clipped.hat.visible = false;
+            original.call(model, pose, consumer, light, overlay, color);
+            clipped.hat.visible = true;
+            return;
+        }
         if (mode == 0) {
             original.call(model, pose, consumer, light, overlay, color);
             return;

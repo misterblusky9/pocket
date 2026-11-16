@@ -7,6 +7,7 @@ import com.misterblusky9.pym.api.spi.Participation;
 import com.misterblusky9.pym.api.spi.ResizeFollower;
 import com.misterblusky9.pym.api.spi.ResizePolicy;
 import com.misterblusky9.pym.api.spi.ScaleCoupling;
+import com.misterblusky9.pym.api.spi.SchematicListener;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -35,6 +36,15 @@ public final class PymExtensions {
     private static final List<Predicate<Entity>> NATIVE_STATIC_ENTITIES = new CopyOnWriteArrayList<>();
     private static final List<Function<ServerSubLevel, Collection<UUID>>> OWNERSHIP = new CopyOnWriteArrayList<>();
     private static final List<Function<ServerSubLevel, Collection<UUID>>> LINKS = new CopyOnWriteArrayList<>();
+    private static final List<SchematicListener> SCHEMATIC_LISTENERS = new CopyOnWriteArrayList<>();
+
+    public static void register(SchematicListener listener) {
+        SCHEMATIC_LISTENERS.add(Objects.requireNonNull(listener));
+    }
+
+    public static List<SchematicListener> schematicListeners() {
+        return SCHEMATIC_LISTENERS;
+    }
 
     public static void register(ResizePolicy policy) {
         POLICIES.add(Objects.requireNonNull(policy));

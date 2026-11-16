@@ -22,6 +22,9 @@ config="pocket.mixins.json"
 [[mixins]]
 config="pocket.photomancy.mixins.json"
 
+[[mixins]]
+config="pocket.vista.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"
@@ -39,7 +42,7 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="pym"
 type="required"
-versionRange="[${pym_mod_version},0.7.0)"
+versionRange="[${pym_mod_version},0.8.0)"
 ordering="AFTER"
 side="BOTH"
 
@@ -82,6 +85,13 @@ side="BOTH"
 modId="curios"
 type="optional"
 versionRange="[9.0.0,10)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="accessories"
+type="optional"
+versionRange="[1.1.0-beta.54+1.21.1,)"
 ordering="NONE"
 side="BOTH"
 

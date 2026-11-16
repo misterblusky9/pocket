@@ -31,6 +31,9 @@ config="pym.simulatedcoasters.mixins.json"
 config="pym.simurail.mixins.json"
 
 [[mixins]]
+config="pym.electroenergetics.mixins.json"
+
+[[mixins]]
 config="pym.aeronautics_utility_objects.mixins.json"
 
 [[mixins]]
@@ -50,6 +53,9 @@ config="pym.aero_no_horizon.mixins.json"
 
 [[mixins]]
 config="pym.createbigcannons.mixins.json"
+
+[[mixins]]
+config="pym.create_submarine.mixins.json"
 
 [[mixins]]
 config="pym.pehkui.mixins.json"
@@ -121,6 +127,13 @@ ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
+modId="electroenergetics"
+type="optional"
+versionRange="*"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
 modId="aeronautics_utility_objects"
 type="optional"
 versionRange="[0.2.7,)"
@@ -150,6 +163,13 @@ side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="createbigcannons"
+type="optional"
+versionRange="*"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="create_submarine"
 type="optional"
 versionRange="*"
 ordering="AFTER"

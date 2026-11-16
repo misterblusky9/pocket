@@ -11,6 +11,7 @@ import com.misterblusky9.pym.api.Rules;
 import com.misterblusky9.pym.api.client.Mirrors;
 import com.misterblusky9.pym.api.client.Portrait;
 import dev.ryanhcode.sable.companion.math.Pose3d;
+import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.Minecraft;
@@ -40,9 +41,11 @@ import java.util.UUID;
 public final class BuildMirrors {
     private static final int IDLE_TICKS = 100;
     private static final int RETRY_TICKS = 100;
+    private static final int BUSY_RETRY_TICKS = 5;
     private static final Map<UUID, ClientSubLevel> MIRRORS = new HashMap<>();
     private static final Map<UUID, Long> USED = new HashMap<>();
     private static final Map<UUID, Long> REQUESTED = new HashMap<>();
+    private static final Map<UUID, Integer> ASKED_EPOCH = new HashMap<>();
     private static final Set<UUID> MISSING = new HashSet<>();
     private static final Set<UUID> STANDING = new HashSet<>();
     private static final Set<UUID> SEEN = new HashSet<>();
@@ -50,6 +53,10 @@ public final class BuildMirrors {
     private static final Map<UUID, double[]> EASED = new HashMap<>();
     private static final Map<UUID, List<Rider>> RIDERS = new HashMap<>();
     private static final Map<UUID, BlockPos> HOSTS = new HashMap<>();
+    private static final Map<UUID, Player> WEARERS = new HashMap<>();
+    private static final Map<UUID, Integer> EPOCHS = new HashMap<>();
+    private static final Map<UUID, Long> ACCEPTED = new HashMap<>();
+    private static final int SETTLE_TICKS = 20;
 
     public record Rider(ClientSubLevel mirror, Pose3d relative, RiderPlayback playback) {
         public Pose3d at() {
@@ -72,7 +79,26 @@ public final class BuildMirrors {
     }
 
     public static @Nullable ClientSubLevel get(ItemStack stack) {
-        return get(token(stack));
+        UUID token = token(stack);
+        return token != null && current(token, stack) ? get(token) : null;
+    }
+
+    public static boolean current(UUID token, ItemStack stack) {
+        int held = BuildHostBlockEntity.epoch(stack);
+        int shown = EPOCHS.getOrDefault(token, 0);
+        ClientLevel level = Minecraft.getInstance().level;
+        if (held > shown && level != null) requestEpoch(token, held, level.getGameTime());
+        return held == shown;
+    }
+
+    private static void requestEpoch(UUID token, int epoch, long now) {
+        if (ASKED_EPOCH.getOrDefault(token, -1) >= epoch) {
+            request(token, now);
+            return;
+        }
+        ASKED_EPOCH.put(token, epoch);
+        REQUESTED.put(token, now);
+        PacketDistributor.sendToServer(new BuildMirrorRequestPayload(token));
     }
 
     public static @Nullable ClientSubLevel get(@Nullable UUID token) {
@@ -88,9 +114,34 @@ public final class BuildMirrors {
         return mirror;
     }
 
+    public static @Nullable ClientSubLevel peek(@Nullable UUID token) {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (token == null || level == null) return null;
+        ClientSubLevel mirror = MIRRORS.get(token);
+        if (mirror == null) request(token, level.getGameTime());
+        else USED.put(token, level.getGameTime());
+        return mirror;
+    }
+
+    public static @Nullable ClientSubLevel interim(ItemStack stack) {
+        UUID token = token(stack);
+        if (token == null) return null;
+        int held = BuildHostBlockEntity.epoch(stack);
+        int shown = EPOCHS.getOrDefault(token, 0);
+        if (held == shown || held < shown && !settling(token)) return null;
+        return get(token);
+    }
+
     public static boolean pending(ItemStack stack) {
         UUID token = token(stack);
-        return token != null && !MISSING.contains(token);
+        return token != null && !MISSING.contains(token)
+                && (BuildHostBlockEntity.epoch(stack) >= EPOCHS.getOrDefault(token, 0) || settling(token));
+    }
+
+    private static boolean settling(UUID token) {
+        Long at = ACCEPTED.get(token);
+        ClientLevel level = Minecraft.getInstance().level;
+        return at != null && level != null && level.getGameTime() - at < SETTLE_TICKS;
     }
 
     public static @Nullable ClientSubLevel standing(UUID token) {
@@ -116,6 +167,11 @@ public final class BuildMirrors {
             double gap = offset[i] - eased[i];
             eased[i] = Math.abs(gap) < 0.01 ? offset[i] : eased[i] + gap * 0.5;
         }
+        standAt(token, mirror, level, pos, eased);
+    }
+
+    private static void standAt(UUID token, ClientSubLevel mirror, Level level, BlockPos pos, double[] eased) {
+        long now = level.getGameTime();
         Pose3d pose = new Pose3d();
         if (!BuildSites.stand(pose, mirror, level, pos, new Vector3d(eased[0], eased[1], eased[2]))) return;
         boolean standing = STANDING.contains(token);
@@ -150,6 +206,14 @@ public final class BuildMirrors {
         return null;
     }
 
+    public static @Nullable BlockPos standHost(SubLevel part) {
+        if (part == null) return null;
+        UUID id = part.getUniqueId();
+        for (UUID token : STANDING)
+            if (matchesHatPart(token, MIRRORS.get(token), id)) return HOSTS.get(token);
+        return null;
+    }
+
     public static List<ClientSubLevel> standingMirrors() {
         List<ClientSubLevel> standing = new ArrayList<>();
         for (UUID token : STANDING) {
@@ -179,6 +243,81 @@ public final class BuildMirrors {
 
     private static boolean inPlot(ClientSubLevel mirror, Vector3d position) {
         return mirror != null && !mirror.isRemoved() && mirror.getPlot().contains(position);
+    }
+
+    public static boolean isKnownHatPart(SubLevel candidate) {
+        if (candidate == null) return false;
+        UUID id = candidate.getUniqueId();
+        for (Map.Entry<UUID, ClientSubLevel> entry : MIRRORS.entrySet()) {
+            if (matchesHatPart(entry.getKey(), entry.getValue(), id)) return true;
+        }
+        return false;
+    }
+
+    public static boolean isWornHatPart(SubLevel candidate) {
+        if (candidate == null) return false;
+        UUID id = candidate.getUniqueId();
+        for (UUID token : WORN) {
+            if (matchesHatPart(token, MIRRORS.get(token), id)) return true;
+        }
+        return false;
+    }
+
+    private static boolean matchesHatPart(UUID token, ClientSubLevel root, UUID id) {
+        if (root != null && !root.isRemoved() && id.equals(root.getUniqueId())) return true;
+        for (Rider rider : riders(token)) {
+            ClientSubLevel part = rider.mirror();
+            if (!part.isRemoved() && id.equals(part.getUniqueId())) return true;
+        }
+        return false;
+    }
+
+    public static @Nullable Player wearerOf(SubLevel part) {
+        if (part == null) return null;
+        for (UUID token : WORN) {
+            ClientSubLevel root = MIRRORS.get(token);
+            if (root == null) continue;
+            if (root == part) return WEARERS.get(token);
+            for (Rider rider : riders(token)) if (rider.mirror() == part) return WEARERS.get(token);
+        }
+        return null;
+    }
+
+    public static @Nullable ClientSubLevel wornRootOf(SubLevel part) {
+        if (part == null) return null;
+        for (UUID token : WORN) {
+            ClientSubLevel root = MIRRORS.get(token);
+            if (root == null) continue;
+            if (root == part) return root;
+            for (Rider rider : riders(token)) if (rider.mirror() == part) return root;
+        }
+        return null;
+    }
+
+    public static @Nullable Pose3d wornFrame(SubLevel part, float partialTick) {
+        if (part == null) return null;
+        for (UUID token : WORN) {
+            ClientSubLevel root = MIRRORS.get(token);
+            Player wearer = WEARERS.get(token);
+            if (root == null || root.isRemoved() || wearer == null || wearer.isRemoved()) continue;
+            boolean isRoot = root == part;
+            Rider owner = null;
+            if (!isRoot) for (Rider rider : riders(token)) if (rider.mirror() == part) owner = rider;
+            if (!isRoot && owner == null) continue;
+            Pose3d hat = WornHatFrame.at(root, wearer, partialTick);
+            if (hat == null) return null;
+            return isRoot ? hat : Detached.compose(hat, owner.at());
+        }
+        return null;
+    }
+
+    public static boolean isStandingHatPart(SubLevel candidate) {
+        if (candidate == null) return false;
+        UUID id = candidate.getUniqueId();
+        for (UUID token : STANDING) {
+            if (matchesHatPart(token, MIRRORS.get(token), id)) return true;
+        }
+        return false;
     }
 
     public static boolean sameBuild(SubLevel first, SubLevel second) {
@@ -211,6 +350,8 @@ public final class BuildMirrors {
             return;
         }
         ClientSubLevel old = MIRRORS.remove(payload.token());
+        BlockPos host = old != null && STANDING.contains(payload.token()) ? HOSTS.get(payload.token()) : null;
+        double[] eased = EASED.get(payload.token());
         if (old != null) {
             Mirrors.close(old);
             forget(payload.token());
@@ -220,16 +361,23 @@ public final class BuildMirrors {
         HatNativeContraptionRender.forget(payload.token());
         UUID id = payload.children().hasUUID("uuid") ? payload.children().getUUID("uuid") : payload.token();
         ClientSubLevel mirror = Mirrors.open(level, id, payload.plot());
+        if (mirror == null && evict(level, payload.plot())) mirror = Mirrors.open(level, id, payload.plot());
         if (mirror == null) {
             MISSING.add(payload.token());
+            if (occupied(level, payload.plot()))
+                REQUESTED.put(payload.token(), level.getGameTime() - RETRY_TICKS + BUSY_RETRY_TICKS);
             return;
         }
         MISSING.remove(payload.token());
         MIRRORS.put(payload.token(), mirror);
+        EPOCHS.put(payload.token(), payload.children().getInt(BuildSites.MIRROR_EPOCH));
+        ACCEPTED.put(payload.token(), level.getGameTime());
         List<Rider> riders = new ArrayList<>();
         for (Tag entry : payload.children().getList("children", Tag.TAG_COMPOUND)) {
             CompoundTag rider = (CompoundTag) entry;
             ClientSubLevel child = Mirrors.open(level, rider.getUUID("uuid"), rider.getCompound("plot"));
+            if (child == null && evict(level, rider.getCompound("plot")))
+                child = Mirrors.open(level, rider.getUUID("uuid"), rider.getCompound("plot"));
             if (child != null) {
                 Pose3d relative = Detached.loadPose(rider.getCompound("relative"));
                 riders.add(new Rider(child, relative, new RiderPlayback()));
@@ -238,6 +386,41 @@ public final class BuildMirrors {
         if (!riders.isEmpty()) RIDERS.put(payload.token(), riders);
         HatNativeContraptionRender.accept(payload.token(), payload.children().getCompound("native_contraptions"));
         USED.put(payload.token(), level.getGameTime());
+        if (host != null && eased != null) {
+            EASED.put(payload.token(), eased);
+            standAt(payload.token(), mirror, level, host, eased);
+        }
+    }
+
+    private static boolean evict(ClientLevel level, CompoundTag plot) {
+        SubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container == null) return false;
+        int x = plot.getInt("plot_x");
+        int z = plot.getInt("plot_z");
+        int side = 1 << container.getLogSideLength();
+        if (x < 0 || z < 0 || x >= side || z >= side) return false;
+        SubLevel there = container.getSubLevel(x, z);
+        if (there == null) return false;
+        for (Map.Entry<UUID, ClientSubLevel> entry : MIRRORS.entrySet()) {
+            UUID token = entry.getKey();
+            if (!containsPart(token, entry.getValue(), there)) continue;
+            Mirrors.close(entry.getValue());
+            MIRRORS.remove(token);
+            EPOCHS.remove(token);
+            WORN.remove(token);
+            forget(token);
+            dismount(token);
+            return container.getSubLevel(x, z) == null;
+        }
+        return false;
+    }
+
+    private static boolean occupied(ClientLevel level, CompoundTag plot) {
+        SubLevelContainer container = SubLevelContainer.getContainer(level);
+        int x = plot.getInt("plot_x");
+        int z = plot.getInt("plot_z");
+        int side = container == null ? 0 : 1 << container.getLogSideLength();
+        return x >= 0 && z >= 0 && x < side && z < side && container.getSubLevel(x, z) != null;
     }
 
     public static void tick(ClientTickEvent.Post event) {
@@ -252,20 +435,24 @@ public final class BuildMirrors {
             keep(HatRendering.headwear(player), now);
         }
         Set<UUID> worn = new HashSet<>();
+        Map<UUID, Player> wearers = new HashMap<>();
         for (Player wearer : level.players()) {
-            UUID token = BuildHostBlockEntity.token(HatRendering.headwear(wearer));
-            ClientSubLevel mirror = token == null ? null : MIRRORS.get(token);
-            if (mirror == null) continue;
-            Pose3d pose = new Pose3d();
             ItemStack headwear = HatRendering.headwear(wearer);
+            UUID token = BuildHostBlockEntity.token(headwear);
+            ClientSubLevel mirror = token == null ? null : MIRRORS.get(token);
+            if (mirror == null || !current(token, headwear)) continue;
+            Pose3d pose = new Pose3d();
             BuildSites.wear(pose, mirror, wearer, BuildSites.offsetVector(headwear), headwear);
             if (WORN.contains(token)) Mirrors.moveTo(mirror, pose);
             else Mirrors.snapTo(mirror, pose);
             for (Rider rider : riders(token)) place(rider, pose, WORN.contains(token));
             worn.add(token);
+            wearers.put(token, wearer);
         }
         WORN.clear();
         WORN.addAll(worn);
+        WEARERS.clear();
+        WEARERS.putAll(wearers);
         Iterator<Map.Entry<UUID, ClientSubLevel>> iterator = MIRRORS.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<UUID, ClientSubLevel> entry = iterator.next();
@@ -280,11 +467,13 @@ public final class BuildMirrors {
             }
             if (mirror.isRemoved()) {
                 iterator.remove();
+                EPOCHS.remove(token);
                 forget(token);
                 dismount(token);
             } else if (now - USED.getOrDefault(token, now) > IDLE_TICKS) {
                 Mirrors.close(mirror);
                 iterator.remove();
+                EPOCHS.remove(token);
                 forget(token);
                 dismount(token);
             }
@@ -299,6 +488,7 @@ public final class BuildMirrors {
     }
 
     private static void forget(UUID token) {
+        ACCEPTED.remove(token);
         USED.remove(token);
         REQUESTED.remove(token);
         STANDING.remove(token);
@@ -314,16 +504,20 @@ public final class BuildMirrors {
     private static void keep(ItemStack stack, long now) {
         UUID token = token(stack);
         if (token == null) return;
-        if (MIRRORS.containsKey(token)) USED.put(token, now);
-        else request(token, now);
+        if (!MIRRORS.containsKey(token)) request(token, now);
+        else if (current(token, stack)) USED.put(token, now);
     }
 
     public static void clear(LevelEvent.Unload event) {
         if (!event.getLevel().isClientSide()) return;
         MIRRORS.clear();
+        WEARERS.clear();
+        EPOCHS.clear();
+        ACCEPTED.clear();
         HatNativeContraptionRender.clear();
         USED.clear();
         REQUESTED.clear();
+        ASKED_EPOCH.clear();
         MISSING.clear();
         STANDING.clear();
         SEEN.clear();

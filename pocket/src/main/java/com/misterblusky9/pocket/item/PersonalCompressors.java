@@ -1,5 +1,7 @@
 package com.misterblusky9.pocket.item;
 
+import com.misterblusky9.pocket.compat.WornHats;
+import com.misterblusky9.pocket.compat.accessories.AccessoriesCompat;
 import com.misterblusky9.pocket.compat.curios.CuriosCompressors;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -13,6 +15,10 @@ public final class PersonalCompressors {
     public static @Nullable ItemStack find(Player player) {
         if (CURIOS) {
             ItemStack worn = CuriosCompressors.find(player);
+            if (worn != null) return worn;
+        }
+        if (WornHats.ACCESSORIES) {
+            ItemStack worn = AccessoriesCompat.findCompressor(player);
             if (worn != null) return worn;
         }
         if (is(player.getMainHandItem())) return player.getMainHandItem();

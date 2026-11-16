@@ -10,6 +10,7 @@ import com.misterblusky9.pym.api.ScaleFormat;
 import com.misterblusky9.pym.internal.PymMod;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import com.misterblusky9.pym.internal.network.DebugPayload;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
@@ -66,12 +67,20 @@ public final class ScaleCommand {
                                         .then(Commands.argument("targets", EntityArgument.entities())
                                                 .executes(ScaleCommand::entityInfo))))
                         .then(Commands.literal("hosted")
-                                .then(Commands.literal("on").executes(ScaleCommand::hostedOn))
-                                .then(Commands.literal("off").executes(ScaleCommand::hostedOff))
-                                .then(Commands.literal("status").executes(ScaleCommand::hostedStatus)))
+                                .then(Commands.literal("status").executes(ScaleCommand::hostedStatus))
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> BoolArgumentType.getBool(context, "enabled")
+                                                ? hostedOn(context) : hostedOff(context))))
+                        .then(Commands.literal("gamerule")
+                                .then(Commands.literal("setspawnscale")
+                                        .executes(ScaleCommand::spawnScaleQuery)
+                                        .then(Commands.literal("false").executes(context -> spawnScale(context, 0.0D)))
+                                        .then(Commands.argument("scaleFactor", DoubleArgumentType.doubleArg())
+                                                .executes(context -> spawnScale(context,
+                                                        DoubleArgumentType.getDouble(context, "scaleFactor"))))))
                         .then(Commands.literal("debug")
-                                .then(Commands.literal("on").executes(context -> debug(context, true)))
-                                .then(Commands.literal("off").executes(context -> debug(context, false))))
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> debug(context, BoolArgumentType.getBool(context, "enabled")))))
         );
     }
 
@@ -360,6 +369,28 @@ public final class ScaleCommand {
             count++;
         }
         return count;
+    }
+
+    private static int spawnScaleQuery(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        double scale = SpawnScale.get(source.getServer());
+        source.sendSuccess(() -> scale > 0.0D
+                ? Component.translatable("pym.command.spawnscale.query", ScaleFormat.label(scale))
+                : Component.translatable("pym.command.spawnscale.query.off"), false);
+        return 1;
+    }
+
+    private static int spawnScale(CommandContext<CommandSourceStack> context, double scale) {
+        CommandSourceStack source = context.getSource();
+        if (scale != 0.0D && !ScaleBounds.isValid(scale)) {
+            source.sendFailure(Component.translatable("pym.command.invalid", 1));
+            return 0;
+        }
+        SpawnScale.set(source.getServer(), scale);
+        source.sendSuccess(() -> scale > 0.0D
+                ? Component.translatable("pym.command.spawnscale.set", ScaleFormat.label(scale))
+                : Component.translatable("pym.command.spawnscale.off"), true);
+        return 1;
     }
 
     private static int debug(CommandContext<CommandSourceStack> context, boolean on) throws CommandSyntaxException {

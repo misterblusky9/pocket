@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pocket.compat.vista.mixin",
+  "plugin": "com.misterblusky9.pocket.compat.vista.VistaMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "VistaTvHatMixin",
+    "VistaBroadcastHatMixin",
+    "VistaViewFinderScaleMixin",
+    "ViewFinderControllerAccessor",
+    "VistaViewFinderNearPlaneMixin",
+    "VistaFeedNearPlaneMixin",
+    "VistaTvHeadUnderHatMixin",
+    "VistaPolygonOffsetMixin",
+    "VistaFeedHatCameraMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

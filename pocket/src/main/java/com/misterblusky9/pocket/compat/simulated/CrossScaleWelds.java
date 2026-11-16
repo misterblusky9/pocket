@@ -154,12 +154,9 @@ public final class CrossScaleWelds {
             double footprint = unsized ? 1.0D : smallScale / bigScale;
             Vec3 rawHit = firstIsSmall ? secondHit : firstHit;
             Vec3 hit = rawHit == null ? new Vec3(0.5D, 0.5D, 0.5D) : rawHit;
-            WeldGeometry.SnapMode resolvedMode = !unsized && !firstIsSmall
-                    ? WeldGeometry.SnapMode.GRID
-                    : mode;
             Vector3d bigAnchor = unsized && mode != WeldGeometry.SnapMode.FREE
                     ? WeldGeometry.faceCentre(bigPos, bigFacing)
-                    : WeldGeometry.anchor(bigPos, bigFacing, hit.x, hit.y, hit.z, divisor, footprint, resolvedMode);
+                    : WeldGeometry.anchor(bigPos, bigFacing, hit.x, hit.y, hit.z, divisor, footprint, mode);
 
             return new Weld(
                     small,

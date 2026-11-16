@@ -34,6 +34,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -59,7 +62,7 @@ public final class PocketedSubLevelEvents {
                 ? BuildSites.hostOf(root != null ? root : server) : null;
         boolean build = host != null
                 || event.getLevel().getBlockState(found.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
-        if (!fitsPocket(player, build ? PocketCaseItem.POCKETABLE_SCALE : settled)) return;
+        if (build ? !fitsPocket(player, PocketCaseItem.POCKETABLE_SCALE) : !groupFitsPocket(player, found)) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
@@ -71,17 +74,68 @@ public final class PocketedSubLevelEvents {
             player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_mounted"), true);
             return;
         }
-        ServerSubLevel subLevel = host == null ? ready(serverLevel, player, target) ? target : null
-                : host.release(player, candidate -> ready(serverLevel, player, candidate));
+        List<ServerSubLevel> welded = host == null ? weldedGroup(serverLevel, player, target) : List.of();
+        if (welded == null) return;
+        ServerSubLevel subLevel = host == null ? ready(serverLevel, player, target, welded) ? target : null
+                : host.release(player, candidate -> ready(serverLevel, player, candidate, null));
         if (subLevel == null) return;
-        pocket(serverLevel, player, subLevel, held);
+        pocket(serverLevel, player, subLevel, held, welded);
     }
 
-    private static boolean ready(ServerLevel level, Player player, ServerSubLevel subLevel) {
+    private static @Nullable List<ServerSubLevel> weldedGroup(ServerLevel level, Player player, ServerSubLevel root) {
         ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
-        if (container != null && CrossScaleWelds.isWelded(container, subLevel)) {
+        if (container == null) return null;
+        CrossScaleWelds.WeldGraph graph = CrossScaleWelds.snapshot(container);
+        UUID rootId = root.getUniqueId();
+        if (!graph.isEndpoint(rootId)) return List.of();
+        if (graph.worldAnchored(rootId)) {
+            player.displayClientMessage(Component.translatable("pocket.message.cut_world_welds_before_pocketing"), true);
+            return null;
+        }
+        if (!graph.complete(rootId)) {
+            player.displayClientMessage(Component.translatable("pocket.message.weld_group_unloaded"), true);
+            return null;
+        }
+        List<ServerSubLevel> members = new ArrayList<>();
+        for (UUID id : graph.component(rootId)) {
+            if (id.equals(rootId)) continue;
+            if (!(container.getSubLevel(id) instanceof ServerSubLevel member) || member.isRemoved()) {
+                player.displayClientMessage(Component.translatable("pocket.message.weld_group_unloaded"), true);
+                return null;
+            }
+            if (Detached.isDetached(member) || Hosted.isHosted(member)) {
+                player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_mounted"), true);
+                return null;
+            }
+            double settled = Pym.scale().settled(member);
+            if (Math.abs(Pym.scale().of(member) - settled) > PICKUP_SCALE_TOLERANCE
+                    || !Pym.scale().isAt(member, settled)) {
+                player.displayClientMessage(Component.translatable("pocket.weld.still_scaling"), true);
+                return null;
+            }
+            members.add(member);
+        }
+        return members;
+    }
+
+    private static boolean ready(ServerLevel level, Player player, ServerSubLevel subLevel,
+                                 @Nullable List<ServerSubLevel> welded) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (welded == null && container != null && CrossScaleWelds.isWelded(container, subLevel)) {
             player.displayClientMessage(Component.translatable(CrossScaleWelds.POCKET_BLOCKED), true);
             return false;
+        }
+
+        if (welded != null) {
+            int limit = Pym.resize().shrunkBlockLimit();
+            for (ServerSubLevel member : welded) {
+                PocketedEntities.disassembleContraptions(level, member);
+                int blocks = Pym.resize().contents(member).blocks();
+                if (blocks > limit) {
+                    player.displayClientMessage(Component.translatable("pocket.message.hard_limit_ratio", blocks, limit), true);
+                    return false;
+                }
+            }
         }
 
         PocketedEntities.disassembleContraptions(level, subLevel);
@@ -106,6 +160,22 @@ public final class PocketedSubLevelEvents {
         return scale <= (PocketCaseItem.POCKETABLE_SCALE + PICKUP_SCALE_TOLERANCE) * relative;
     }
 
+    public static boolean groupFitsPocket(Player player, SubLevel target) {
+        if (!fitsPocket(player, Pym.scale().settled(target))) return false;
+        SubLevelContainer container = SubLevelContainer.getContainer(target.getLevel());
+        UUID rootId = target.getUniqueId();
+        if (container == null || rootId == null) return true;
+        CrossScaleWelds.WeldGraph graph = CrossScaleWelds.snapshot(container);
+        if (!graph.isEndpoint(rootId)) return true;
+        for (UUID id : graph.component(rootId)) {
+            if (id.equals(rootId)) continue;
+            SubLevel member = container.getSubLevel(id);
+            if (member == null || member.isRemoved()) continue;
+            if (!fitsPocket(player, Pym.scale().settled(member))) return false;
+        }
+        return true;
+    }
+
     private static SubLevel findSubLevel(PlayerInteractEvent.RightClickBlock event) {
         SubLevel sub = Sable.HELPER.getContaining(event.getLevel(), event.getHitVec().getBlockPos());
         if (sub == null) sub = Sable.HELPER.getContaining(event.getLevel(), event.getHitVec().getLocation());
@@ -116,12 +186,13 @@ public final class PocketedSubLevelEvents {
             ServerLevel level,
             Player player,
             ServerSubLevel subLevel,
-            ItemStack packedInto
+            ItemStack packedInto,
+            List<ServerSubLevel> welded
     ) {
         ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         if (container == null) return;
 
-        if (CrossScaleWelds.isWelded(container, subLevel)) {
+        if (welded.isEmpty() && CrossScaleWelds.isWelded(container, subLevel)) {
             player.displayClientMessage(Component.translatable(CrossScaleWelds.POCKET_BLOCKED), true);
             return;
         }
@@ -129,6 +200,13 @@ public final class PocketedSubLevelEvents {
         if (Pym.connections().isJoinedToAnother(subLevel)) {
             player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_joined"), true);
             return;
+        }
+        for (ServerSubLevel member : welded) {
+            if (member.isRemoved()) return;
+            if (Pym.connections().isJoinedToAnother(member)) {
+                player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_joined"), true);
+                return;
+            }
         }
 
         SubLevelData serialized = SubLevelSerializer.toData(subLevel, List.of());
@@ -143,6 +221,9 @@ public final class PocketedSubLevelEvents {
                 subLevel, fullTag, token, player);
         if (canonicalMetrics == null) return;
 
+        List<CompoundTag> weldedPayloads = PocketCaseItem.captureWelded(subLevel, welded, fullTag, token, player);
+        if (weldedPayloads == null) return;
+
         PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(level);
         storage.put(token, fullTag);
         String displayName = subLevel.getName();
@@ -155,10 +236,15 @@ public final class PocketedSubLevelEvents {
 
         var massTracker = subLevel.getMassTracker();
         double mass = massTracker == null ? 0.0D : massTracker.getMass();
+        for (ServerSubLevel member : welded) {
+            var memberMass = member.getMassTracker();
+            if (memberMass != null && Double.isFinite(memberMass.getMass())) mass += memberMass.getMass();
+        }
 
         ItemStack result = PocketCaseItem.createFilled(
                 new ItemStack(ModItems.POCKETED_SUBLEVEL.get()), token, level,
                 displayName, snapshot, canonicalMetrics.blocks(), canonicalMetrics.blockEntities(), mass);
+        PocketCaseItem.setWeldedContents(result, fullTag);
         PocketCaseItem.setPackedBy(result, player.getGameProfile().getName());
         double settled = Pym.scale().settled(subLevel);
         PocketCaseItem.setPocketedScale(result, creativePocketsAnything(player)
@@ -175,12 +261,20 @@ public final class PocketedSubLevelEvents {
         boolean resultGiven = false;
         try {
             PocketedEntities.capture(level, subLevel, fullTag);
+            for (int i = 0; i < welded.size(); i++) {
+                PocketedEntities.capture(level, welded.get(i), weldedPayloads.get(i));
+            }
             storage.put(token, fullTag);
+            storage.remember(token, result, level.registryAccess());
             subLevel.getPlot().kickAllEntities();
+            for (ServerSubLevel member : welded) member.getPlot().kickAllEntities();
 
             UUID id = subLevel.getUniqueId();
             container.removeSubLevel(subLevel, SubLevelRemovalReason.REMOVED);
             removedFromWorld = true;
+            for (ServerSubLevel member : welded) {
+                if (!member.isRemoved()) container.removeSubLevel(member, SubLevelRemovalReason.REMOVED);
+            }
 
             giveResult(player, result);
             resultGiven = true;

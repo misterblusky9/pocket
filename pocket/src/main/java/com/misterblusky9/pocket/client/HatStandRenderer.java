@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.block.DummyHead;
 import com.misterblusky9.pocket.block.HatStandBlock;
 import com.misterblusky9.pocket.block.HatPlateSlot;
 import com.misterblusky9.pocket.block.HatStandBlockEntity;
@@ -63,6 +64,8 @@ public final class HatStandRenderer implements BlockEntityRenderer<HatStandBlock
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "textures/block/hatters_stand_head.png");
     public static final ResourceLocation HEROBRINE =
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "textures/block/herobrine.png");
+    private static final ResourceLocation TRIP =
+            ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "textures/block/trip-facade_by_eggsandbacon19.png");
     private static final float[] HAT_INFLATION = {0.25F, 0.05F, -1.0F, 0.01F};
     private static final int SKULL_CAP_SKIN_LAYER = 3;
     static final float HEAD_SCALE = 1.005F;
@@ -76,6 +79,11 @@ public final class HatStandRenderer implements BlockEntityRenderer<HatStandBlock
 
     public static void register(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(ModBlockEntities.HAT_STAND.get(), HatStandRenderer::new);
+    }
+
+    public static void registerDummyHead(EntityRenderersEvent.CreateSkullModels event) {
+        SkullBlockRenderer.SKIN_BY_TYPE.put(DummyHead.TYPE, HEAD);
+        event.registerSkullModel(DummyHead.TYPE, new SkullModel(event.getEntityModelSet().bakeLayer(ModelLayers.PLAYER_HEAD)));
     }
 
     @Override
@@ -97,11 +105,15 @@ public final class HatStandRenderer implements BlockEntityRenderer<HatStandBlock
         int skinLayer = HatRendering.skinLayer(stand.getActivator(), stand.getSkinLayer());
         if (skullCap && skinLayer == HatStandBlockEntity.LAYER_FLAT) skinLayer = SKULL_CAP_SKIN_LAYER;
         float headScale = skullCap ? 1.0F : HEAD_SCALE;
+        float inflation = HAT_INFLATION[Math.floorMod(skinLayer, HAT_INFLATION.length)];
+        if (inflation >= 0.0F && HeadLayerClip.hides(stand, (4.0F + inflation) * headScale))
+            skinLayer = HatStandBlockEntity.LAYER_REMOVED;
         RenderType headType = DummyHeadHaunting.haunts(stand) || egg == HatStandBlockEntity.NameEgg.HEROBRINE
                 ? RenderType.entityTranslucent(HEROBRINE) : headType(stand.getSkinProfile());
         boolean keygen = egg == HatStandBlockEntity.NameEgg.RAINBOW && !DummyHeadHaunting.haunts(stand);
         renderHead(headType, keygen, skinLayer, yaw, pose, buffers, light, rise, headScale);
-        if (!stand.getActivator().isEmpty() && stand.getHeadwearLayer() != HatStandBlockEntity.LAYER_REMOVED)
+        if (!stand.getActivator().isEmpty() && stand.getHeadwearLayer() != HatStandBlockEntity.LAYER_REMOVED
+                && !HeadLayerClip.hides(stand, standHeadwearBox(stand)))
             renderHeadwear(BuildHostBlockEntity.plain(stand.getActivator()), egg, stand.getHeadwearLayer() == 1,
                     yaw, pose, buffers, light, rise);
         pose.popPose();
@@ -112,6 +124,13 @@ public final class HatStandRenderer implements BlockEntityRenderer<HatStandBlock
             ValueBoxRenderer.renderItemIntoValueBox(BuildHostBlockEntity.plain(stand.getActivator()), pose, buffers, light, overlay);
             pose.popPose();
         }
+    }
+
+    private static double standHeadwearBox(HatStandBlockEntity stand) {
+        ItemStack headwear = stand.getActivator();
+        double box = headwear.getItem() instanceof ArmorItem armor && armor.getEquipmentSlot() == EquipmentSlot.HEAD
+                ? HeadLayerClip.HELMET : HeadLayerClip.HEADWEAR;
+        return stand.getHeadwearLayer() == 1 ? box * HatRendering.headwearFlat(headwear) : box;
     }
 
     private static void renderHat(HatStandBlockEntity stand, float partialTick, PoseStack pose, MultiBufferSource buffers,
@@ -159,6 +178,11 @@ public final class HatStandRenderer implements BlockEntityRenderer<HatStandBlock
 
     private static void drawHeadwear(ItemStack stack, HatStandBlockEntity.NameEgg egg, boolean flat, PoseStack pose,
                                      MultiBufferSource buffers, int light) {
+        HeadwearUnderHat.run(() -> drawHeadwearUnderHat(stack, egg, flat, pose, buffers, light));
+    }
+
+    private static void drawHeadwearUnderHat(ItemStack stack, HatStandBlockEntity.NameEgg egg, boolean flat, PoseStack pose,
+                                             MultiBufferSource buffers, int light) {
         Minecraft minecraft = Minecraft.getInstance();
         pose.pushPose();
         HatRendering.pullSkullCap(pose, stack);
@@ -226,6 +250,7 @@ public final class HatStandRenderer implements BlockEntityRenderer<HatStandBlock
     private static RenderType headType(@Nullable ResolvableProfile profile) {
         HatStandBlockEntity.NameEgg egg = HatStandBlockEntity.NameEgg.of(profile);
         if (egg == HatStandBlockEntity.NameEgg.HEROBRINE) return RenderType.entityTranslucent(HEROBRINE);
+        if (egg == HatStandBlockEntity.NameEgg.MELONS) return RenderType.entityTranslucent(TRIP);
         return profile == null || egg == HatStandBlockEntity.NameEgg.UPSIDE_DOWN || egg == HatStandBlockEntity.NameEgg.RAINBOW
                 ? RenderType.entityTranslucent(HEAD)
                 : SkullBlockRenderer.getRenderType(SkullBlock.Types.PLAYER, profile);

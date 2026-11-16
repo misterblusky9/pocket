@@ -4,12 +4,15 @@ import com.misterblusky9.pocket.scale.ScaleLadder;
 import com.misterblusky9.pocket.network.EntityCompressionGlowPayload;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
+import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.goat.Goat;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.Iterator;
@@ -33,7 +36,7 @@ public final class EntityCompressionSessions {
         if (ScaleBounds.same(current, goal)) return false;
 
         Session session = new Session(target.getUUID(), holder.getUUID(), null, goal, current);
-        if (!session.resizeTo(target, goal)) return false;
+        if (!session.resizeTo(target, goal, holder)) return false;
         Session previous = SESSIONS.put(target.getUUID(), session);
         if (previous != null) EntityCompressionGlowPayload.clear(target);
         EntityCompressionGlowPayload.send(target, goal > current, GLOW_TIMEOUT_TICKS);
@@ -137,7 +140,7 @@ public final class EntityCompressionSessions {
         BeamSession.Tick tick = beam.advance(BeamSession.Pace.HELD_BEAM, ScaleBounds.same(next, session.goal));
         if (session.resizing() || !tick.step()) return true;
 
-        if (!session.resizeTo(target, next)) return false;
+        if (!session.resizeTo(target, next, holder)) return false;
         beam.stepped();
         return true;
     }
@@ -154,6 +157,13 @@ public final class EntityCompressionSessions {
 
     private static boolean locked(Entity target, ServerPlayer holder) {
         return target instanceof Player player && PersonalLock.blocks(holder, player);
+    }
+
+    private static void awardShrunkTheKid(ServerPlayer holder) {
+        AdvancementHolder advancement = holder.server.getAdvancements().get(
+                ResourceLocation.fromNamespaceAndPath("pocket", "shrunkthekid")
+        );
+        if (advancement != null) holder.getAdvancements().award(advancement, "kid");
     }
 
     private static Entity findEntity(ServerTickEvent.Post event, UUID entityId) {
@@ -188,11 +198,12 @@ public final class EntityCompressionSessions {
             return !Double.isNaN(this.resizingTo);
         }
 
-        boolean resizeTo(Entity target, double scale) {
+        boolean resizeTo(Entity target, double scale, ServerPlayer holder) {
             if (!Pym.entities().setScale(target, scale / EntityCompressionTargeting.containerScale(target), RESIZE_TICKS)) {
                 return false;
             }
             if (target instanceof ServerPlayer player) PersonalScale.remember(player, scale);
+            if (scale < this.settled && target instanceof Goat goat && goat.isBaby()) awardShrunkTheKid(holder);
             this.resizingTo = scale;
             this.resizeAge = 0;
             return true;

@@ -1,5 +1,8 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.block.HatStandBlockEntity;
+import com.misterblusky9.pocket.build.HatSeals;
+import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.item.ModItems;
@@ -102,6 +105,9 @@ public final class PocketKnifeCutPreview {
         LocalPlayer player = minecraft.player;
         if (player == null || minecraft.level == null || minecraft.screen != null
                 || !player.getItemInHand(event.getHand()).is(ModItems.POCKET_KNIFE.get())) return;
+        if (selected == null && minecraft.hitResult instanceof BlockHitResult aimed
+                && HatSeals.base(minecraft.level, aimed) instanceof HatStandBlockEntity stand
+                && PocketCaseItem.isSealed(stand.getActivator())) return;
         if (clickHeld) {
             event.setCanceled(true);
             event.setSwingHand(false);

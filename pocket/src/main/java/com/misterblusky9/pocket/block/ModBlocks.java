@@ -8,7 +8,9 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SkullBlock;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.WallSkullBlock;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.PushReaction;
@@ -83,6 +85,14 @@ public final class ModBlocks {
                     "blueprint_casing",
                     () -> new CasingBlock(BlockBehaviour.Properties.ofFullCopy(SharedProperties.stone()).sound(SoundType.WOOD))
             );
+
+    public static final DeferredHolder<Block, SkullBlock> DUMMY_HEAD =
+            BLOCKS.register("dummy_head", () -> new SkullBlock(DummyHead.TYPE,
+                    BlockBehaviour.Properties.of().strength(1.0F).pushReaction(PushReaction.DESTROY)));
+
+    public static final DeferredHolder<Block, WallSkullBlock> DUMMY_WALL_HEAD =
+            BLOCKS.register("dummy_wall_head", () -> new WallSkullBlock(DummyHead.TYPE,
+                    BlockBehaviour.Properties.of().strength(1.0F).lootFrom(DUMMY_HEAD).pushReaction(PushReaction.DESTROY)));
 
     static {
         BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "diagram_tile"), BLUEPRINT_CASING.getId());

@@ -49,7 +49,9 @@ public record CrossScaleWeldPayload(
     public static final Type<CrossScaleWeldPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "cross_scale_weld")
     );
-    private static final double MAX_REACH_SQ = 64.0D;
+    private static final double MIN_REACH = 8.0D;
+    private static final double REACH_SLACK = 1.0D;
+    private static final double FACE_HALF_DIAGONAL = Math.sqrt(0.5D);
 
     public static final StreamCodec<RegistryFriendlyByteBuf, CrossScaleWeldPayload> STREAM_CODEC =
             StreamCodec.of(
@@ -93,7 +95,14 @@ public record CrossScaleWeldPayload(
         ItemStack glue = player.getItemInHand(this.hand);
         if (!glue.is(ModItems.GLUE_GUN.get())) return;
 
-        if (!withinReach(player, this.smallPos) || !withinReach(player, this.bigPos)) return;
+        Vector3d smallFace = WeldGeometry.faceCentre(this.smallPos, this.smallFacing);
+        Vector3d bigFace = new Vector3d(
+                this.bigPos.getX() + this.hitX, this.bigPos.getY() + this.hitY, this.bigPos.getZ() + this.hitZ);
+        if (!withinReach(player, this.smallPos, smallFace, FACE_HALF_DIAGONAL)
+                || !withinReach(player, this.bigPos, bigFace, 0.0D)) {
+            message(player, CrossScaleWelds.Refusal.OUT_OF_RANGE);
+            return;
+        }
 
         CrossScaleWelds.Weld weld = CrossScaleWelds.Weld.resolve(
                 level,
@@ -148,21 +157,22 @@ public record CrossScaleWeldPayload(
         player.awardStat(Stats.ITEM_USED.get(glue.getItem()));
     }
 
-    private static boolean withinReach(ServerPlayer player, BlockPos pos) {
+    private static boolean withinReach(ServerPlayer player, BlockPos pos, Vector3d point, double faceSlack) {
         ServerLevel level = player.serverLevel();
-        Vec3 center = Vec3.atCenterOf(pos);
-        Vector3d world = new Vector3d(center.x, center.y, center.z);
+        Vector3d world = new Vector3d(point);
+        double scale = 1.0D;
         SubLevel subLevel = Sable.HELPER.getContaining(level, pos);
         if (subLevel != null) {
             var shown = Hosted.presented(subLevel);
             (shown != null ? shown : subLevel.logicalPose()).transformPosition(world);
+            double own = Pym.scale().of(subLevel);
+            if (Double.isFinite(own) && own > 0.0D) scale = own;
         }
-        Vec3 playerPos = player.position();
-        double dx = world.x - playerPos.x;
-        double dy = world.y - playerPos.y;
-        double dz = world.z - playerPos.z;
-        double distanceSquared = dx * dx + dy * dy + dz * dz;
-        return Double.isFinite(distanceSquared) && distanceSquared <= MAX_REACH_SQ;
+        Vec3 eye = player.getEyePosition();
+        double distance = world.distance(eye.x, eye.y, eye.z);
+        double reach = Math.max(MIN_REACH, player.blockInteractionRange() + REACH_SLACK)
+                + faceSlack * scale;
+        return Double.isFinite(distance) && distance <= reach;
     }
 
     private WeldGeometry.SnapMode mode() {

@@ -143,7 +143,10 @@ public enum PocketContainer {
     }
 
     public static PocketContainer of(ItemStack carrier) {
-        ResourceLocation recorded = PocketCaseItem.containerId(carrier);
+        return byId(PocketCaseItem.containerId(carrier));
+    }
+
+    public static PocketContainer byId(ResourceLocation recorded) {
         if (recorded != null) {
             for (PocketContainer container : values()) {
                 if (container.id().equals(recorded)) return container;

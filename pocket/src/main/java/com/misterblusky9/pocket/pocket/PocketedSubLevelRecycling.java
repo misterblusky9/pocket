@@ -55,6 +55,8 @@ public final class PocketedSubLevelRecycling {
         UUID token = PocketCaseItem.token(carrier);
         if (token == null || !PocketCaseItem.isUnique(carrier))
             throw new IllegalStateException("Not a filled pocketed sublevel");
+        if (PocketCaseItem.payloadState(current, carrier) != PocketCaseItem.PayloadState.AVAILABLE)
+            throw new IllegalStateException("Pocket payload belongs to another case or is gone");
         CarriedBuilds.close(token);
         ServerLevel source = BuildSites.storedIn(current, token);
         if (source == null) source = PlotSources.resolve(current,
