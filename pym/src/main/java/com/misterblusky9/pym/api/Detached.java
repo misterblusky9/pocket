@@ -32,6 +32,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -249,6 +250,20 @@ public final class Detached {
         tag.put("world_bounds", SableNBTUtils.writeBoundingBox(detached.boundingBox()));
         if (detached.getUserDataTag() != null) tag.put("user_data", detached.getUserDataTag().copy());
         return tag;
+    }
+
+    public static CompoundTag mirrorPlot(ServerSubLevel subLevel) {
+        CompoundTag plot = subLevel.getPlot().save();
+        ServerLevel level = subLevel.getLevel();
+        CompoundTag chunks = plot.getCompound("chunks");
+        for (String key : chunks.getAllKeys()) {
+            for (Tag entry : chunks.getCompound(key).getList("block_entities", Tag.TAG_COMPOUND)) {
+                CompoundTag data = (CompoundTag) entry;
+                BlockEntity live = level.getBlockEntity(BlockEntity.getPosFromTag(data));
+                if (live != null) data.merge(live.getUpdateTag(level.registryAccess()));
+            }
+        }
+        return plot;
     }
 
     public static @Nullable ServerSubLevel adopt(ServerSubLevel subLevel) {

@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:hats",
+  "display": {
+    "icon": {
+      "id": "minecraft:white_wool"
+    },
+    "title": {
+      "text": "Doug Dimmadome"
+    },
+    "description": {
+      "text": "Wear a Hat over 200 blocks tall"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

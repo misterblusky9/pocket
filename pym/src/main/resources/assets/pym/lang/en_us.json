@@ -50,5 +50,9 @@
   "pym.command.info.backend": "Pym backend: %s",
   "pym.command.info.entity_scale": "Scale: %s, target %s",
   "pym.command.debug.on": "Pym debug on: collider outlines for you, scale logging for the server",
-  "pym.command.debug.off": "Pym debug off"
+  "pym.command.debug.off": "Pym debug off",
+  "pym.command.spawnscale.set": "Players now spawn and respawn at scale %s",
+  "pym.command.spawnscale.off": "Spawn scale off: players keep their scale through spawns",
+  "pym.command.spawnscale.query": "Spawn scale: %s",
+  "pym.command.spawnscale.query.off": "Spawn scale: off"
 }

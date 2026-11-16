@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:hats",
+  "display": {
+    "icon": {
+      "id": "minecraft:tinted_glass"
+    },
+    "title": {
+      "text": "Cool Shades"
+    },
+    "description": {
+      "text": "Wear a hat with tinted glass on it"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:smartest_minecraft_player",
+  "display": {
+    "icon": {
+      "id": "minecraft:lightning_rod"
+    },
+    "title": {
+      "text": "Darwin Award Recipient"
+    },
+    "description": {
+      "text": "Get struck by lightning while wearing a Hat with a Lightning Rod on it"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

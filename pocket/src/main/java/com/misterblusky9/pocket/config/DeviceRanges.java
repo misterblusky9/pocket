@@ -53,7 +53,6 @@ public final class DeviceRanges {
     private static final ModConfigSpec.BooleanValue ALLOW_PVP_SCALING_TOGGLE;
     private static final ModConfigSpec.BooleanValue CREATIVE_POCKETS_ANYTHING;
     private static final ModConfigSpec.IntValue KNIFE_MAX_BLOCKS;
-    private static final ModConfigSpec.IntValue KNIFE_MAX_MOVED_BLOCKS;
     private static final ModConfigSpec.DoubleValue TANK_BONUS_PER_CAPACITY_LEVEL;
 
     static {
@@ -93,9 +92,6 @@ public final class DeviceRanges {
         KNIFE_MAX_BLOCKS = builder.comment(
                 "Largest sublevel, in blocks, the Pocket Knife may cut. 0 means no limit.")
                 .defineInRange("maxBlocks", 32_768, 0, Integer.MAX_VALUE);
-        KNIFE_MAX_MOVED_BLOCKS = builder.comment(
-                "Most blocks one Pocket Knife cut may split off. 0 means no limit.")
-                .defineInRange("maxMovedBlocks", 16_384, 0, Integer.MAX_VALUE);
         builder.pop();
 
         builder.push("levititeTanks");
@@ -128,7 +124,14 @@ public final class DeviceRanges {
     }
 
     public static int knifeMaxMovedBlocks() {
-        return SPEC.isLoaded() ? KNIFE_MAX_MOVED_BLOCKS.get() : 16_384;
+        int range;
+        try {
+            range = dev.simulated_team.simulated.service.SimConfigService.INSTANCE.server().assembly.honeyGlueRange.get();
+        } catch (RuntimeException e) {
+            range = 48;
+        }
+        long side = Math.max(1, range);
+        return (int) Math.min(Integer.MAX_VALUE, side * side * side);
     }
 
     public static double tankBonusPerCapacityLevel() {

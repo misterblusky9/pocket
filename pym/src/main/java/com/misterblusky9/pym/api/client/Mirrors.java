@@ -19,6 +19,7 @@ import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
@@ -35,6 +36,7 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
@@ -130,6 +132,20 @@ public final class Mirrors {
             loads.put(blockEntity, data);
         }
         return chunk;
+    }
+
+    public static StructureTemplate template(ClientSubLevel mirror) {
+        StructureTemplate template = new StructureTemplate();
+        BoundingBox3ic bounds = mirror.getPlot().getBoundingBox();
+        if (mirror.isRemoved() || bounds == null || bounds == BoundingBox3i.EMPTY) return template;
+        try {
+            template.fillFromWorld(mirror.getLevel(), new BlockPos(bounds.minX(), bounds.minY(), bounds.minZ()),
+                    new Vec3i(bounds.maxX() - bounds.minX() + 1, bounds.maxY() - bounds.minY() + 1,
+                            bounds.maxZ() - bounds.minZ() + 1), false, null);
+        } catch (RuntimeException exception) {
+            return new StructureTemplate();
+        }
+        return template;
     }
 
     public static @Nullable ClientSubLevel find(UUID id) {

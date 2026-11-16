@@ -25,6 +25,22 @@ public class ProjectionNearPlanePolicyTest {
         near(ProjectionNearPlanePolicy.compose(vanilla, Double.POSITIVE_INFINITY), vanilla, "invalid inf scale");
         if (!Float.isNaN(ProjectionNearPlanePolicy.compose(Float.NaN, s16))) throw new AssertionError("invalid preexisting NaN");
         checks++;
+        float wide = 16.0F / 9.0F;
+        float fov70 = (float) Math.toRadians(70);
+        float fov110 = (float) Math.toRadians(110);
+        near(ProjectionNearPlanePolicy.fovCorrected(vanilla, fov110, wide), vanilla, "1x camera keeps vanilla near at any fov");
+        near(ProjectionNearPlanePolicy.fovCorrected(0.003125F, fov70, wide), 0.003125F, "tiny camera at reference fov unchanged");
+        near(ProjectionNearPlanePolicy.fovCorrected(0.003125F, (float) Math.toRadians(50), wide), 0.003125F, "narrow fov never raises near");
+        float wideTiny = ProjectionNearPlanePolicy.fovCorrected(0.003125F, fov110, wide);
+        double t70 = Math.tan(Math.toRadians(35)), t110 = Math.tan(Math.toRadians(55));
+        double reach70 = Math.sqrt(1 + t70 * t70 + t70 * t70 * wide * wide);
+        double reach110 = Math.sqrt(1 + t110 * t110 + t110 * t110 * wide * wide);
+        near(wideTiny, (float) (0.003125D * reach70 / reach110), "tiny camera at 110 keeps 70-degree corner reach");
+        near((float) (wideTiny * reach110), (float) (0.003125D * reach70), "corner distance matches reference");
+        near(ProjectionNearPlanePolicy.fovCorrected(0.0006F, (float) Math.toRadians(170), wide), 0.0005F, "fov correction floor");
+        near(ProjectionNearPlanePolicy.fovCorrected(0.0001F, (float) Math.toRadians(170), wide), 0.0001F, "fov correction never lowers below an already smaller near");
+        near(ProjectionNearPlanePolicy.fovCorrected(0.003125F, Float.NaN, wide), 0.003125F, "invalid fov");
+        near(ProjectionNearPlanePolicy.fovCorrected(0.003125F, fov110, 0), 0.003125F, "invalid aspect");
         System.out.println("PASS: " + checks + " near-plane composition checks");
     }
 }

@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import com.misterblusky9.pym.internal.client.PortraitGlint;
 import com.misterblusky9.pym.internal.client.PortraitScope;
 import com.misterblusky9.pym.internal.mixin.client.LightTextureAccessor;
+import com.misterblusky9.pym.internal.mixin.client.VanillaChunkedSubLevelRenderDataAccessor;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.render.dispatcher.SubLevelRenderDispatcher;
 import dev.ryanhcode.sable.sublevel.render.vanilla.VanillaChunkedSubLevelRenderData;
@@ -73,8 +74,12 @@ public final class Portrait {
     public static void compileNow(final ClientSubLevel subLevel) {
         if (!(subLevel.getRenderData() instanceof VanillaChunkedSubLevelRenderData data)) return;
         data.rebuild();
-        data.compileSections(PrioritizeChunkUpdates.PLAYER_AFFECTED, new RenderRegionCache(),
-                Minecraft.getInstance().gameRenderer.getMainCamera());
+        final RenderRegionCache cache = new RenderRegionCache();
+        for (final RenderSection section : data.allRenderSections()) {
+            section.compileSync(cache);
+            section.setNotDirty();
+        }
+        ((VanillaChunkedSubLevelRenderDataAccessor) data).pym$getSectionRenderDispatcher().uploadAllPendingUploads();
     }
 
     public static boolean draw(final ClientSubLevel subLevel, final Vector3dc origin, final PoseStack poseStack,

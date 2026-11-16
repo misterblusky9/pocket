@@ -13,6 +13,7 @@ import com.misterblusky9.pocket.pocket.ShellVoxels;
 import com.misterblusky9.pym.api.client.Portrait;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
+import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModel;
 import com.simibubi.create.foundation.item.render.CustomRenderedItemModelRenderer;
@@ -49,6 +50,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector3d;
 
@@ -162,28 +164,69 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         BoundingBox3ic bounds = mirror.getPlot().getBoundingBox();
         if (bounds == null) return;
 
+        UUID token = PocketCaseItem.token(stack);
+        List<BuildMirrors.Rider> riders = new ArrayList<>();
+        if (token != null) {
+            for (BuildMirrors.Rider rider : BuildMirrors.riders(token)) {
+                if (Portrait.canDraw(rider.mirror()) && rider.mirror().getPlot().getBoundingBox() != null)
+                    riders.add(rider);
+            }
+        }
+
+        double[] extent = {
+                bounds.minX(), bounds.minY(), bounds.minZ(),
+                bounds.maxX() + 1, bounds.maxY() + 1, bounds.maxZ() + 1
+        };
+        Vector3d corner = new Vector3d();
+        for (BuildMirrors.Rider rider : riders) {
+            BoundingBox3ic part = rider.mirror().getPlot().getBoundingBox();
+            for (int i = 0; i < 8; i++) {
+                corner.set(
+                        (i & 1) == 0 ? part.minX() : part.maxX() + 1,
+                        (i & 2) == 0 ? part.minY() : part.maxY() + 1,
+                        (i & 4) == 0 ? part.minZ() : part.maxZ() + 1);
+                rider.relative().transformPosition(corner);
+                extent[0] = Math.min(extent[0], corner.x);
+                extent[1] = Math.min(extent[1], corner.y);
+                extent[2] = Math.min(extent[2], corner.z);
+                extent[3] = Math.max(extent[3], corner.x);
+                extent[4] = Math.max(extent[4], corner.y);
+                extent[5] = Math.max(extent[5], corner.z);
+            }
+        }
+
         PocketContainer container = PocketContainer.of(stack);
-        int sizeX = bounds.maxX() - bounds.minX() + 1;
-        int sizeY = bounds.maxY() - bounds.minY() + 1;
-        int sizeZ = bounds.maxZ() - bounds.minZ() + 1;
+        double sizeX = extent[3] - extent[0];
+        double sizeY = extent[4] - extent[1];
+        double sizeZ = extent[5] - extent[2];
         int turns = PocketCaseItem.modelQuarterTurns(stack);
         boolean sideways = (turns & 1) != 0;
-        int footprintX = sideways ? sizeZ : sizeX;
-        int footprintZ = sideways ? sizeX : sizeZ;
+        double footprintX = sideways ? sizeZ : sizeX;
+        double footprintZ = sideways ? sizeX : sizeZ;
         float fit = (float) Math.min(
-                Math.min(COMPRESSED_SCALE, container.clearHeight() / Math.max(1, sizeY)),
-                Math.min(container.clearWidthX() / Math.max(1, footprintX),
-                        container.clearWidthZ() / Math.max(1, footprintZ)));
+                Math.min(COMPRESSED_SCALE, container.clearHeight() / Math.max(1.0D, sizeY)),
+                Math.min(container.clearWidthX() / Math.max(1.0D, footprintX),
+                        container.clearWidthZ() / Math.max(1.0D, footprintZ)));
+        Vector3d origin = new Vector3d(
+                (extent[0] + extent[3]) * 0.5D,
+                extent[1],
+                (extent[2] + extent[5]) * 0.5D);
 
         poseStack.pushPose();
         poseStack.translate(container.centreX(), container.floorY(), container.centreZ());
         poseStack.scale(fit, fit, fit);
         if (turns != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F * turns));
-        Portrait.draw(mirror, new Vector3d(
-                (bounds.minX() + bounds.maxX() + 1) * 0.5D,
-                bounds.minY(),
-                (bounds.minZ() + bounds.maxZ() + 1) * 0.5D),
-                poseStack, bufferSource, packedLight, packedOverlay);
+        Portrait.draw(mirror, origin, poseStack, bufferSource, packedLight, packedOverlay);
+        for (BuildMirrors.Rider rider : riders) {
+            Pose3d relative = rider.relative();
+            poseStack.pushPose();
+            poseStack.translate(relative.position().x() - origin.x, relative.position().y() - origin.y,
+                    relative.position().z() - origin.z);
+            poseStack.mulPose(new Quaternionf(relative.orientation()));
+            poseStack.scale((float) relative.scale().x(), (float) relative.scale().y(), (float) relative.scale().z());
+            Portrait.draw(rider.mirror(), relative.rotationPoint(), poseStack, bufferSource, packedLight, packedOverlay);
+            poseStack.popPose();
+        }
         poseStack.popPose();
     }
 

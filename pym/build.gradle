@@ -91,6 +91,7 @@ dependencies {
     createtestRuntimeOnly "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
     createtestRuntimeOnly "com.tterrag.registrate:Registrate:${registrate_version}"
     compileOnly "maven.modrinth:hNGBYvQN:hwxjOCxE"
+    compileOnly "maven.modrinth:qYJdIoAx:ZMfRgLy5"
 
     compileOnly(annotationProcessor("com.github.bawnorton.mixinsquared:mixinsquared-common:0.3.3"))
     implementation(jarJar("com.github.bawnorton.mixinsquared:mixinsquared-neoforge:0.3.3"))

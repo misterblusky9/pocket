@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.misterblusky9.pocket.build.BuildHostBlockEntity;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ItemFrame;
@@ -19,7 +20,7 @@ public abstract class CreativeCaseItemFrameMixin {
             LivingEntity entity,
             Operation<Void> original
     ) {
-        if (PocketCaseItem.isUnique(stack)) {
+        if (PocketCaseItem.isUnique(stack) || BuildHostBlockEntity.token(stack) != null) {
             stack.shrink(amount);
         } else {
             original.call(stack, amount, entity);

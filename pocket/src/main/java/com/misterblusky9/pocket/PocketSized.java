@@ -44,6 +44,7 @@ public final class PocketSized {
                 com.misterblusky9.pocket.build.CarriedBuilds::openRiders);
         if (ModList.get().isLoaded("sable_schematic_api")) PhotomancyCompat.register();
         if (ModList.get().isLoaded("curios")) com.misterblusky9.pocket.compat.curios.CuriosHats.register();
+        if (com.misterblusky9.pocket.compat.WornHats.ACCESSORIES) com.misterblusky9.pocket.compat.accessories.AccessoriesCompat.register();
 
         ScaledRespawn.registerRespawnTicket();
 
@@ -51,7 +52,11 @@ public final class PocketSized {
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
         modBus.addListener(SubspaceRecyclerBlockEntity::registerCapabilities);
         modBus.addListener(HatStandBlockEntity::registerCapabilities);
+        modBus.addListener(com.misterblusky9.pocket.block.DummyHead::addToSkullEntity);
+        ModItems.ARMOR_MATERIALS.register(modBus);
         ModItems.ITEMS.register(modBus);
+        com.misterblusky9.pocket.item.HatStandRecipe.SERIALIZERS.register(modBus);
+        com.misterblusky9.pocket.item.ModMenus.MENUS.register(modBus);
         com.misterblusky9.pocket.item.ModDataComponents.COMPONENTS.register(modBus);
         com.misterblusky9.pocket.item.CompressionGunTank.COMPONENTS.register(modBus);
         modBus.addListener(com.misterblusky9.pocket.item.CompressionGunTank::registerCapabilities);
@@ -71,6 +76,7 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(HeldInteractionPriority::onEntityInteractSpecific);
         NeoForge.EVENT_BUS.addListener(PocketedSubLevelEvents::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onLeftClickBlock);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onRightClickItem);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onAnvilUpdate);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onAnvilTake);
@@ -78,6 +84,17 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onServerStopping);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onPlayerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onEquipmentChange);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onLeftClickBlock);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onBreak);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onPlace);
+        NeoForge.EVENT_BUS.addListener(net.neoforged.bus.api.EventPriority.LOW,
+                com.misterblusky9.pocket.advancement.HatAdvancements::onPlace);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.advancement.HatAdvancements::onStruck);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onEntityInteract);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onEntityInteractSpecific);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onAttackEntity);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onServerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onLevelSave);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onServerStopping);

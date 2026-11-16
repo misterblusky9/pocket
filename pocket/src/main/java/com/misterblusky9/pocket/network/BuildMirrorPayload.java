@@ -18,8 +18,8 @@ public record BuildMirrorPayload(UUID token, CompoundTag plot, CompoundTag child
 
     public static final StreamCodec<ByteBuf, BuildMirrorPayload> STREAM_CODEC = StreamCodec.composite(
             UUIDUtil.STREAM_CODEC, BuildMirrorPayload::token,
-            ByteBufCodecs.COMPOUND_TAG, BuildMirrorPayload::plot,
-            ByteBufCodecs.COMPOUND_TAG, BuildMirrorPayload::children,
+            ByteBufCodecs.TRUSTED_COMPOUND_TAG, BuildMirrorPayload::plot,
+            ByteBufCodecs.TRUSTED_COMPOUND_TAG, BuildMirrorPayload::children,
             BuildMirrorPayload::new);
 
     @Override

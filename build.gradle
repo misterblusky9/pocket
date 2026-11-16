@@ -50,6 +50,17 @@ subprojects {
         exclusiveContent {
             forRepository {
                 maven {
+                    name = "FabricMC"
+                    url = "https://maven.fabricmc.net/"
+                }
+            }
+            filter {
+                includeGroup "net.fabricmc.fabric-api"
+            }
+        }
+        exclusiveContent {
+            forRepository {
+                maven {
                     name = "Illusive Soulworks"
                     url = "https://maven.theillusivec4.top/"
                 }

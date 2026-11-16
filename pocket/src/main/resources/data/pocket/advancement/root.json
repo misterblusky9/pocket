@@ -15,7 +15,7 @@
     "description": {
       "text": ""
     },
-    "background": "pocket:textures/block/blueprint_casing.png",
+    "background": "pocket:textures/gui/advancement_background.png",
     "frame": "task",
     "show_toast": false,
     "announce_to_chat": false,

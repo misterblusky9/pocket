@@ -1,7 +1,10 @@
 package com.misterblusky9.pocket.build;
 
+import com.misterblusky9.pocket.advancement.HatAdvancements;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.client.BuildMirrors;
+import com.misterblusky9.pocket.item.CaseSeal;
+import com.misterblusky9.pocket.item.ModDataComponents;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelSavedData;
 import com.misterblusky9.pym.api.Detached;
@@ -43,8 +46,14 @@ import java.util.function.Predicate;
 
 public class BuildHostBlockEntity extends SmartBlockEntity {
     private static final String TOKEN = "pocket_hat_token";
+    private static final String EPOCH = "pocket_hat_epoch";
+    private static final String CREATOR = "pocket_hat_creator";
     private static final int SAVE_TICKS = 600;
     private @Nullable UUID hat;
+    private int epoch;
+    private @Nullable String creator;
+    private @Nullable String placer;
+    private boolean started;
     private int[] offset = new int[3];
     private final ItemStackHandler items = new ItemStackHandler(1) {
         @Override
@@ -72,7 +81,77 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
 
     public static @Nullable UUID token(ItemStack stack) {
         CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data != null && data.contains(TOKEN) ? data.copyTag().getUUID(TOKEN) : null;
+        return data != null && data.contains(TOKEN) ? data.getUnsafe().getUUID(TOKEN) : null;
+    }
+
+    public static boolean hasHat(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        return data != null && data.contains(TOKEN);
+    }
+
+    public static int epoch(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        return data != null && data.contains(EPOCH) ? data.getUnsafe().getInt(EPOCH) : 0;
+    }
+
+    public static @Nullable String creator(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        return data != null && data.contains(CREATOR) ? data.getUnsafe().getString(CREATOR) : null;
+    }
+
+    public static void stampCreator(ItemStack stack, String creator) {
+        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        data.putString(CREATOR, creator);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+    }
+
+    public static void stampEpoch(ItemStack stack, int epoch) {
+        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        if (epoch == 0) data.remove(EPOCH);
+        else data.putInt(EPOCH, epoch);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+    }
+
+    public static void retoken(ItemStack stack, UUID token) {
+        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        data.putUUID(TOKEN, token);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+    }
+
+    public static void restore(ItemStack stack, UUID token, int epoch) {
+        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        data.putUUID(TOKEN, token);
+        if (epoch == 0) data.remove(EPOCH);
+        else data.putInt(EPOCH, epoch);
+        data.remove(CREATOR);
+        BuildSites.writeOffset(data, new int[3]);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+    }
+
+    public static void strip(ItemStack stack) {
+        if (token(stack) == null) return;
+        CompoundTag data = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+        strip(data);
+        if (data.isEmpty()) stack.remove(DataComponents.CUSTOM_DATA);
+        else stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+        stack.remove(ModDataComponents.SEAL.get());
+    }
+
+    public static boolean strip(CompoundTag data) {
+        if (!data.hasUUID(TOKEN)) return false;
+        data.remove(TOKEN);
+        data.remove(EPOCH);
+        data.remove(CREATOR);
+        BuildSites.writeOffset(data, new int[3]);
+        return true;
+    }
+
+    public static void empty(CompoundTag saved) {
+        saved.remove("Hat");
+        saved.remove("Offset");
+        saved.remove("Creator");
+        saved.remove("Epoch");
+        saved.remove("Headwear");
     }
 
     public @Nullable UUID getHat() { return hat; }
@@ -80,6 +159,12 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
     public ItemStack getActivator() { return items.getStackInSlot(0); }
 
     public IItemHandler items() { return items; }
+
+    public void seal(@Nullable CaseSeal seal) {
+        ItemStack hat = getActivator().copy();
+        PocketCaseItem.setSeal(hat, seal);
+        items.setStackInSlot(0, hat);
+    }
 
     public int[] getOffset() { return offset; }
 
@@ -145,8 +230,15 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
         if (isActive() || !player.mayBuild()) return ItemInteractionResult.FAIL;
         ItemStack held = player.getItemInHand(hand);
         if (!host().activatedBy(held)) return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        placer = player.getGameProfile().getName();
+        started = false;
         ItemStack rest = items.insertItem(0, held, false);
+        placer = null;
+        if (started && player instanceof ServerPlayer serverPlayer) HatAdvancements.started(serverPlayer);
+        started = false;
         if (rest == held) return ItemInteractionResult.FAIL;
+        if (held.is(com.misterblusky9.pocket.item.ModItems.DUMMY_HEAD.get()) && player instanceof ServerPlayer serverPlayer)
+            HatAdvancements.dummied(serverPlayer);
         player.setItemInHand(hand, rest);
         return ItemInteractionResult.SUCCESS;
     }
@@ -165,14 +257,26 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
         UUID token = token(stack);
         if (token != null && (BuildSites.ownedElsewhere(token, server, worldPosition)
                 || BuildSites.holds(token, server, worldPosition))) return;
+        if (token != null && BuildSites.live(token) == null && !BuildSites.current(server, token, stack)
+                && CarriedBuilds.holds(token)) {
+            strip(stack);
+            token = null;
+        }
+        boolean reopened = token != null && BuildSites.live(token) == null;
         ServerSubLevel child = token == null ? null : BuildSites.open(server, token);
         if (child == null) {
+            reopened = false;
             if (token != null && BuildSites.pending(server, token)) return;
             token = UUID.randomUUID();
             child = BuildSites.create(server);
             if (child == null) return;
+            creator = placer;
+            started = placer != null;
+        } else {
+            creator = creator(stack);
         }
         hat = token;
+        epoch = reopened ? BuildSites.claim(server, token) : BuildSites.epoch(server, token);
         offset = BuildSites.readOffset(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag());
         mount(server, child);
         label(child);
@@ -184,6 +288,7 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
     private void unmount(ServerLevel server) {
         UUID token = hat;
         hat = null;
+        creator = null;
         ServerSubLevel child = BuildSites.live(token);
         if (child != null) {
             scaffold(server, child, false);
@@ -204,16 +309,24 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
         ItemStack stack = getActivator();
         if (stack.isEmpty() || hat == null) return false;
         CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        boolean unsealed = false;
         if (BuildSites.hasBuild(child)) {
             data.putUUID(TOKEN, hat);
+            if (epoch == 0) data.remove(EPOCH);
+            else data.putInt(EPOCH, epoch);
+            if (creator == null) data.remove(CREATOR);
+            else data.putString(CREATOR, creator);
             BuildSites.writeOffset(data, offset);
         } else {
             data.remove(TOKEN);
+            data.remove(EPOCH);
+            data.remove(CREATOR);
             BuildSites.writeOffset(data, new int[3]);
+            unsealed = stack.remove(ModDataComponents.SEAL.get()) != null;
         }
         CustomData labelled = data.isEmpty() ? null : CustomData.of(data);
         if (labelled == null ? !stack.has(DataComponents.CUSTOM_DATA)
-                : labelled.equals(stack.get(DataComponents.CUSTOM_DATA))) return false;
+                : labelled.equals(stack.get(DataComponents.CUSTOM_DATA))) return unsealed;
         if (labelled == null) stack.remove(DataComponents.CUSTOM_DATA);
         else stack.set(DataComponents.CUSTOM_DATA, labelled);
         return true;
@@ -222,11 +335,7 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
     public static ItemStack plain(ItemStack stack) {
         if (token(stack) == null) return stack;
         ItemStack plain = stack.copy();
-        CompoundTag data = plain.get(DataComponents.CUSTOM_DATA).copyTag();
-        data.remove(TOKEN);
-        BuildSites.writeOffset(data, new int[3]);
-        if (data.isEmpty()) plain.remove(DataComponents.CUSTOM_DATA);
-        else plain.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+        strip(plain);
         return plain;
     }
 
@@ -234,6 +343,8 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
         ItemStack result = target.copyWithCount(1);
         CompoundTag data = result.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         data.putUUID(TOKEN, token(source));
+        if (epoch(source) != 0) data.putInt(EPOCH, epoch(source));
+        if (creator(source) != null) data.putString(CREATOR, creator(source));
         BuildSites.writeOffset(data, BuildSites.offset(source));
         result.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
         return result;
@@ -263,12 +374,23 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
                 setActive(false);
                 return null;
             }
+            if (!BuildSites.current(server, hat, getActivator()) && CarriedBuilds.holds(hat)) {
+                strip(getActivator());
+                hat = null;
+                sync();
+                return null;
+            }
             child = BuildSites.open(server, hat);
             if (child == null) {
                 if (BuildSites.pending(server, hat)) return null;
                 hat = UUID.randomUUID();
                 child = BuildSites.create(server);
                 if (child == null) return null;
+                epoch = 0;
+                creator = null;
+            } else {
+                epoch = BuildSites.claim(server, hat);
+                creator = creator(getActivator());
             }
             mount(server, child);
             label(child);
@@ -296,6 +418,8 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
             return null;
         }
         hat = UUID.randomUUID();
+        epoch = 0;
+        creator = null;
         offset = new int[3];
         ServerSubLevel fresh = BuildSites.create(server);
         if (fresh != null) {
@@ -319,7 +443,10 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
 
     private static void commit(ServerLevel server, ItemStack result, @Nullable ServerPlayer holder) {
         UUID token = token(result);
-        if (token != null) PocketedSubLevelSavedData.getOrLoad(server).commitCapture(server, token, holder);
+        if (token == null) return;
+        ServerLevel stored = BuildSites.storedIn(server, token);
+        if (stored != null) PocketedSubLevelSavedData.getOrLoad(stored).remember(token, result, server.registryAccess());
+        PocketedSubLevelSavedData.getOrLoad(server).commitCapture(server, token, holder);
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, BuildHostBlockEntity host) {
@@ -341,7 +468,8 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
     public static void clientTick(Level level, BlockPos pos, BlockState state, BuildHostBlockEntity host) {
         host.tick();
         host.animate();
-        if (host.hat != null && !host.getActivator().isEmpty()) BuildMirrors.stand(host.hat, level, pos, host.offset);
+        if (host.hat != null && !host.getActivator().isEmpty() && BuildMirrors.current(host.hat, host.getActivator()))
+            BuildMirrors.stand(host.hat, level, pos, host.offset);
     }
 
     public void moved() {
@@ -374,6 +502,8 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
         if (clientPacket) tag.putBoolean("Active", !getActivator().isEmpty());
         if (hat != null) tag.putUUID("Hat", hat);
         if (offset[0] != 0 || offset[1] != 0 || offset[2] != 0) tag.putIntArray("Offset", offset);
+        if (creator != null) tag.putString("Creator", creator);
+        if (epoch != 0) tag.putInt("Epoch", epoch);
         if (!getActivator().isEmpty()) tag.put("Headwear", getActivator().save(registries));
     }
 
@@ -383,6 +513,8 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
         hat = tag.hasUUID("Hat") ? tag.getUUID("Hat") : null;
         int[] saved = tag.getIntArray("Offset");
         offset = saved.length == 3 ? saved : new int[3];
+        creator = tag.contains("Creator") ? tag.getString("Creator") : null;
+        epoch = tag.getInt("Epoch");
         items.setStackInSlot(0, tag.contains("Headwear", Tag.TAG_COMPOUND)
                 ? ItemStack.parseOptional(registries, tag.getCompound("Headwear")) : ItemStack.EMPTY);
     }

@@ -10,12 +10,19 @@
     "ContinuousOBBManifoldScaleMixin",
     "ContraptionInteractionPacketScaleMixin",
     "SchematicPrinterPlotChunksMixin",
+    "SchematicPlacePacketScaleMixin",
+    "SchematicPrinterErrorAccessor",
+    "SchematicLoadScaleMixin",
+    "SchematicContextScaleMixin",
+    "SchematicExportScaleMixin",
+    "StructureTemplateScaleMixin",
     "HostedLinkRangeMixin",
     "HostedLinkSlotMixin"
   ],
   "client": [
     "ContraptionVisualScaleMixin",
     "CarriageContraptionVisualScaleMixin",
+    "ContraptionEntityRendererScaleMixin",
     "CarriageCouplingScaleMixin",
     "TrackMarkerScaleMixin",
     "CreateContraptionDebugHitboxScaleMixin",
@@ -25,7 +32,12 @@
     "FlywheelSubLevelScaleMixin",
     "SchematicQuillScaleMixin",
     "SchematicToolScaleMixin",
+    "SchematicToolAimMixin",
     "SchematicToolOutlineScaleMixin",
+    "SchematicRendererScaleMixin",
+    "SchematicHandlerGridMixin",
+    "SchematicTransformationGridMixin",
+    "DeployToolGridMixin",
     "DeployToolOutlineScaleMixin"
   ],
   "injectors": {

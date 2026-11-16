@@ -1,16 +1,13 @@
 package com.misterblusky9.pocket.compat.curios;
 
+import com.misterblusky9.pocket.compat.CompressorBeltRender;
 import com.misterblusky9.pocket.item.ModItems;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import top.theillusivec4.curios.api.SlotContext;
@@ -29,17 +26,6 @@ public final class CuriosCompressorRenderer implements ICurioRenderer {
             float partialTicks, float ageInTicks, float netHeadYaw, float headPitch
     ) {
         if (!(parent.getModel() instanceof HumanoidModel<?> model)) return;
-        LivingEntity entity = slotContext.entity();
-
-        pose.pushPose();
-        model.body.translateAndRotate(pose);
-        pose.translate(-0.3F + 0.5F / 16.0F, 0.65F, 0.0F);
-        pose.mulPose(Axis.YP.rotationDegrees(90.0F));
-        pose.mulPose(Axis.ZP.rotationDegrees(15.0F));
-        pose.scale(0.375F, -0.375F, -0.375F);
-        Minecraft.getInstance().getItemRenderer().renderStatic(
-                stack, ItemDisplayContext.FIXED, light, OverlayTexture.NO_OVERLAY,
-                pose, buffers, entity.level(), entity.getId());
-        pose.popPose();
+        CompressorBeltRender.render(stack, slotContext.entity(), model, pose, buffers, light);
     }
 }

@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:hats",
+  "display": {
+    "icon": {
+      "id": "aeronautics:white_envelope"
+    },
+    "title": {
+      "text": "Safety First"
+    },
+    "description": {
+      "text": "Wear a hat lined with nothing but air or soft blocks"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

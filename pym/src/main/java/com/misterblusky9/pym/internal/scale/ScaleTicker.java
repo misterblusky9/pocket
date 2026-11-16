@@ -4,6 +4,7 @@ import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.api.ScaleDriver;
 import com.misterblusky9.pym.api.event.ScaleTickEvent;
 import com.misterblusky9.pym.api.event.SubLevelScaleEvent;
+import com.misterblusky9.pym.internal.compat.electroenergetics.WireResize;
 import com.misterblusky9.pym.internal.compat.simulatedcoasters.CoasterRivets;
 import com.misterblusky9.pym.internal.extension.PymExtensions;
 import com.misterblusky9.pym.internal.network.ScaleNetwork;
@@ -17,6 +18,10 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.common.NeoForge;
 
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
 public final class ScaleTicker {
     public static void tick(ServerSubLevelContainer container) {
         long now = container.getLevel().getGameTime();
@@ -25,12 +30,22 @@ public final class ScaleTicker {
             if (live(subLevel)) ScaleDrivers.tick(subLevel, now);
         }
 
+        Set<UUID> resizing = new HashSet<>();
+        for (ServerSubLevel subLevel : container.getAllSubLevels()) {
+            if (!live(subLevel)) continue;
+            ScaleRecord record = ScaleState.recordOf(subLevel.getUniqueId());
+            if (record != null && record.moving()) resizing.add(subLevel.getUniqueId());
+        }
+        Object wireSpans = container.getLevel() instanceof ServerLevel serverLevel
+                ? WireResize.before(serverLevel, resizing) : null;
+
         PhysicsPipeline pipeline = container.physicsSystem().getPipeline();
         for (ServerSubLevel subLevel : container.getAllSubLevels()) {
             if (!live(subLevel)) continue;
             ScaleRecord record = ScaleState.recordOf(subLevel.getUniqueId());
             if (record != null) step(container, pipeline, subLevel, record);
         }
+        WireResize.after(wireSpans);
 
         if (container.getLevel() instanceof ServerLevel level) SubLevelParentage.tick(container, level);
         ConstraintRefresh.refreshStale(container);

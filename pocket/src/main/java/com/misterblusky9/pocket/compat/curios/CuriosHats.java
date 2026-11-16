@@ -1,10 +1,12 @@
 package com.misterblusky9.pocket.compat.curios;
 
 import com.misterblusky9.pocket.PocketSized;
-import com.misterblusky9.pocket.block.HatStandBlock;
-import com.misterblusky9.pocket.build.BuildHostBlockEntity;
+import com.misterblusky9.pocket.compat.WornHats;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.util.TriState;
@@ -14,20 +16,24 @@ import top.theillusivec4.curios.api.event.CurioAttributeModifierEvent;
 import top.theillusivec4.curios.api.event.CurioCanUnequipEvent;
 import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 
+import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 public final class CuriosHats {
     private static final String SLOT = "head";
+    private static final List<TagKey<Item>> HEAD_SLOT_TAGS = Stream.of("curios:head", "curios:curio", "accessories:hat", "accessories:any")
+            .map(id -> TagKey.create(Registries.ITEM, ResourceLocation.parse(id))).toList();
 
     public static void register() {
         CuriosApi.registerCurioPredicate(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "custom_hat"),
-                result -> isCustomHat(result.stack()));
+                result -> isCustomHat(result.stack()) || HEAD_SLOT_TAGS.stream().anyMatch(result.stack()::is));
         NeoForge.EVENT_BUS.addListener(CuriosHats::onAttributes);
         NeoForge.EVENT_BUS.addListener(CuriosHats::onUnequip);
     }
 
     public static boolean isCustomHat(ItemStack stack) {
-        return HatStandBlock.isHeadwear(stack) && BuildHostBlockEntity.token(stack) != null;
+        return WornHats.isCustomHat(stack);
     }
 
     public static @Nullable ItemStack find(LivingEntity entity) {

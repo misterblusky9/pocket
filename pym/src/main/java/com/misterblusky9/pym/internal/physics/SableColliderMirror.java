@@ -3,6 +3,7 @@ package com.misterblusky9.pym.internal.physics;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import com.misterblusky9.pym.internal.physics.ColliderGeometry.SectionKey;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
+import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.physics.chunk.VoxelNeighborhoodState;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -57,6 +58,28 @@ public final class SableColliderMirror {
     public static synchronized CompiledCollider current(UUID id) {
         Applied state = id == null ? null : APPLIED.get(id);
         return state == null ? null : state.collider;
+    }
+
+    public record CallbackSite(ServerSubLevel subLevel, CompiledCollider collider) {}
+
+    public static synchronized CallbackSite callbackSite(ServerLevel level, int cellX, int cellY, int cellZ) {
+        if (level == null || APPLIED.isEmpty()) return null;
+        SubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container == null) return null;
+        SectionKey key = new SectionKey(
+                Math.floorDiv(cellX, 16), Math.floorDiv(cellY, 16), Math.floorDiv(cellZ, 16));
+        int localIndex = Math.floorMod(cellX, 16)
+                + (Math.floorMod(cellZ, 16) << 4)
+                + (Math.floorMod(cellY, 16) << 8);
+        for (Map.Entry<UUID, Applied> entry : APPLIED.entrySet()) {
+            SectionBinding binding = entry.getValue().sections.get(key);
+            if (binding == null) continue;
+            CompiledCollider.Cell cell = binding.section.byIndex().get(localIndex);
+            if (cell == null || !cell.shape().material().callback()) continue;
+            if (!(container.getSubLevel(entry.getKey()) instanceof ServerSubLevel subLevel)) continue;
+            return new CallbackSite(subLevel, entry.getValue().collider);
+        }
+        return null;
     }
 
     public static synchronized boolean has(UUID id) {

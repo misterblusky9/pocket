@@ -1,5 +1,7 @@
 package com.misterblusky9.pocket.block;
 
+import com.misterblusky9.pocket.build.HatSeals;
+import net.minecraft.world.entity.player.Player;
 import com.simibubi.create.foundation.blockEntity.behaviour.BehaviourType;
 import com.simibubi.create.foundation.blockEntity.behaviour.ValueBoxTransform;
 import com.simibubi.create.foundation.blockEntity.behaviour.scrollValue.INamedIconOptions;
@@ -19,6 +21,7 @@ public final class HatPlateToggle extends ScrollOptionBehaviour<HatPlateToggle.S
     private final BehaviourType<HatPlateToggle> type;
     private final int netId;
     private final BooleanSupplier shown;
+    private final HatStandBlockEntity stand;
 
     public HatPlateToggle(BehaviourType<HatPlateToggle> type, int netId, Component label, HatStandBlockEntity stand,
                           ValueBoxTransform slot, BooleanSupplier shown, Consumer<Boolean> show) {
@@ -26,6 +29,7 @@ public final class HatPlateToggle extends ScrollOptionBehaviour<HatPlateToggle.S
         this.type = type;
         this.netId = netId;
         this.shown = shown;
+        this.stand = stand;
         withCallback(value -> show.accept(value == Shown.ON.ordinal()));
         onlyActiveWhen(() -> !stand.getActivator().isEmpty());
     }
@@ -40,6 +44,11 @@ public final class HatPlateToggle extends ScrollOptionBehaviour<HatPlateToggle.S
     public void setValue(int value) {
         this.value = current();
         super.setValue(value);
+    }
+
+    @Override
+    public boolean mayInteract(Player player) {
+        return !HatSeals.locks(stand, player);
     }
 
     private int current() {

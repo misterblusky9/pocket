@@ -4,6 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.misterblusky9.pocket.client.HatRendering;
+import com.misterblusky9.pocket.client.HeadLayerClip;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -24,6 +25,8 @@ public abstract class HatWornRenderMixin {
                                     float netHeadYaw, float headPitch, Operation<Void> original) {
         int mode = slot == EquipmentSlot.HEAD ? HatRendering.headwearMode(entity) : 0;
         if (mode == 2) return;
+        if (slot == EquipmentSlot.HEAD && HeadLayerClip.hides(entity, HeadLayerClip.HELMET
+                * (mode == 1 ? HatRendering.headwearFlat(HatRendering.headwear(entity)) : 1.0F))) return;
         pose.pushPose();
         if (mode == 1) HatRendering.flatten(pose,
                 ((HumanoidModel<?>) ((RenderLayer<?, ?>) (Object) this).getParentModel()).head,

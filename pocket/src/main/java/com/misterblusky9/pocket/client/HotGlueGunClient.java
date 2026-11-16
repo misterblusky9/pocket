@@ -135,7 +135,7 @@ public final class HotGlueGunClient {
                 bigHit.x,
                 bigHit.y,
                 bigHit.z,
-                placementMode(weld).ordinal(),
+                mode().ordinal(),
                 rotationDegrees));
         HotGlueGunRenderHandler.INSTANCE.shoot(event.getHand(), player.position());
 
@@ -412,11 +412,6 @@ public final class HotGlueGunClient {
         BlockPos pos = hit.getBlockPos();
         Vec3 location = hit.getLocation();
         return new Vec3(location.x - pos.getX(), location.y - pos.getY(), location.z - pos.getZ());
-    }
-
-    private static WeldGeometry.SnapMode placementMode(CrossScaleWelds.Weld weld) {
-        if (weld.divisor() > 1 && !weld.startedSmall(firstPos)) return WeldGeometry.SnapMode.GRID;
-        return mode();
     }
 
     private static WeldGeometry.SnapMode mode() {

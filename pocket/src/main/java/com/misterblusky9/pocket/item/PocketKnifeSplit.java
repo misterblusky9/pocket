@@ -14,6 +14,7 @@ import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,6 +24,8 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -147,6 +150,7 @@ public final class PocketKnifeSplit {
                 new Vector3d(origin.getX() + 0.5D, origin.getY() + 0.5D, origin.getZ() + 0.5D));
         boolean cut = false;
         boolean failed = false;
+        List<Moved> moved = new ArrayList<>();
         for (CutPiece piece : plan) {
             try {
                 ServerSubLevel child = SubLevelAssemblyHelper.assembleBlocks(
@@ -155,6 +159,7 @@ public final class PocketKnifeSplit {
                     failed = true;
                     break;
                 }
+                moved.add(new Moved(piece.blocks(), child));
                 cut = true;
             } catch (RuntimeException exception) {
                 Sable.LOGGER.error("Pocket knife failed to assemble a cut piece from sublevel {}", id, exception);
@@ -164,6 +169,7 @@ public final class PocketKnifeSplit {
         }
         if (failed) refuse(player, "pocket.cut.incomplete");
         if (!cut) return;
+        settle(level, moved);
         knife.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         level.playSound(null, sound.x, sound.y, sound.z,
                 SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.1F);
@@ -228,6 +234,7 @@ public final class PocketKnifeSplit {
                 refuse(player, "pocket.cut.selection_failed");
                 return;
             }
+            settle(level, List.of(new Moved(blocks, assembled)));
         } catch (RuntimeException exception) {
             Sable.LOGGER.error("Pocket knife failed to assemble a world selection", exception);
             refuse(player, "pocket.cut.selection_failed");
@@ -235,6 +242,32 @@ public final class PocketKnifeSplit {
         }
         knife.hurtAndBreak(1, player, LivingEntity.getSlotForHand(hand));
         level.playSound(null, min, SoundEvents.SHEEP_SHEAR, SoundSource.BLOCKS, 0.8F, 1.1F);
+    }
+
+    private record Moved(List<BlockPos> blocks, ServerSubLevel piece) {}
+
+    private static void settle(ServerLevel level, List<Moved> cuts) {
+        BlockState air = Blocks.AIR.defaultBlockState();
+        for (Moved cut : cuts) {
+            Set<BlockPos> inside = new HashSet<>(cut.blocks());
+            BlockPos origin = cut.blocks().getFirst();
+            BlockPos centre = cut.piece().isRemoved() ? null : cut.piece().getPlot().getCenterBlock();
+            for (BlockPos from : cut.blocks()) {
+                boolean edge = false;
+                for (Direction direction : Direction.values()) {
+                    if (inside.contains(from.relative(direction))) continue;
+                    edge = true;
+                    if (centre == null) continue;
+                    BlockPos to = from.subtract(origin).offset(centre);
+                    BlockState state = level.getBlockState(to);
+                    if (state.isAir()) break;
+                    BlockPos next = to.relative(direction);
+                    BlockState shaped = state.updateShape(direction, level.getBlockState(next), level, to, next);
+                    if (shaped != state) Block.updateOrDestroy(state, shaped, level, to, Block.UPDATE_ALL);
+                }
+                if (edge) air.updateNeighbourShapes(level, from, Block.UPDATE_ALL);
+            }
+        }
     }
 
     private static boolean inside(BlockPos pos, BlockPos min, BlockPos max) {

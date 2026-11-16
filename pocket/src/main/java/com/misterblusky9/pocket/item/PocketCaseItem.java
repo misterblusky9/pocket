@@ -2,6 +2,8 @@ package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pocket.debug.PocketTrace;
+import com.misterblusky9.pocket.compat.simulated.WeldTransfer;
+import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.pocket.DeploymentClearance;
 import com.misterblusky9.pocket.pocket.NetherEvaporation;
 import com.misterblusky9.pym.api.PlotContents;
@@ -81,6 +83,7 @@ import org.joml.Quaterniond;
 import org.joml.Vector3d;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -102,12 +105,20 @@ public class PocketCaseItem extends PackageItem {
     private static final String BLOCKS_KEY = "pocket_blocks";
     private static final String BLOCK_ENTITIES_KEY = "pocket_block_entities";
     private static final String MASS_KEY = "pocket_mass";
+    private static final String WELDED_BLOCKS_KEY = "pocket_welded_blocks";
+    private static final String WELDED_BLOCK_ENTITIES_KEY = "pocket_welded_block_entities";
     private static final String SCALE_KEY = "pocket_scale";
     private static final String FACADE_OFFSET_KEY = "pocket_facade_offset";
     private static final String PACKED_BY_KEY = "packed_by";
     private static final String CASE_TURNS_KEY = "pocket_case_quarter_turns";
 
     private static final String CONTAINER_KEY = "pocket_container";
+    private static final String WELDED_KEY = "pocket_welded";
+    private static final String WELDED_PAYLOAD_KEY = "payload";
+    private static final String WELDED_RELATIVE_KEY = "relative";
+    private static final String WELDS_KEY = "pocket_welds";
+    private static final java.util.Set<String> EMPTY_BLOCKS = java.util.Set.of("minecraft:air", "minecraft:cave_air",
+            "minecraft:void_air", "minecraft:structure_void");
     private static final String INTEGRITY_KEY = "pocket_integrity";
     private static final String INTEGRITY_VERSION_KEY = "version";
     private static final String INTEGRITY_BLOCKS_KEY = "blocks";
@@ -145,6 +156,208 @@ public class PocketCaseItem extends PackageItem {
 
     public static boolean isFilled(ItemStack stack) { return token(stack) != null; }
 
+    public static boolean isCasePayload(CompoundTag fullTag) {
+        return fullTag.contains(INTEGRITY_KEY, Tag.TAG_COMPOUND);
+    }
+
+    public static @Nullable List<CompoundTag> captureWelded(
+            ServerSubLevel root,
+            List<ServerSubLevel> members,
+            CompoundTag fullTag,
+            UUID token,
+            Player feedbackPlayer
+    ) {
+        if (members.isEmpty()) return List.of();
+        List<CompoundTag> payloads = new ArrayList<>();
+        ListTag entries = new ListTag();
+        for (ServerSubLevel member : members) {
+            CompoundTag payload = SubLevelSerializer.toData(member, List.of()).fullTag().copy();
+            markDetachedPayload(payload);
+            if (prepareCapturedPayload(member, payload, token, feedbackPlayer) == null) return null;
+            CompoundTag entry = new CompoundTag();
+            entry.put(WELDED_PAYLOAD_KEY, payload);
+            entry.put(WELDED_RELATIVE_KEY, com.misterblusky9.pym.api.Detached.savePose(
+                    com.misterblusky9.pym.api.Detached.relative(root.logicalPose(), member.logicalPose())));
+            entries.add(entry);
+            payloads.add(payload);
+        }
+        java.util.Map<UUID, WeldTransfer.Member> group = new java.util.HashMap<>();
+        for (ServerSubLevel part : members) group.put(part.getUniqueId(), new WeldTransfer.Member(part.getUniqueId(), Vec3i.ZERO));
+        group.put(root.getUniqueId(), new WeldTransfer.Member(root.getUniqueId(), Vec3i.ZERO));
+        fullTag.put(WELDED_KEY, entries);
+        fullTag.put(WELDS_KEY, WeldTransfer.capture(WeldStore.get(root.getLevel()).all(), group, null));
+        return payloads;
+    }
+
+    public static ListTag weldedRiders(CompoundTag fullTag) {
+        ListTag riders = new ListTag();
+        for (Tag tag : fullTag.getList(WELDED_KEY, Tag.TAG_COMPOUND)) {
+            CompoundTag entry = (CompoundTag) tag;
+            CompoundTag payload = entry.getCompound(WELDED_PAYLOAD_KEY);
+            if (!payload.hasUUID("uuid")) continue;
+            CompoundTag rider = new CompoundTag();
+            rider.putUUID("uuid", payload.getUUID("uuid"));
+            rider.put("plot", payload.getCompound("plot").copy());
+            rider.put("relative", entry.getCompound(WELDED_RELATIVE_KEY).copy());
+            riders.add(rider);
+        }
+        return riders;
+    }
+
+    private static @Nullable List<ServerSubLevel> restoreWelded(
+            ServerLevel serverLevel,
+            ServerSubLevelContainer container,
+            ServerLevel sourceLevel,
+            CompoundTag fullTag,
+            ServerSubLevel root,
+            UUID storedRoot,
+            Vec3i rootDelta,
+            double rootScale,
+            UUID token
+    ) {
+        ListTag entries = fullTag.getList(WELDED_KEY, Tag.TAG_COMPOUND);
+        if (entries.isEmpty()) return List.of();
+        java.util.Map<UUID, WeldTransfer.Target> identities = new java.util.HashMap<>();
+        identities.put(storedRoot, new WeldTransfer.Target(root, rootDelta));
+        Pose3d rootPose = new Pose3d(root.logicalPose());
+        rootPose.scale().set(rootScale, rootScale, rootScale);
+        List<ServerSubLevel> restored = new ArrayList<>();
+        List<CompoundTag> payloads = new ArrayList<>();
+
+        for (int i = 0; i < entries.size(); i++) {
+            CompoundTag entry = entries.getCompound(i);
+            CompoundTag payload = entry.getCompound(WELDED_PAYLOAD_KEY).copy();
+            CompoundTag plot = payload.getCompound("plot");
+            int sourceX = plot.getInt("plot_x");
+            int sourceZ = plot.getInt("plot_z");
+            int[] slot = Plots.free(container, sourceX, sourceZ);
+            if (slot == null) return abandonWelded(container, restored, token, "no free plots");
+            Vec3i delta = Plots.delta(sourceLevel, sourceX, sourceZ, serverLevel, slot[0], slot[1]);
+            rebasePlotPayload(payload, sourceLevel, serverLevel, slot[0], slot[1],
+                    delta.getX(), delta.getY(), delta.getZ());
+
+            UUID stored = payload.getUUID("uuid");
+            UUID fresh = UUID.randomUUID();
+            payload.putUUID("uuid", fresh);
+            payload.remove("linear_velocity");
+            payload.remove("angular_velocity");
+
+            Pose3d relative = com.misterblusky9.pym.api.Detached.loadPose(entry.getCompound(WELDED_RELATIVE_KEY));
+            relative.position().add(rootDelta.getX(), rootDelta.getY(), rootDelta.getZ());
+            Pose3d pose = com.misterblusky9.pym.api.Detached.compose(rootPose, relative);
+            pose.rotationPoint().set(SableNBTUtils.readPose3d(payload.getCompound("pose")).rotationPoint());
+            payload.put("pose", SableNBTUtils.writePose3d(pose));
+
+            SubLevelData data = SubLevelSerializer.fromData(payload);
+            ServerSubLevel member;
+            try {
+                member = data == null ? null : SubLevelSerializer.fullyLoad(serverLevel, data);
+            } catch (RuntimeException exception) {
+                PocketTrace.logger().error("[PocketTransfer] welded member load threw token={}", token, exception);
+                member = container.getSubLevel(fresh) instanceof ServerSubLevel partial ? partial : null;
+                if (member != null) restored.add(member);
+                return abandonWelded(container, restored, token, "fullyLoad threw");
+            }
+            if (member == null) return abandonWelded(container, restored, token, "loader returned null");
+            restored.add(member);
+
+            PayloadIntegrity integrity = validateRestoredPayload(member, payload, token, 0, 0);
+            if (!integrity.valid()) return abandonWelded(container, restored, token, "payload integrity");
+            double scale = pose.scale().x();
+            if (!Pym.resize().request(member).scaleTo(scale).immediate().submit().accepted())
+                return abandonWelded(container, restored, token, "scale initialization refused");
+
+            identities.put(stored, new WeldTransfer.Target(member, delta));
+            payloads.add(payload);
+        }
+
+        for (int i = 0; i < restored.size(); i++) {
+            ServerSubLevel member = restored.get(i);
+            CompoundTag payload = payloads.get(i);
+            com.misterblusky9.pocket.scale.PlayerSpawnScale.restoring(
+                    () -> com.misterblusky9.pocket.pocket.PocketedEntities.restore(serverLevel, member, payload));
+        }
+
+        WeldTransfer.restore(serverLevel, fullTag.getList(WELDS_KEY, Tag.TAG_COMPOUND), identities, null);
+        return restored;
+    }
+
+    private static @Nullable List<ServerSubLevel> abandonWelded(
+            ServerSubLevelContainer container, List<ServerSubLevel> restored, UUID token, String reason) {
+        PocketTrace.logger().error("[PocketTransfer] welded member restore failed token={} reason={}", token, reason);
+        for (ServerSubLevel member : restored) {
+            UUID id = member.getUniqueId();
+            try {
+                if (!member.isRemoved()) container.removeSubLevel(member,
+                        dev.ryanhcode.sable.sublevel.storage.SubLevelRemovalReason.REMOVED);
+                Pym.resize().discard(id);
+            } catch (RuntimeException exception) {
+                PocketTrace.logger().error("[PocketTransfer] welded member rollback failed token={} uuid={}",
+                        token, id, exception);
+            }
+        }
+        return null;
+    }
+
+    public static void refreshIntegrity(CompoundTag fullTag, ServerSubLevel live) {
+        if (isCasePayload(fullTag)) writeIntegrityManifest(fullTag, measureStructure(live));
+    }
+
+    public static ItemStack rebuild(ServerLevel source, UUID token, CompoundTag fullTag) {
+        CompoundTag manifest = fullTag.getCompound(INTEGRITY_KEY);
+        ItemStack stack = createFilled(new ItemStack(ModItems.POCKETED_SUBLEVEL.get()), token, source, null, null,
+                manifest.getInt(INTEGRITY_BLOCKS_KEY), manifest.getInt(INTEGRITY_BLOCK_ENTITIES_KEY), 0.0D);
+        if (fullTag.contains("pose", Tag.TAG_COMPOUND))
+            setPocketedScale(stack, SableNBTUtils.readPose3d(fullTag.getCompound("pose")).scale().x());
+        setContainer(stack, new ItemStack(ModItems.EMPTY_BOX.get()));
+        setWeldedContents(stack, fullTag);
+        return stack;
+    }
+
+    public static void setWeldedContents(ItemStack stack, CompoundTag fullTag) {
+        int blocks = 0;
+        int blockEntities = 0;
+        for (Tag entry : fullTag.getList(WELDED_KEY, Tag.TAG_COMPOUND)) {
+            CompoundTag manifest = ((CompoundTag) entry).getCompound(WELDED_PAYLOAD_KEY).getCompound(INTEGRITY_KEY);
+            blocks += Math.max(0, manifest.getInt(INTEGRITY_BLOCKS_KEY));
+            blockEntities += Math.max(0, manifest.getInt(INTEGRITY_BLOCK_ENTITIES_KEY));
+        }
+        if (blocks <= 0 && blockEntities <= 0) return;
+        CompoundTag tag = customTag(stack);
+        if (tag == null) return;
+        tag.putInt(WELDED_BLOCKS_KEY, blocks);
+        tag.putInt(WELDED_BLOCK_ENTITIES_KEY, blockEntities);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+    }
+
+    public static @Nullable ItemStack duplicate(ServerLevel level, ItemStack source) {
+        UUID token = token(source);
+        if (token == null || payloadState(level, source) != PayloadState.AVAILABLE) return null;
+        com.misterblusky9.pocket.build.CarriedBuilds.flush(token);
+        ServerLevel from = BuildSites.storedIn(level, token);
+        if (from == null) return null;
+        PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(from);
+        CompoundTag copy = storage.getCopy(token);
+        if (copy == null) return null;
+        CompoundTag plot = copy.getCompound("plot");
+        int x = plot.getInt("plot_x");
+        int z = plot.getInt("plot_z");
+        int[] slot = BuildSites.reserveFreePlot(from);
+        if (slot == null) return null;
+        Vec3i delta = Plots.delta(from, x, z, from, slot[0], slot[1]);
+        rebasePlotPayload(copy, from, from, slot[0], slot[1], delta.getX(), delta.getY(), delta.getZ());
+        copy.putUUID("uuid", UUID.randomUUID());
+        UUID fresh = UUID.randomUUID();
+        storage.put(fresh, copy);
+        ItemStack result = source.copyWithCount(1);
+        CompoundTag tag = customTag(result);
+        tag.putUUID(TOKEN_KEY, fresh);
+        result.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        com.misterblusky9.pocket.build.BuildHostBlockEntity.stampEpoch(result, storage.epoch(fresh));
+        storage.remember(fresh, result, level.registryAccess());
+        return result;
+    }
+
     public static boolean isContainer(ItemStack stack) {
         return PocketContainer.isContainer(stack);
     }
@@ -157,6 +370,11 @@ public class PocketCaseItem extends PackageItem {
 
     public static Item containerItem(ItemStack stack) {
         return PocketContainer.of(stack).item();
+    }
+
+    public static Item savedContainer(CompoundTag data) {
+        if (!data.hasUUID(TOKEN_KEY)) return null;
+        return PocketContainer.byId(ResourceLocation.tryParse(data.getString(CONTAINER_KEY))).item();
     }
 
     public static void setContainer(ItemStack stack, ItemStack container) {
@@ -445,32 +663,14 @@ public class PocketCaseItem extends PackageItem {
 
         if (!(level instanceof ServerLevel currentLevel)) return;
 
-        UUID payloadToken = token(stack);
-        ResourceLocation sourceId = PlotSources.dimension(storedTag(stack), DIMENSION_KEY);
-        ServerLevel sourceLevel = PlotSources.resolve(currentLevel, sourceId);
-        PocketedSubLevelSavedData storage = sourceLevel == null ? null
-                : PocketedSubLevelSavedData.getOrLoad(sourceLevel);
-        if (storage != null && storage.contains(payloadToken)) {
-            updateSource(stack, sourceLevel);
-            clearOrphaned(stack, entity, payloadToken);
+        if (payloadState(currentLevel, stack) == PayloadState.AVAILABLE) {
+            updateSource(stack, BuildSites.storedIn(currentLevel, token(stack)));
+            clearLegacyOrphan(stack);
             return;
         }
-
-        ServerLevel relocated = BuildSites.storedIn(currentLevel, payloadToken);
-        if (relocated != null) {
-            updateSource(stack, relocated);
-            clearOrphaned(stack, entity, payloadToken);
-            return;
+        if (entity instanceof Player player) {
+            replaceHeld(player, stack, new ItemStack(containerItem(stack), stack.getCount()));
         }
-
-        if (storage == null) return;
-        if (storage.wasDeployed(payloadToken) && entity instanceof Player player
-                && replaceHeld(player, stack, new ItemStack(containerItem(stack), stack.getCount()))) {
-            return;
-        }
-
-        markOrphaned(stack, entity, slotId,
-                "payload " + payloadToken + " is not in " + sourceId + "'s pocketed-sublevel storage");
     }
 
     private static boolean replaceHeld(Player player, ItemStack stack, ItemStack replacement) {
@@ -484,43 +684,13 @@ public class PocketCaseItem extends PackageItem {
         return false;
     }
 
-    private static void markOrphaned(
-            ItemStack stack,
-            Entity entity,
-            int slotId,
-            String reason
-    ) {
-        CompoundTag tag = customTag(stack);
-        if (tag != null && tag.getBoolean(ORPHANED_KEY)) return;
-
-        CompoundTag updated = tag == null ? new CompoundTag() : tag;
-        updated.putBoolean(ORPHANED_KEY, true);
-        updated.putString(ORPHANED_REASON_KEY, reason);
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(updated));
-
-        PocketTrace.logger().error(
-                "[PocketTransfer] carrier PRESERVED with unreachable payload - {} holder={} slot={}. "
-                        + "The item has NOT been removed; its token is intact and it will recover if "
-                        + "the entry returns.",
-                reason, entity == null ? "?" : entity.getScoreboardName(), slotId);
-    }
-
-    private static void clearOrphaned(ItemStack stack, Entity entity, UUID payloadToken) {
-        CompoundTag tag = customTag(stack);
-        if (tag == null || !tag.getBoolean(ORPHANED_KEY)) return;
-
-        tag.remove(ORPHANED_KEY);
-        tag.remove(ORPHANED_REASON_KEY);
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-
-        PocketTrace.logger().warn(
-                "[PocketTransfer] carrier recovered token={} holder={} - payload is reachable again",
-                payloadToken, entity == null ? "?" : entity.getScoreboardName());
-    }
-
-    public static boolean isOrphaned(ItemStack stack) {
-        CompoundTag tag = customTag(stack);
-        return tag != null && tag.getBoolean(ORPHANED_KEY);
+    private static void clearLegacyOrphan(ItemStack stack) {
+        CompoundTag tag = storedTag(stack);
+        if (tag == null || !tag.contains(ORPHANED_KEY)) return;
+        CompoundTag cleared = tag.copy();
+        cleared.remove(ORPHANED_KEY);
+        cleared.remove(ORPHANED_REASON_KEY);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(cleared));
     }
 
     private static int storedCount(ItemStack stack, String key) {
@@ -600,6 +770,11 @@ public class PocketCaseItem extends PackageItem {
         if (!isFilled(stack)) return super.useOn(context);
 
         if (!player.isShiftKeyDown()) return super.useOn(context);
+        SubLevel clicked = Sable.HELPER.getContaining(context.getLevel(), context.getClickedPos());
+        if (com.misterblusky9.pym.api.Detached.isDetached(clicked) || com.misterblusky9.pym.api.Hosted.isHosted(clicked)) {
+            if (!context.getLevel().isClientSide) fail(player, "pocket.case.not_on_hat");
+            return InteractionResult.FAIL;
+        }
         if (isSealed(stack)) return placeAsPackage(context);
 
         if (!(context.getLevel() instanceof ServerLevel serverLevel)) return InteractionResult.SUCCESS;
@@ -658,8 +833,8 @@ public class PocketCaseItem extends PackageItem {
         if (state != PayloadState.AVAILABLE) {
             player.setItemInHand(hand, recoveryFor(level, stack));
             player.getInventory().setChanged();
-            fail(player, state == PayloadState.DEPLOYED
-                    ? "pocket.case.already_unpacked"
+            fail(player, state == PayloadState.DEPLOYED ? "pocket.case.already_unpacked"
+                    : state == PayloadState.STALE ? "pocket.case.elsewhere"
                     : "pocket.case.contents_lost");
             PocketTrace.logger().warn(
                     "[PocketTransfer] route=hand refused token={} target={} player={} reason=payload {}",
@@ -704,6 +879,153 @@ public class PocketCaseItem extends PackageItem {
                 "[PocketTransfer] route=hand end token={} target={} restored=true backendValid=true",
                 payloadToken, level.dimension().location());
         return true;
+    }
+
+    public static boolean placeOnHat(ServerLevel level, ServerPlayer player,
+                                     com.misterblusky9.pocket.build.BuildHostBlockEntity stand,
+                                     BlockPos anchor, net.minecraft.world.level.block.Rotation rotation,
+                                     net.minecraft.world.level.block.Mirror mirror) {
+        ItemStack stack = player.getMainHandItem();
+        UUID token = token(stack);
+        ServerSubLevel hat = stand.getHat() == null ? null : BuildSites.live(stand.getHat());
+        if (token == null || isSealed(stack) || hat == null || hat.getLevel() != level || !player.mayBuild()
+                || com.misterblusky9.pocket.build.HatSeals.locks(stand, player)
+                || payloadState(level, stack) != PayloadState.AVAILABLE) return false;
+        CarriedBuilds.close(token);
+        ServerLevel stored = BuildSites.storedIn(level, token);
+        PocketedSubLevelSavedData storage = stored == null ? null : PocketedSubLevelSavedData.getOrLoad(stored);
+        CompoundTag saved = storage == null ? null : storage.getCopy(token);
+        if (saved == null || !saved.hasUUID("uuid")) return false;
+        if (!saved.getList(WELDED_KEY, Tag.TAG_COMPOUND).isEmpty() || !saved.getList("children", Tag.TAG_COMPOUND).isEmpty()
+                || com.misterblusky9.pocket.pocket.PocketedEntities.ridesInWorld(saved)) {
+            fail(player, "pocket.case.hat_too_complex.contraption");
+            return false;
+        }
+        ServerSubLevel build = com.misterblusky9.pym.api.Detached.open(level, saved.getUUID("uuid"), saved.getCompound("plot"), stored);
+        if (build == null) {
+            fail(player, "pocket.case.restore_failed_plot");
+            return false;
+        }
+        net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate template =
+                new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate();
+        HatFit fit = null;
+        try {
+            var bounds = build.getPlot().getBoundingBox();
+            if (bounds != null && bounds != dev.ryanhcode.sable.companion.math.BoundingBox3i.EMPTY) {
+                BlockPos min = new BlockPos(bounds.minX(), bounds.minY(), bounds.minZ());
+                Vec3i size = new Vec3i(bounds.maxX() - bounds.minX() + 1, bounds.maxY() - bounds.minY() + 1,
+                        bounds.maxZ() - bounds.minZ() + 1);
+                fit = hatFit(level, hat, build, min, size, anchor, rotation, mirror);
+                if (fit.inside() && (fit.overlaps().isEmpty() || player.isCreative())) {
+                    com.misterblusky9.pocket.scale.PlayerSpawnScale.restoring(
+                            () -> com.misterblusky9.pocket.pocket.PocketedEntities.restore(level, build, saved));
+                    template.fillFromWorld(level, min, size, true, null);
+                    AABB box = new AABB(min.getX(), min.getY(), min.getZ(),
+                            min.getX() + size.getX(), min.getY() + size.getY(), min.getZ() + size.getZ());
+                    for (net.minecraft.world.entity.Entity entity
+                            : level.getEntities((net.minecraft.world.entity.Entity) null, box, found -> !(found instanceof Player)))
+                        entity.discard();
+                }
+            }
+        } finally {
+            com.misterblusky9.pym.api.Detached.discard(build);
+        }
+        if (fit == null || !fit.inside()) {
+            fail(player, "pocket.case.hat_blocked");
+            return false;
+        }
+        if (!fit.overlaps().isEmpty() && !player.isCreative()) {
+            fail(player, "pocket.case.hat_overlaps");
+            return false;
+        }
+        template = withoutOverlaps(level, template, fit.overlaps());
+        template.placeInWorld(level, anchor, anchor,
+                new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings()
+                        .setRotation(rotation)
+                        .setMirror(mirror)
+                        .addProcessor(net.minecraft.world.level.levelgen.structure.templatesystem.BlockIgnoreProcessor.AIR),
+                level.random, 2);
+        storage.remove(token);
+        storage.markDeployed(token);
+        replaceHeldAfterDeployment(player, InteractionHand.MAIN_HAND, stack);
+        storage.commitDeploy(stored, level, token, player);
+        return true;
+    }
+
+    private static HatFit hatFit(ServerLevel level, ServerSubLevel hat, ServerSubLevel build, BlockPos min, Vec3i size,
+                                 BlockPos anchor, net.minecraft.world.level.block.Rotation rotation,
+                                 net.minecraft.world.level.block.Mirror mirror) {
+        List<BlockPos> solids = new ArrayList<>();
+        for (var holder : build.getPlot().getLoadedChunks()) {
+            var chunk = holder.getChunk();
+            var sections = chunk.getSections();
+            for (int index = 0; index < sections.length; index++) {
+                if (sections[index].hasOnlyAir()) continue;
+                int baseY = chunk.getSectionYFromSectionIndex(index) << 4;
+                for (int y = 0; y < 16; y++)
+                    for (int x = 0; x < 16; x++)
+                        for (int z = 0; z < 16; z++) {
+                            if (sections[index].getBlockState(x, y, z).isAir()) continue;
+                            BlockPos from = new BlockPos(chunk.getPos().getBlockX(x), baseY + y, chunk.getPos().getBlockZ(z));
+                            solids.add(from.subtract(min));
+                        }
+            }
+        }
+        return hatFit(level, hat, size, solids, anchor, rotation, mirror);
+    }
+
+    public record HatFit(boolean inside, List<BlockPos> overlaps) {}
+
+    public static HatFit hatFit(Level level, SubLevel hat, Vec3i size, Iterable<BlockPos> solids, BlockPos anchor,
+                                net.minecraft.world.level.block.Rotation rotation,
+                                net.minecraft.world.level.block.Mirror mirror) {
+        BlockPos far = onHat(new BlockPos(size.getX() - 1, size.getY() - 1, size.getZ() - 1), anchor, rotation, mirror);
+        if (Sable.HELPER.getContaining(level, anchor) != hat || Sable.HELPER.getContaining(level, far) != hat
+                || level.isOutsideBuildHeight(anchor) || level.isOutsideBuildHeight(far)) return new HatFit(false, List.of());
+        List<BlockPos> overlaps = new ArrayList<>();
+        for (BlockPos local : solids)
+            if (!level.getBlockState(onHat(local, anchor, rotation, mirror)).isAir()) overlaps.add(local);
+        return new HatFit(true, overlaps);
+    }
+
+    public static List<BlockPos> templateSolids(net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate template) {
+        CompoundTag saved = template.save(new CompoundTag());
+        ListTag palette = saved.contains("palettes", Tag.TAG_LIST)
+                ? saved.getList("palettes", Tag.TAG_LIST).getList(0)
+                : saved.getList("palette", Tag.TAG_COMPOUND);
+        ListTag blocks = saved.getList("blocks", Tag.TAG_COMPOUND);
+        List<BlockPos> solids = new ArrayList<>();
+        for (int i = 0; i < blocks.size(); i++) {
+            CompoundTag block = blocks.getCompound(i);
+            int state = block.getInt("state");
+            if (state < 0 || state >= palette.size() || EMPTY_BLOCKS.contains(palette.getCompound(state).getString("Name"))) continue;
+            ListTag pos = block.getList("pos", Tag.TAG_INT);
+            solids.add(new BlockPos(pos.getInt(0), pos.getInt(1), pos.getInt(2)));
+        }
+        return solids;
+    }
+
+    public static net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate withoutOverlaps(
+            Level level, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate template,
+            Collection<BlockPos> overlaps) {
+        if (overlaps.isEmpty()) return template;
+        java.util.Set<BlockPos> skipped = new java.util.HashSet<>(overlaps);
+        CompoundTag saved = template.save(new CompoundTag());
+        ListTag blocks = saved.getList("blocks", Tag.TAG_COMPOUND);
+        blocks.removeIf(block -> {
+            ListTag pos = ((CompoundTag) block).getList("pos", Tag.TAG_INT);
+            return skipped.contains(new BlockPos(pos.getInt(0), pos.getInt(1), pos.getInt(2)));
+        });
+        net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate kept =
+                new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate();
+        kept.load(level.holderLookup(net.minecraft.core.registries.Registries.BLOCK), saved);
+        return kept;
+    }
+
+    private static BlockPos onHat(BlockPos local, BlockPos anchor, net.minecraft.world.level.block.Rotation rotation,
+                                  net.minecraft.world.level.block.Mirror mirror) {
+        return net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.transform(
+                local, mirror, rotation, BlockPos.ZERO).offset(anchor);
     }
 
     public static boolean breakOpen(ServerLevel level, PackageEntity pocketed) {
@@ -1079,6 +1401,16 @@ public class PocketCaseItem extends PackageItem {
             rollbackDestination(serverLevel, destinationContainer, transfer, positioned.uuid(), token,
                     "scale initialization failed", exception);
             return fail(feedbackPlayer, "pocket.case.init_failed");
+        }
+
+        List<ServerSubLevel> welded = restoreWelded(serverLevel, destinationContainer, backend.sourceLevel(),
+                fullTag, restored, storedIdentity,
+                new Vec3i(transfer.deltaBlocksX(), transfer.deltaBlocksY(), transfer.deltaBlocksZ()),
+                pocketedScale, token);
+        if (welded == null) {
+            rollbackDestination(serverLevel, destinationContainer, transfer, positioned.uuid(), token,
+                    "welded member restore failed", null);
+            return fail(feedbackPlayer, "pocket.case.welded_restore_failed");
         }
 
         com.misterblusky9.pocket.scale.PlayerSpawnScale.restoring(
@@ -1783,7 +2115,7 @@ public class PocketCaseItem extends PackageItem {
         return true;
     }
 
-    public enum PayloadState { AVAILABLE, DEPLOYED, MISSING }
+    public enum PayloadState { AVAILABLE, STALE, DEPLOYED, MISSING }
 
     public static PayloadState payloadState(ServerLevel level, ItemStack stack) {
         UUID token = token(stack);
@@ -1795,15 +2127,15 @@ public class PocketCaseItem extends PackageItem {
         if (sourceLevel == null) return PayloadState.MISSING;
 
         PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(sourceLevel);
-        if (storage.contains(token)) return PayloadState.AVAILABLE;
+        if (storage.contains(token))
+            return BuildSites.current(sourceLevel, token, stack) ? PayloadState.AVAILABLE : PayloadState.STALE;
         return storage.wasDeployed(token) ? PayloadState.DEPLOYED : PayloadState.MISSING;
     }
 
     public static ItemStack recoveryFor(ServerLevel level, ItemStack stack) {
         return switch (payloadState(level, stack)) {
             case AVAILABLE -> stack.copy();
-            case DEPLOYED -> new ItemStack(containerItem(stack), stack.getCount());
-            case MISSING -> ItemStack.EMPTY;
+            case STALE, DEPLOYED, MISSING -> new ItemStack(containerItem(stack), stack.getCount());
         };
     }
 
@@ -1819,7 +2151,7 @@ public class PocketCaseItem extends PackageItem {
         return PocketedSubLevelSavedData.getOrLoad(sourceLevel).contains(token);
     }
 
-    private static ServerSubLevel fail(Player player, String key) {
+    public static ServerSubLevel fail(Player player, String key) {
         if (player != null) player.displayClientMessage(Component.translatable(key), true);
         return null;
     }
@@ -1902,40 +2234,28 @@ public class PocketCaseItem extends PackageItem {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        CompoundTag tag = customTag(stack);
-
-        if (tag != null && tag.getBoolean(ORPHANED_KEY)) {
-            tooltip.add(Component.translatable("pocket.tooltip.payload_unreachable").withStyle(ChatFormatting.RED));
-            tooltip.add(Component.translatable("pocket.tooltip.payload_kept_safe")
-                    .withStyle(ChatFormatting.GRAY));
-            if (flag.isAdvanced()) {
-                String reason = tag.getString(ORPHANED_REASON_KEY);
-                if (!reason.isEmpty()) {
-                    tooltip.add(Component.literal(reason).withStyle(ChatFormatting.DARK_RED));
-                }
-            }
-        }
-
-        if (tag == null || !tag.hasUUID(TOKEN_KEY)) {
-            if (stack.has(AllDataComponents.PACKAGE_CONTENTS)) {
-                super.appendHoverText(stack, context, tooltip, flag);
-                return;
-            }
-
-            tooltip.add(Component.translatable("pocket.tooltip.case_hint")
-                    .withStyle(ChatFormatting.GRAY));
+        if (isFilled(stack)) return;
+        if (stack.has(AllDataComponents.PACKAGE_CONTENTS)) {
+            super.appendHoverText(stack, context, tooltip, flag);
             return;
         }
+        tooltip.add(Component.translatable("pocket.tooltip.case_hint").withStyle(ChatFormatting.GRAY));
+    }
 
+    public static @Nullable Component owner(ItemStack stack) {
         CaseSeal seal = caseSeal(stack);
-        if (seal != null) {
-            tooltip.add(Component.translatable("pocket.tooltip.sealed_by", seal.ownerName())
-                    .withStyle(ChatFormatting.AQUA));
-        } else if (tag.contains(PACKED_BY_KEY)) {
-            tooltip.add(Component.translatable("pocket.tooltip.captured_by", tag.getString(PACKED_BY_KEY))
-                    .withStyle(ChatFormatting.AQUA));
-        }
+        if (seal != null)
+            return Component.translatable("pocket.tooltip.sealed_by", seal.ownerName()).withStyle(ChatFormatting.AQUA);
+        CompoundTag tag = storedTag(stack);
+        return tag != null && tag.contains(PACKED_BY_KEY)
+                ? Component.translatable("pocket.tooltip.captured_by", tag.getString(PACKED_BY_KEY))
+                        .withStyle(ChatFormatting.AQUA)
+                : null;
+    }
 
+    public static void details(ItemStack stack, boolean advanced, List<Component> tooltip) {
+        CompoundTag tag = storedTag(stack);
+        if (tag == null) return;
         int[] localBounds = tag.getIntArray(PocketRenderSnapshot.LOCAL_BOUNDS_KEY);
         int[] size = tag.getIntArray(PocketRenderSnapshot.SIZE_KEY);
         String summary = null;
@@ -1951,19 +2271,20 @@ public class PocketCaseItem extends PackageItem {
                 : Component.translatable("pocket.tooltip.size_at_scale", summary, scale))
                 .withStyle(ChatFormatting.DARK_GRAY));
 
-        if (!flag.isAdvanced()) return;
+        if (!advanced) return;
 
         int entities = com.misterblusky9.pocket.pocket.PocketedEntities.count(tag);
         if (tag.contains(BLOCKS_KEY)) {
             net.minecraft.network.chat.MutableComponent contents = Component.translatable("pocket.tooltip.contents",
-                    grouped(tag.getInt(BLOCKS_KEY)), grouped(tag.getInt(BLOCK_ENTITIES_KEY)));
+                    grouped(tag.getInt(BLOCKS_KEY) + tag.getInt(WELDED_BLOCKS_KEY)),
+                    grouped(tag.getInt(BLOCK_ENTITIES_KEY) + tag.getInt(WELDED_BLOCK_ENTITIES_KEY)));
             tooltip.add((entities > 0
                     ? Component.translatable("pocket.tooltip.contents_entities", contents, grouped(entities))
                     : contents).withStyle(ChatFormatting.DARK_GRAY));
         } else if (entities > 0) {
             tooltip.add(Component.translatable("pocket.tooltip.entities", grouped(entities)).withStyle(ChatFormatting.DARK_GRAY));
         }
-        if (seal == null) {
+        if (caseSeal(stack) == null) {
             tooltip.add(Component.translatable("pocket.tooltip.potato_cannon_ammo").withStyle(ChatFormatting.GOLD));
         }
     }

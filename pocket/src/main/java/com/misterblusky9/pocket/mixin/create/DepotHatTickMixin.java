@@ -33,7 +33,8 @@ public abstract class DepotHatTickMixin extends BlockEntityBehaviour {
                 ? PocketCaseItem.token(stack) : BuildHostBlockEntity.token(stack);
         if (token == null) return;
         BlockPos pos = getPos();
-        CarriedBuilds.keep(level, token, pos, !(stack.getItem() instanceof PocketCaseItem), hat -> BuildSites.hold(hat,
-                new Vector3d(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5), new Quaterniond(), stack));
+        CarriedBuilds.keep(level, token, pos, stack, hat -> BuildSites.hold(hat,
+                new Vector3d(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5), new Quaterniond(), stack),
+                blockEntity::notifyUpdate);
     }
 }

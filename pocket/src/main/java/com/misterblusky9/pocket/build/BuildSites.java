@@ -19,6 +19,8 @@ import com.misterblusky9.pym.api.Rules;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
+import dev.ryanhcode.sable.sublevel.storage.SubLevelOccupancySavedData;
+import com.misterblusky9.pym.api.Plots;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -66,17 +68,21 @@ public final class BuildSites {
     private static final double GOGGLES_SCALE = 8.2 / GRID_WIDTH;
     private static final double SKULL_SCALE = 9.5 / GRID_WIDTH;
     private static final double HELMET_SCALE = 10.0 / GRID_WIDTH;
+    private static final double NECK_LENGTH = 0.25 * 0.9375;
     private static final double GOGGLES_LIFT_PIXELS = -0.40625;
     private static final double SKULL_LIFT_PIXELS = 0.75;
     private static final String OFFSET = "pocket_hat_offset";
     private static final String KEY = "pocket:hat_stand_child";
     private static final String OLD_KEY = "pocket:hatters_stand_child";
     private static final String CHILDREN = "children";
+    public static final String MIRROR_EPOCH = "epoch";
 
     private record Site(ServerSubLevel hat, BlockPos host) {}
 
     private static final Map<UUID, Site> SITES = new HashMap<>();
     private static final Set<UUID> UNLOADING = new HashSet<>();
+    private static final Map<UUID, Long> CLAIMED = new HashMap<>();
+    private static final long CLAIM_GRACE_TICKS = 40L;
     private static final Map<UUID, Set<UUID>> PUBLISHED = new HashMap<>();
     private static final Map<UUID, Long> RETRY = new HashMap<>();
     private static final int RETRY_TICKS = 100;
@@ -149,6 +155,34 @@ public final class BuildSites {
         return load(level, token, true);
     }
 
+    public static int epoch(ServerLevel level, UUID token) {
+        ServerLevel from = storedIn(level, token);
+        return from == null ? 0 : PocketedSubLevelSavedData.getOrLoad(from).epoch(token);
+    }
+
+    public static boolean current(ServerLevel level, UUID token, ItemStack stack) {
+        int held = BuildHostBlockEntity.epoch(stack);
+        int stored = epoch(level, token);
+        if (held == stored) return true;
+        Long claimed = CLAIMED.get(token);
+        long age = claimed == null ? -1L : level.getGameTime() - claimed;
+        return held == stored - 1 && age >= 0L && age < CLAIM_GRACE_TICKS;
+    }
+
+    public static boolean settle(ServerLevel level, UUID token, ItemStack stack) {
+        if (!current(level, token, stack)) return false;
+        int stored = epoch(level, token);
+        if (BuildHostBlockEntity.epoch(stack) != stored) BuildHostBlockEntity.stampEpoch(stack, stored);
+        return true;
+    }
+
+    public static int claim(ServerLevel level, UUID token) {
+        ServerLevel from = storedIn(level, token);
+        if (from == null) return 0;
+        CLAIMED.put(token, level.getGameTime());
+        return PocketedSubLevelSavedData.getOrLoad(from).claim(token);
+    }
+
     public static @Nullable ServerSubLevel load(ServerLevel level, UUID token) {
         return load(level, token, false);
     }
@@ -178,6 +212,71 @@ public final class BuildSites {
             PocketedSubLevelSavedData.getOrLoad(level).put(token, saved);
         }
         return hat;
+    }
+
+    public static @Nullable ItemStack duplicate(ServerLevel level, ItemStack source) {
+        UUID token = BuildHostBlockEntity.token(source);
+        if (token == null || !current(level, token, source)) return null;
+        save(token);
+        CarriedBuilds.flush(token);
+        ServerLevel from = storedIn(level, token);
+        if (from == null) return null;
+        PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(from);
+        CompoundTag copy = storage.getCopy(token);
+        if (copy == null || !relocate(from, copy.getCompound("plot"))) return null;
+        copy.putUUID("uuid", UUID.randomUUID());
+        for (Tag entry : copy.getList(CHILDREN, Tag.TAG_COMPOUND)) {
+            CompoundTag rider = (CompoundTag) entry;
+            if (!relocate(from, rider.getCompound("plot"))) return null;
+            rider.putUUID("uuid", UUID.randomUUID());
+        }
+        UUID fresh = UUID.randomUUID();
+        storage.put(fresh, copy);
+        ItemStack result = source.copyWithCount(1);
+        BuildHostBlockEntity.retoken(result, fresh);
+        BuildHostBlockEntity.stampEpoch(result, storage.epoch(fresh));
+        storage.remember(fresh, result, level.registryAccess());
+        return result;
+    }
+
+    private static boolean relocate(ServerLevel level, CompoundTag plot) {
+        int[] slot = reserveFreePlot(level);
+        if (slot == null) return false;
+        Plots.rebase(plot, level, level, slot[0], slot[1]);
+        return true;
+    }
+
+    public static int[] reserveFreePlot(ServerLevel level) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        int[] slot = container == null ? null : Plots.free(container, -1, -1);
+        if (slot == null) return null;
+        container.getOccupancy().set(container.getIndex(slot[0], slot[1]));
+        SubLevelOccupancySavedData.getOrLoad(level).setDirty();
+        return slot;
+    }
+
+    public static void discardClone(ServerLevel level, UUID token) {
+        ServerLevel from = storedIn(level, token);
+        if (from == null || live(token) != null || CarriedBuilds.holds(token)) return;
+        PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(from);
+        CompoundTag saved = storage.peek(token);
+        if (saved == null) return;
+        release(from, saved.getCompound("plot"));
+        for (Tag entry : saved.getList(CHILDREN, Tag.TAG_COMPOUND)) release(from, ((CompoundTag) entry).getCompound("plot"));
+        storage.remove(token);
+    }
+
+    private static void release(ServerLevel level, CompoundTag plot) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        int x = plot.getInt("plot_x");
+        int z = plot.getInt("plot_z");
+        if (container == null || !Plots.inBounds(container, x, z) || container.getSubLevel(x, z) != null) return;
+        container.getOccupancy().clear(container.getIndex(x, z));
+        SubLevelOccupancySavedData.getOrLoad(level).setDirty();
+    }
+
+    public static boolean isHatPayload(CompoundTag saved) {
+        return saved.contains(CHILDREN) && !PocketCaseItem.isCasePayload(saved);
     }
 
     public static boolean pending(ServerLevel level, UUID token) {
@@ -233,11 +332,18 @@ public final class BuildSites {
         ServerSubLevel hat = live(token);
         if (hat == null) return;
         PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(hat.getLevel());
-        CompoundTag saved = storage.getCopy(token);
-        if (saved == null) saved = payload(hat);
-        else saved.put("plot", hat.getPlot().save());
-        saved.put(CHILDREN, riders(hat));
-        storage.put(token, saved);
+        if (!storage.edit(token, saved -> {
+            saved.put("plot", hat.getPlot().save());
+            PocketCaseItem.refreshIntegrity(saved, hat);
+            saved.put(CHILDREN, riders(hat, false));
+        })) {
+            CompoundTag saved = payload(hat);
+            saved.put(CHILDREN, riders(hat, false));
+            storage.put(token, saved);
+        }
+        BuildHostBlockEntity host = hostOf(hat);
+        if (host != null && token.equals(BuildHostBlockEntity.token(host.getActivator())))
+            storage.remember(token, host.getActivator(), hat.getLevel().registryAccess());
     }
 
     public static CompoundTag payload(ServerSubLevel hat) {
@@ -246,21 +352,21 @@ public final class BuildSites {
         return tag;
     }
 
-    private static ListTag riders(ServerSubLevel hat) {
+    private static ListTag riders(ServerSubLevel hat, boolean mirror) {
         ListTag list = new ListTag();
         for (ServerSubLevel child : Detached.children(hat)) {
             Pose3d relative = Detached.relative(child);
             if (relative == null) continue;
             CompoundTag rider = new CompoundTag();
             rider.putUUID("uuid", child.getUniqueId());
-            rider.put("plot", child.getPlot().save());
+            rider.put("plot", mirror ? Detached.mirrorPlot(child) : child.getPlot().save());
             rider.put("relative", Detached.savePose(relative));
             list.add(rider);
         }
         for (ServerSubLevel member : Hosted.members(hat)) {
             CompoundTag rider = new CompoundTag();
             rider.putUUID("uuid", member.getUniqueId());
-            rider.put("plot", member.getPlot().save());
+            rider.put("plot", mirror ? Detached.mirrorPlot(member) : member.getPlot().save());
             rider.put("relative", Detached.savePose(Hosted.relative(hat, member)));
             list.add(rider);
         }
@@ -269,11 +375,11 @@ public final class BuildSites {
 
     static boolean openRiders(ServerLevel level, UUID token, ServerSubLevel hat) {
         ServerLevel from = storedIn(level, token);
-        CompoundTag saved = from == null ? null : PocketedSubLevelSavedData.getOrLoad(from).getCopy(token);
+        CompoundTag saved = from == null ? null : PocketedSubLevelSavedData.getOrLoad(from).peek(token);
         if (saved == null) return true;
         for (Tag entry : saved.getList(CHILDREN, Tag.TAG_COMPOUND)) {
             CompoundTag rider = (CompoundTag) entry;
-            ServerSubLevel child = Detached.open(level, rider.getUUID("uuid"), rider.getCompound("plot"), from);
+            ServerSubLevel child = Detached.open(level, rider.getUUID("uuid"), rider.getCompound("plot").copy(), from);
             if (child == null) {
                 for (ServerSubLevel opened : Detached.children(hat)) {
                     Detached.detach(opened);
@@ -288,7 +394,7 @@ public final class BuildSites {
     }
 
     static void storeRiders(CompoundTag saved, ServerSubLevel hat) {
-        if (!Detached.children(hat).isEmpty()) saved.put(CHILDREN, riders(hat));
+        if (!Detached.children(hat).isEmpty()) saved.put(CHILDREN, riders(hat, false));
     }
 
     static void publishHosted(UUID token, ServerSubLevel hat, Set<UUID> known) {
@@ -459,23 +565,27 @@ public final class BuildSites {
         CompoundTag children;
         if (SITES.containsKey(token) || !Hosted.members(hat).isEmpty()) {
             children = new CompoundTag();
-            children.put(CHILDREN, riders(hat));
+            children.put(CHILDREN, riders(hat, true));
         } else {
             children = mirrorChildren(hat.getLevel(), token);
         }
         children.putUUID("uuid", hat.getUniqueId());
+        children.putInt(MIRROR_EPOCH, epoch(hat.getLevel(), token));
         children.put("native_contraptions", HatNativeContraptions.snapshot(hat));
-        return new BuildMirrorPayload(token, hat.getPlot().save(), children);
+        return new BuildMirrorPayload(token, Detached.mirrorPlot(hat), children);
     }
 
     public static CompoundTag mirrorChildren(ServerLevel level, UUID token) {
         CompoundTag children = new CompoundTag();
         ServerLevel stored = storedIn(level, token);
         if (stored == null) return children;
-        CompoundTag saved = PocketedSubLevelSavedData.getOrLoad(stored).getCopy(token);
+        CompoundTag saved = PocketedSubLevelSavedData.getOrLoad(stored).peek(token);
         if (saved == null) return children;
         if (saved.hasUUID("uuid")) children.putUUID("uuid", saved.getUUID("uuid"));
-        children.put(CHILDREN, saved.getList(CHILDREN, Tag.TAG_COMPOUND).copy());
+        children.putInt(MIRROR_EPOCH, PocketedSubLevelSavedData.getOrLoad(stored).epoch(token));
+        ListTag riders = saved.getList(CHILDREN, Tag.TAG_COMPOUND).copy();
+        riders.addAll(PocketCaseItem.weldedRiders(saved));
+        children.put(CHILDREN, riders);
         return children;
     }
 
@@ -500,6 +610,26 @@ public final class BuildSites {
                             if (!state.isAir() && !state.is(com.misterblusky9.pocket.block.ModBlocks.POCKET_DUMMY.get()))
                                 return true;
                         }
+            }
+        }
+        return false;
+    }
+
+    public static boolean hasStoredBuild(CompoundTag saved) {
+        if (!saved.getList(CHILDREN, Tag.TAG_COMPOUND).isEmpty()) return true;
+        CompoundTag chunks = saved.getCompound("plot").getCompound("chunks");
+        for (String chunkKey : chunks.getAllKeys()) {
+            CompoundTag sections = chunks.getCompound(chunkKey).getCompound("sections");
+            for (String sectionKey : sections.getAllKeys()) {
+                ListTag palette = sections.getCompound(sectionKey).getCompound("block_states")
+                        .getList("palette", Tag.TAG_COMPOUND);
+                for (int i = 0; i < palette.size(); i++) {
+                    var id = net.minecraft.resources.ResourceLocation.tryParse(palette.getCompound(i).getString("Name"));
+                    if (id == null) continue;
+                    var block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(id);
+                    if (!block.defaultBlockState().isAir()
+                            && block != com.misterblusky9.pocket.block.ModBlocks.POCKET_DUMMY.get()) return true;
+                }
             }
         }
         return false;
@@ -600,8 +730,9 @@ public final class BuildSites {
     }
 
     public static void wear(Pose3d pose, SubLevel hat, LivingEntity wearer, Vector3dc offset, ItemStack headwear) {
-        pose.rotationPoint().set(head(hat, offset, headwear));
-        pose.position().set(wearer.getX(), wearer.getEyeY(), wearer.getZ());
+        double neck = NECK_LENGTH * Pym.entities().scaleOf(wearer);
+        pose.rotationPoint().set(head(hat, offset, headwear)).sub(0.0, neck / scale(headwear), 0.0);
+        pose.position().set(wearer.getX(), wearer.getEyeY() - neck, wearer.getZ());
         pose.orientation().set(new Quaterniond()
                 .rotateY(Math.toRadians(180.0 - wearer.getYHeadRot()))
                 .rotateX(Math.toRadians(-wearer.getXRot())));

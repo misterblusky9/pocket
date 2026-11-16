@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:hats",
+  "display": {
+    "icon": {
+      "id": "create:fluid_tank"
+    },
+    "title": {
+      "text": "He was number one!"
+    },
+    "description": {
+      "text": "Wear a Hat with two max size Fluid Tanks holding different fluids"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

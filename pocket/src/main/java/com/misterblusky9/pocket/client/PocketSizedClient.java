@@ -56,16 +56,19 @@ public final class PocketSizedClient {
         modBus.addListener(BlueprintEncasingClient::registerVisuals);
         modBus.addListener(PocketPackageModels::register);
         modBus.addListener(PocketItemTooltips::register);
+        modBus.addListener((net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) -> event.register(
+                com.misterblusky9.pocket.item.ModMenus.LOST_AND_FOUND.get(), LostAndFoundScreen::new));
         modBus.addListener(PocketItemProperties::register);
         if (ModList.get().isLoaded("curios")) modBus.addListener(CuriosCompressorRenderer::register);
+        if (com.misterblusky9.pocket.compat.WornHats.ACCESSORIES) modBus.addListener(com.misterblusky9.pocket.compat.accessories.AccessoriesRenderers::register);
         modBus.addListener(TheMoonPackageRenderer::register);
         modBus.addListener(PocketShaders::register);
         modBus.addListener(HotGlueParticle::register);
         modBus.addListener(PortableSubspaceCompressorRenderer::register);
         modBus.addListener(StaticSubspaceCompressorRenderer::register);
         modBus.addListener(HatStandRenderer::register);
+        modBus.addListener(HatStandRenderer::registerDummyHead);
         modBus.addListener(HatRendering::addLayers);
-        modBus.addListener(HatRendering::registerItemColours);
         modBus.addListener(SwitchBearingRenderer::register);
         modBus.addListener(SwitchBearingRenderer::registerVisual);
         modBus.addListener(HelmBearingRenderer::register);
@@ -96,12 +99,14 @@ public final class PocketSizedClient {
         NeoForge.EVENT_BUS.addListener(HatFacePick::render);
         NeoForge.EVENT_BUS.addListener(HatStandOutline::render);
         NeoForge.EVENT_BUS.addListener(HatStandNameTooltip::onTooltip);
+        NeoForge.EVENT_BUS.addListener(HatSchematics::onUse);
         com.misterblusky9.pocket.compat.simulated.CrossScaleWelds.setClientHatResolver(BuildMirrors::sameBuild);
         NeoForge.EVENT_BUS.addListener(BuildMirrors::tick);
         NeoForge.EVENT_BUS.addListener(BuildMirrors::clear);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassIndicator::render);
         NeoForge.EVENT_BUS.addListener(WeldFaceRenderer::render);
         NeoForge.EVENT_BUS.addListener(CopycatFacadeFrames::tick);
+        NeoForge.EVENT_BUS.addListener(FacadeSkin::tick);
         CompressionGunRenderHandler.INSTANCE.registerListeners(NeoForge.EVENT_BUS);
         HotGlueGunRenderHandler.INSTANCE.registerListeners(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(

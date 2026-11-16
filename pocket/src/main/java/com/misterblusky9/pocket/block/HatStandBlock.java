@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.block;
 
+import com.misterblusky9.pocket.build.HatSeals;
 import com.misterblusky9.pocket.build.BuildHostBlock;
 import com.misterblusky9.pocket.build.BuildHostBlockEntity;
 import com.misterblusky9.pocket.item.ModDataComponents;
@@ -143,10 +144,17 @@ public class HatStandBlock extends BuildHostBlock implements IWrenchable {
                                               Player player, InteractionHand hand, BlockHitResult hit) {
         if (!stack.is(Items.NAME_TAG)) return super.useItemOn(stack, state, level, pos, player, hand, hit);
         Component name = stack.get(DataComponents.CUSTOM_NAME);
-        if (name == null || !StringUtil.isValidPlayerName(name.getString())
-                || !(level.getBlockEntity(pos) instanceof HatStandBlockEntity stand))
+        if (!(level.getBlockEntity(pos) instanceof HatStandBlockEntity stand))
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
-        if (!player.mayBuild()) return ItemInteractionResult.FAIL;
+        if (name == null) {
+            if (stand.getSkinProfile() == null) return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+            if (!player.mayBuild() || HatSeals.locks(stand, player)) return ItemInteractionResult.FAIL;
+            if (!level.isClientSide) stand.setSkin(null);
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
+        if (!StringUtil.isValidPlayerName(name.getString()))
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        if (!player.mayBuild() || HatSeals.locks(stand, player)) return ItemInteractionResult.FAIL;
         if (!level.isClientSide) {
             stand.setSkin(new ResolvableProfile(Optional.of(name.getString()), Optional.empty(), new PropertyMap()));
             stack.consume(1, player);
