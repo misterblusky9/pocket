@@ -8,6 +8,7 @@ import com.misterblusky9.pocket.scale.ResizeActor;
 import com.misterblusky9.pocket.scale.ResizeFeedback;
 import com.misterblusky9.pocket.scale.ScaleLimits;
 import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.RefusalText;
 import com.misterblusky9.pym.api.ResizeResult;
 import com.misterblusky9.pym.api.ResizeRequest;
 import com.misterblusky9.pym.api.ScaleBounds;
@@ -87,15 +88,14 @@ public final class CompressionSessions {
             PlotContents contents = Pym.resize().contents(subLevel);
             String blocked = ResizeFeedback.cannotShrink(contents);
             if (blocked != null) {
-                player.displayClientMessage(Component.literal(blocked), true);
+                player.displayClientMessage(RefusalText.component(blocked), true);
                 return false;
             }
 
             int blocks = contents.blocks();
             if (blocks > ceiling) {
                 cellLimit = ceiling;
-                player.displayClientMessage(Component.literal(
-                        "Exceeds maximum block count (" + blocks + " / " + ceiling + ")"), true);
+                player.displayClientMessage(Component.translatable("pocket.message.exceeds_block_count", blocks, ceiling), true);
             }
         }
 
@@ -144,7 +144,7 @@ public final class CompressionSessions {
         if (requested < current - ScaleBounds.EPSILON) {
             String blocked = ResizeFeedback.cannotShrink(Pym.resize().contents(subLevel));
             if (blocked != null) {
-                player.displayClientMessage(Component.literal(blocked), true);
+                player.displayClientMessage(RefusalText.component(blocked), true);
                 return;
             }
         }

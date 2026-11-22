@@ -193,10 +193,10 @@ public final class CompressionFieldRenderer {
         if (playerId == null) return null;
 
         var player = level.getPlayerByUUID(playerId);
-        if (player == null) return null;
-
-        CompressionAim.Aim aim = CompressionAim.of(player, AIM_RANGE);
-        if (aim != null && subLevelId.equals(aim.subLevelId())) return aim.plotHit();
+        if (player != null) {
+            CompressionAim.Aim aim = CompressionAim.of(player, AIM_RANGE);
+            if (aim != null && subLevelId.equals(aim.subLevelId())) return aim.plotHit();
+        }
 
         Vec3 held = CompressionBeamRenderer.landingOn(playerId, subLevelId);
         if (held == null) return null;

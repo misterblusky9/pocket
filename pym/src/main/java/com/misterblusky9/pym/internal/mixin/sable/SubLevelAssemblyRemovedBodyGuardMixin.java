@@ -2,6 +2,8 @@ package com.misterblusky9.pym.internal.mixin.sable;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.misterblusky9.pym.api.Detached;
+import com.misterblusky9.pym.internal.scale.SplitInheritance;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
 import dev.ryanhcode.sable.api.physics.PhysicsPipelineBody;
@@ -59,5 +61,21 @@ public abstract class SubLevelAssemblyRemovedBodyGuardMixin {
     ) {
         if (body == null || body.isRemoved()) return;
         original.call(pipeline, body, position, orientation);
+    }
+
+    @WrapOperation(
+            method = "kickFromContainingSubLevel(Ldev/ryanhcode/sable/api/physics/PhysicsPipeline;"
+                    + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;Lorg/joml/Vector3d;Lorg/joml/Vector3d;"
+                    + "Ldev/ryanhcode/sable/companion/math/Pose3d;Ldev/ryanhcode/sable/sublevel/SubLevel;)V",
+            at = @At(value = "INVOKE", target = "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
+                    + "setSplitFrom(Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
+                    + "Ldev/ryanhcode/sable/companion/math/Pose3d;)V"),
+            remap = false,
+            require = 1
+    )
+    private static void pym$noSplitFromDetached(ServerSubLevel subLevel, ServerSubLevel from, Pose3d pose,
+                                                Operation<Void> original) {
+        if (Detached.isDetached(from)) SplitInheritance.adoptLive(subLevel, from);
+        else original.call(subLevel, from, pose);
     }
 }

@@ -3,6 +3,7 @@ package com.misterblusky9.pym.internal.mixin.interaction;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.SubLevel;
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.api.ScaleBounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
@@ -40,9 +41,11 @@ public abstract class PlayerInteractionDistanceMixin extends LivingEntity {
             CallbackInfoReturnable<Boolean> cir
     ) {
         SubLevel subLevel = Sable.HELPER.getContaining(this.level(), pos);
-        if (subLevel == null || !isActuallyScaled(subLevel)) return;
+        if (subLevel == null) return;
+        Pose3dc worn = Hosted.presented(subLevel);
+        if (worn == null && !isActuallyScaled(subLevel)) return;
 
-        Pose3dc pose = subLevel.logicalPose();
+        Pose3dc pose = worn != null ? worn : subLevel.logicalPose();
         Vec3 eyeWorld = this.getEyePosition();
         Vec3 eyeLocal = pose.transformPositionInverse(eyeWorld);
 
@@ -68,9 +71,11 @@ public abstract class PlayerInteractionDistanceMixin extends LivingEntity {
             CallbackInfoReturnable<Boolean> cir
     ) {
         SubLevel subLevel = Sable.HELPER.getContaining(this.level(), bounds.getBottomCenter());
-        if (subLevel == null || !isActuallyScaled(subLevel)) return;
+        if (subLevel == null) return;
+        Pose3dc worn = Hosted.presented(subLevel);
+        if (worn == null && !isActuallyScaled(subLevel)) return;
 
-        Pose3dc pose = subLevel.logicalPose();
+        Pose3dc pose = worn != null ? worn : subLevel.logicalPose();
         Vec3 eyeWorld = this.getEyePosition();
         Vec3 eyeLocal = pose.transformPositionInverse(eyeWorld);
 

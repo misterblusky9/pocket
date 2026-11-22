@@ -1,26 +1,34 @@
 package com.misterblusky9.pym.internal.physics;
 
+import dev.ryanhcode.sable.api.block.BlockWithSubLevelCollisionCallback;
 import dev.ryanhcode.sable.physics.config.block_properties.PhysicsBlockPropertyHelper;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public record ColliderMaterial(double friction, double restitution) {
-    public static final ColliderMaterial DEFAULT = new ColliderMaterial(1.0D, 0.0D);
+public record ColliderMaterial(double friction, double restitution, boolean callback) {
+    public static final ColliderMaterial DEFAULT = new ColliderMaterial(1.0D, 0.0D, false);
     public static final short DEFAULT_ID = 0;
 
     private static final Map<ColliderMaterial, Short> IDS = new HashMap<>(Map.of(DEFAULT, DEFAULT_ID));
     private static final List<ColliderMaterial> BY_ID = new ArrayList<>(List.of(DEFAULT));
+    private static volatile boolean[] CALLBACK_IDS = new boolean[1];
+
+    public ColliderMaterial(double friction, double restitution) {
+        this(friction, restitution, false);
+    }
 
     public static short id(BlockState state) {
         if (state == null) return DEFAULT_ID;
         double friction = PhysicsBlockPropertyHelper.getFriction(state);
         double restitution = PhysicsBlockPropertyHelper.getRestitution(state);
-        if (friction == DEFAULT.friction && restitution == DEFAULT.restitution) return DEFAULT_ID;
-        return intern(new ColliderMaterial(friction, restitution));
+        boolean callback = BlockWithSubLevelCollisionCallback.hasCallback(state);
+        if (friction == DEFAULT.friction && restitution == DEFAULT.restitution && !callback) return DEFAULT_ID;
+        return intern(new ColliderMaterial(friction, restitution, callback));
     }
 
     public static boolean special(BlockState state) {
@@ -31,6 +39,17 @@ public record ColliderMaterial(double friction, double restitution) {
         return id > 0 && id < BY_ID.size() ? BY_ID.get(id) : DEFAULT;
     }
 
+    public static boolean hasCallback(short id) {
+        boolean[] callbacks = CALLBACK_IDS;
+        return id > 0 && id < callbacks.length && callbacks[id];
+    }
+
+    public static short withCallback(short id) {
+        if (hasCallback(id)) return id;
+        ColliderMaterial material = byId(id);
+        return intern(new ColliderMaterial(material.friction, material.restitution, true));
+    }
+
     private static synchronized short intern(ColliderMaterial material) {
         Short known = IDS.get(material);
         if (known != null) return known;
@@ -38,6 +57,9 @@ public record ColliderMaterial(double friction, double restitution) {
         short id = (short) BY_ID.size();
         BY_ID.add(material);
         IDS.put(material, id);
+        boolean[] callbacks = Arrays.copyOf(CALLBACK_IDS, BY_ID.size());
+        callbacks[id] = material.callback;
+        CALLBACK_IDS = callbacks;
         return id;
     }
 
@@ -45,9 +67,11 @@ public record ColliderMaterial(double friction, double restitution) {
         private short first = -1;
         private double firstWeight;
         private Map<Short, Double> mixed;
+        private boolean callback;
 
         public void add(short id, double weight) {
             if (!(weight > 0.0D)) return;
+            if (hasCallback(id)) this.callback = true;
             if (this.mixed != null) {
                 this.mixed.merge(id, weight, Double::sum);
                 return;
@@ -70,7 +94,16 @@ public record ColliderMaterial(double friction, double restitution) {
             return this.mixed != null;
         }
 
+        public boolean callback() {
+            return this.callback;
+        }
+
         public short winner() {
+            short best = materialWinner();
+            return this.callback ? withCallback(best) : best;
+        }
+
+        private short materialWinner() {
             if (this.mixed == null) return this.first < 0 ? DEFAULT_ID : this.first;
             short best = DEFAULT_ID;
             double bestWeight = this.mixed.getOrDefault(DEFAULT_ID, 0.0D);

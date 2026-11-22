@@ -132,7 +132,7 @@ public abstract class VanillaChunkedSubLevelRenderDataMixin {
                 traceBounds.maxZ() - traceBounds.minZ() + 1);
 
         if (PortraitScope.isDrawing(this.subLevel)) {
-            pym$applyNormalScale(shader, modelView, PortraitScope.visualScale());
+            pym$applyNormalScale(shader, modelView, PortraitScope.visualScale() * PortraitScope.visualScale());
             return;
         }
 

@@ -19,6 +19,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -170,7 +171,7 @@ public final class CompressionBeamRenderer {
         }
 
         for (Map.Entry<UUID, Beam> entry : ACTIVE.entrySet()) {
-            Player owner = level.getPlayerByUUID(entry.getKey());
+            CompressionBeamOwner owner = ownerOf(level, entry.getKey());
             if (owner == null) continue;
             entry.getValue().tick(owner, level);
         }
@@ -191,9 +192,9 @@ public final class CompressionBeamRenderer {
 
         boolean drew = false;
         for (Map.Entry<UUID, Beam> entry : ACTIVE.entrySet()) {
-            Player owner = level.getPlayerByUUID(entry.getKey());
+            CompressionBeamOwner owner = ownerOf(level, entry.getKey());
             if (owner == null) continue;
-            if (entry.getValue().render(poses, buffer, camera, partialTick, muzzleOf(owner, partialTick), owner)) {
+            if (entry.getValue().render(poses, buffer, camera, partialTick, owner.muzzle(partialTick), owner)) {
                 drew = true;
             }
         }
@@ -201,8 +202,52 @@ public final class CompressionBeamRenderer {
         if (drew) buffer.draw();
     }
 
-    private static Vec3 muzzleOf(Player player) {
-        return muzzleOf(player, 1.0F);
+    private static CompressionBeamOwner ownerOf(Level level, UUID id) {
+        Player player = level.getPlayerByUUID(id);
+        return player == null ? null : new PlayerOwner(player);
+    }
+
+    private record PlayerOwner(Player player) implements CompressionBeamOwner {
+        @Override
+        public Vec3 muzzle(float partialTick) {
+            return muzzleOf(this.player, partialTick);
+        }
+
+        @Override
+        public Vec3 aimOrigin() {
+            return this.player.getEyePosition();
+        }
+
+        @Override
+        public Vec3 aimDirection() {
+            return this.player.getViewVector(1.0F);
+        }
+
+        @Override
+        public double range() {
+            return RANGE;
+        }
+
+        @Override
+        public double scale() {
+            double scale = Pym.entities().scaleOf(this.player);
+            return ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL;
+        }
+
+        @Override
+        public Entity emitter() {
+            return this.player;
+        }
+
+        @Override
+        public EntityCompressionTargeting.Target entityTarget(double range) {
+            return EntityCompressionTargeting.find(this.player, range);
+        }
+
+        @Override
+        public void chargedUp() {
+            recoil(this.player.getUUID());
+        }
     }
 
     private static Vec3 muzzleOf(Player player, float partialTick) {
@@ -228,27 +273,28 @@ public final class CompressionBeamRenderer {
 
     private record Landing(Vec3 point, boolean struck, boolean targetSurface) {}
 
-    private static Landing endpointOf(Player player, Level level, UUID lockedTarget) {
-        EntityCompressionTargeting.Target entityTarget =
-                EntityCompressionTargeting.find(player, RANGE);
+    private static Landing endpointOf(CompressionBeamOwner owner, Level level, UUID lockedTarget) {
+        double range = owner.range();
+        EntityCompressionTargeting.Target entityTarget = owner.entityTarget(range);
         if (entityTarget != null) {
             return new Landing(entityTarget.hitPos(), true, false);
         }
 
-        Vec3 eye = player.getEyePosition();
-        Vec3 end = eye.add(player.getViewVector(1.0F).scale(RANGE));
+        Vec3 eye = owner.aimOrigin();
+        Vec3 look = owner.aimDirection();
+        Vec3 end = eye.add(look.scale(range));
 
-        BlockHitResult hit = level.clip(new ClipContext(
-                eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+        Entity emitter = owner.emitter();
+        BlockHitResult hit = level.clip(emitter == null
+                ? new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
+                        net.minecraft.world.phys.shapes.CollisionContext.empty())
+                : new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, emitter));
 
         SubLevel struck = hit == null || hit.getType() == HitResult.Type.MISS
                 ? null : Sable.HELPER.getContaining(level, hit.getBlockPos());
 
         if (hit == null || hit.getType() == HitResult.Type.MISS) {
-            double scale = Pym.entities().scaleOf(player);
-            return new Landing(
-                    eye.add(player.getViewVector(1.0F).scale(RANGE * MISS_REACH_FRACTION
-                            * (ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL))), false, false);
+            return new Landing(eye.add(look.scale(range * MISS_REACH_FRACTION * owner.scale())), false, false);
         }
 
         SubLevel found = struck;
@@ -430,16 +476,15 @@ public final class CompressionBeamRenderer {
             this.line.getParams().colored(value ? GROW_COLOUR : SHRINK_COLOUR);
         }
 
-        private void tick(Player owner, Level level) {
+        private void tick(CompressionBeamOwner owner, Level level) {
             this.energy *= SURGE_DECAY;
             boolean charging = this.chargeTicks < CHARGE_TICKS;
             this.chargeTicks = Math.min(CHARGE_TICKS, this.chargeTicks + 1.0F);
-            if (charging && this.chargeTicks >= CHARGE_TICKS) recoil(owner.getUUID());
+            if (charging && this.chargeTicks >= CHARGE_TICKS) owner.chargedUp();
             tickSurge();
 
-            this.muzzle = muzzleOf(owner);
-            double scale = Pym.entities().scaleOf(owner);
-            this.ownerScale = ScaleBounds.isValid(scale) ? scale : ScaleBounds.FULL;
+            this.muzzle = owner.muzzle(1.0F);
+            this.ownerScale = owner.scale();
 
             Landing landing = endpointOf(owner, level, this.lockedTarget);
             this.endpoint = landing.point();
@@ -530,10 +575,10 @@ public final class CompressionBeamRenderer {
                 Vec3 camera,
                 float partialTick,
                 Vec3 frameMuzzle,
-                Player owner
+                CompressionBeamOwner owner
         ) {
             if (this.nodes.size() < 2) return false;
-            LineEmitter.firedBy(this.line.getParams(), owner);
+            LineEmitter.firedBy(this.line.getParams(), owner.emitter());
 
             this.nodes.get(0).pinTo(frameMuzzle);
             if (Mth.lerp(partialTick, (float) this.previousReach, (float) this.reach) <= 0.01F) return false;

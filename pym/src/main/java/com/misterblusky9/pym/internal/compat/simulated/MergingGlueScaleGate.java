@@ -11,8 +11,8 @@ import net.minecraft.world.level.Level;
 public final class MergingGlueScaleGate {
     public enum Refusal {
         NONE(null),
-        SCALE("Scales must match"),
-        COUPLED("Already connected");
+        SCALE("pym.refusal.scales_must_match"),
+        COUPLED("pym.refusal.already_connected");
 
         private final String message;
 

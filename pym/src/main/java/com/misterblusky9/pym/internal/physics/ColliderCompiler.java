@@ -416,9 +416,10 @@ public final class ColliderCompiler {
             PlotSource source
     ) {
         if (!cell.materials.mixed() || source == null || pivot == null) return cell.materials.winner();
-        return source.surfaceMaterial(
+        short surface = source.surfaceMaterial(
                 expand(pivot.x(), cellX, scale), expand(pivot.y(), cellY, scale), expand(pivot.z(), cellZ, scale),
                 expand(pivot.x(), cellX + 1.0D, scale), expand(pivot.y(), cellY + 1.0D, scale), expand(pivot.z(), cellZ + 1.0D, scale));
+        return cell.materials.callback() ? ColliderMaterial.withCallback(surface) : surface;
     }
 
     private static double expand(double pivot, double value, double scale) {

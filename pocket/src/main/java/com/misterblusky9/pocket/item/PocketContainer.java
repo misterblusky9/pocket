@@ -15,6 +15,13 @@ public enum PocketContainer {
             false
     ),
 
+    CREATIVE_POCKET_CASE(
+            "creative_pocket_case", "item/creative_pocket_case",
+            2.0D, 14.0D, 2.0D, 14.0D, 0.5D,
+            3.5D, 12.0D, -1.0D,
+            false
+    ),
+
     DISPLAY_BOTTLE(
             "display_bottle", "item/display_bottle",
             1.25D, 15.25D, 2.25D, 13.25D, 0.5D,
@@ -143,7 +150,10 @@ public enum PocketContainer {
     }
 
     public static PocketContainer of(ItemStack carrier) {
-        ResourceLocation recorded = PocketCaseItem.containerId(carrier);
+        return byId(PocketCaseItem.containerId(carrier));
+    }
+
+    public static PocketContainer byId(ResourceLocation recorded) {
         if (recorded != null) {
             for (PocketContainer container : values()) {
                 if (container.id().equals(recorded)) return container;

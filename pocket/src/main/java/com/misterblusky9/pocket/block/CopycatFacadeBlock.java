@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.block;
 
+import com.simibubi.create.AllBlocks;
 import com.simibubi.create.content.decoration.copycat.CopycatBlock;
 import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -26,6 +27,7 @@ import java.util.Set;
 
 public class CopycatFacadeBlock extends CopycatBlock {
     private static final int MAX_CONNECTED = 4096;
+    private static final ThreadLocal<Boolean> SHAPING = ThreadLocal.withInitial(() -> false);
 
     public CopycatFacadeBlock(Properties properties) {
         super(properties);
@@ -119,6 +121,19 @@ public class CopycatFacadeBlock extends CopycatBlock {
         return true;
     }
 
+    public static void shaping(boolean shaping) {
+        SHAPING.set(shaping);
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moving) {
+        if (SHAPING.get() && !state.is(newState.getBlock())
+                && level.getBlockEntity(pos) instanceof CopycatBlockEntity copycat) {
+            copycat.setConsumedItem(ItemStack.EMPTY);
+        }
+        super.onRemove(state, level, pos, newState, moving);
+    }
+
     @Override
     public BlockEntityType<? extends CopycatBlockEntity> getBlockEntityType() {
         return ModBlockEntities.COPYCAT_FACADE.get();
@@ -153,6 +168,7 @@ public class CopycatFacadeBlock extends CopycatBlock {
             Direction dir
     ) {
         BlockState material = getMaterial(level, pos);
+        if (AllBlocks.COPYCAT_BASE.has(material)) return false;
         BlockState neighbour = neighborState.getBlock() instanceof CopycatBlock
                 ? getMaterial(level, pos.relative(dir))
                 : neighborState;

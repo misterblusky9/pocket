@@ -31,6 +31,7 @@ public final class PlayerSpawnScale {
     private record Use(Player player, SubLevel surface, BlockHitResult hit) {}
 
     private static final ThreadLocal<Use> USE = new ThreadLocal<>();
+    private static final ThreadLocal<SubLevel> SITE = new ThreadLocal<>();
 
     public static <T> T using(Player player, SubLevel surface, BlockHitResult hit, Supplier<T> use) {
         Use outer = USE.get();
@@ -49,9 +50,24 @@ public final class PlayerSpawnScale {
         });
     }
 
+    public static <T> T spawningOn(SubLevel surface, Supplier<T> spawn) {
+        if (surface == null) return spawn.get();
+        SubLevel outer = SITE.get();
+        SITE.set(surface);
+        try {
+            return spawn.get();
+        } finally {
+            SITE.set(outer);
+        }
+    }
+
     public static void onJoin(EntityJoinLevelEvent event) {
+        if (event.getLevel().isClientSide() || event.loadedFromDisk()) return;
         Use use = USE.get();
-        if (use == null || event.getLevel().isClientSide() || event.loadedFromDisk()) return;
+        if (use == null) {
+            matchSite(event.getEntity());
+            return;
+        }
 
         Entity entity = event.getEntity();
         if (!follows(entity)) return;
@@ -67,6 +83,16 @@ public final class PlayerSpawnScale {
         entity.refreshDimensions();
         if (use.hit() != null) placeAtHit(entity, use.hit());
         else placeAlongLook(entity, use.player(), surface);
+    }
+
+    private static void matchSite(Entity entity) {
+        SubLevel site = SITE.get();
+        if (site == null || !follows(entity)) return;
+        double grid = gridScale(site);
+        if (ScaleBounds.same(grid, 1.0D)) return;
+        double goal = grid / EntityCompressionTargeting.containerScale(entity);
+        if (!ScaleBounds.isValid(goal)) return;
+        if (!ScaleBounds.same(goal, Pym.entities().target(entity))) Pym.entities().setScale(entity, goal, 0);
     }
 
     public static void inherit(Entity replacement, Entity original) {

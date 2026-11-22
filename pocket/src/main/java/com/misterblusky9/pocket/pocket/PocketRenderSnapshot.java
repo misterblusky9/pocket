@@ -404,15 +404,15 @@ public final class PocketRenderSnapshot {
 
     public void writeTo(CompoundTag tag) {
         tag.putIntArray(SIZE_KEY, new int[]{this.sizeX, this.sizeY, this.sizeZ});
-        tag.putIntArray(BLOCKS_V2_KEY, this.blocks);
+        tag.remove(BLOCKS_V2_KEY);
+        tag.remove(BLOCKS_KEY);
+        tag.remove(PocketWheelPreview.WHEELS_KEY);
+        tag.remove(PocketCopycatPreview.COPYCATS_KEY);
         tag.putFloat(VIEW_YAW_KEY, this.previewYaw);
         tag.putFloat(VIEW_PITCH_KEY, this.previewPitch);
         tag.putDouble(UPRIGHT_YAW_KEY, this.uprightYaw);
         if (this.revision > 0) tag.putInt(REVISION_KEY, this.revision);
         tag.putIntArray(GRID_ANCHOR_KEY, this.gridAnchor);
-
-        if (this.wheels.length > 0) tag.putIntArray(PocketWheelPreview.WHEELS_KEY, this.wheels);
-        if (!this.copycats.isEmpty()) tag.put(PocketCopycatPreview.COPYCATS_KEY, this.copycats.copy());
 
         if (this.localBounds.length == 6) {
             tag.putIntArray(LOCAL_BOUNDS_KEY, this.localBounds);
@@ -437,7 +437,7 @@ public final class PocketRenderSnapshot {
             if ((legacy.length % 4) != 0) return null;
             blocks = widenLegacy(legacy);
         } else {
-            return null;
+            blocks = new int[0];
         }
 
         float previewYaw = tag.contains(VIEW_YAW_KEY) ? tag.getFloat(VIEW_YAW_KEY) : 138.0F;

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CCC",
+    "CHC",
+    "CCC"
+  ],
+  "key": {
+    "C": { "item": "create:cardboard" },
+    "H": { "item": "minecraft:hay_block" }
+  },
+  "result": {
+    "id": "pocket:dummy_head",
+    "count": 1
+  }
+}

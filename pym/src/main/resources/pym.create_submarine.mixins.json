@@ -1,0 +1,27 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pym.internal.compat.create_submarine.mixin",
+  "plugin": "com.misterblusky9.pym.internal.compat.CompatMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "HandleBodyAccess",
+    "PhysicsHelperForceContextMixin",
+    "FloodWeightForceContextMixin",
+    "BoatBuoyancyScaleMixin",
+    "BoatEngineImmersionScaleMixin",
+    "BuoyWaterlineScaleMixin",
+    "AnchorFloorProbeScaleMixin",
+    "ImplosionBlastScaleMixin",
+    "ImplosionRadiusScaleMixin",
+    "CompartmentBoundsScaleMixin"
+  ],
+  "client": [
+    "WaterCullRadiusScaleMixin",
+    "CrackShellScaleMixin",
+    "SailShaderOffsetScaleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

@@ -3,7 +3,12 @@ package com.misterblusky9.pocket.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.misterblusky9.pocket.build.BuildHostBlockEntity;
+import com.misterblusky9.pocket.client.CaseCloning;
 import com.misterblusky9.pocket.item.PocketCaseItem;
+import com.misterblusky9.pocket.network.CaseClonePayload;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
@@ -22,9 +27,18 @@ public abstract class CreativeCaseCloneMixin {
             ItemStack stack,
             int count,
             Operation<ItemStack> original,
-            @Local(argsOnly = true) ClickType clickType
+            @Local(argsOnly = true) ClickType clickType,
+            @Local(argsOnly = true) Player player
     ) {
         if (!pocket$cloning(clickType, stack)) return original.call(stack, count);
+        if (clickType == ClickType.CLONE && player instanceof ServerPlayer server) {
+            ItemStack copy = CaseClonePayload.duplicate(server.serverLevel(), stack);
+            if (copy != null) return copy;
+        } else if (clickType == ClickType.CLONE && player.level().isClientSide()) {
+            CaseCloning.request(stack);
+            return ItemStack.EMPTY;
+        }
+        if (BuildHostBlockEntity.token(stack) != null) return original.call(BuildHostBlockEntity.plain(stack), count);
         ItemStack empty = new ItemStack(PocketCaseItem.containerItem(stack));
         return empty.copyWithCount(clickType == ClickType.CLONE ? empty.getMaxStackSize() : Math.min(count, empty.getMaxStackSize()));
     }
@@ -43,6 +57,6 @@ public abstract class CreativeCaseCloneMixin {
     private boolean pocket$cloning(ClickType clickType, ItemStack stack) {
         boolean clone = clickType == ClickType.CLONE
                 || clickType == ClickType.QUICK_CRAFT && this.quickcraftType == AbstractContainerMenu.QUICKCRAFT_TYPE_CLONE;
-        return clone && PocketCaseItem.isUnique(stack);
+        return clone && (PocketCaseItem.isUnique(stack) || BuildHostBlockEntity.token(stack) != null);
     }
 }

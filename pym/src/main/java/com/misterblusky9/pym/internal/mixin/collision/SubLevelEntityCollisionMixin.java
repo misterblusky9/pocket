@@ -1,6 +1,9 @@
 package com.misterblusky9.pym.internal.mixin.collision;
 
 import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.internal.PlacedSubLevels;
+import dev.ryanhcode.sable.ActiveSableCompanion;
+import net.minecraft.world.level.Level;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.internal.scale.ScaleState;
 import com.misterblusky9.pym.internal.collision.CollisionLog;
@@ -515,6 +518,19 @@ public abstract class SubLevelEntityCollisionMixin {
             @Local(argsOnly = true) Pose3dc subLevelPose
     ) {
         return coefficient - 0.05 * (1.0 - pym$subLevelScale(subLevelPose));
+    }
+
+    @WrapOperation(
+            method = "collide",
+            at = @At(value = "INVOKE",
+                    target = "Ldev/ryanhcode/sable/ActiveSableCompanion;getAllIntersecting(Lnet/minecraft/world/level/Level;Ldev/ryanhcode/sable/companion/math/BoundingBox3dc;)Ljava/lang/Iterable;"),
+            remap = false,
+            require = 1
+    )
+    private static Iterable<SubLevel> pym$standingMirrorsCollide(
+            ActiveSableCompanion helper, Level level, BoundingBox3dc bounds, Operation<Iterable<SubLevel>> original,
+            @Local(argsOnly = true) Entity entity) {
+        return PlacedSubLevels.colliding(original.call(helper, level, bounds), level, bounds, entity);
     }
 
     @Unique

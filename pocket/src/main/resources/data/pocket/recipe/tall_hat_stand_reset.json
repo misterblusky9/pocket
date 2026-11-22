@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "pocket:tall_hat_stand"
+    }
+  ],
+  "result": {
+    "id": "pocket:tall_hat_stand",
+    "count": 1
+  }
+}

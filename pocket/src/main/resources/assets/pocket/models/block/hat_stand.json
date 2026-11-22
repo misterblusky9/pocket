@@ -1,0 +1,145 @@
+{
+  "textures": {
+    "particle": "pocket:block/hatters_stand_particle",
+    "wood": "pocket:block/hatters_stand_wood"
+  },
+  "elements": [
+    {
+      "from": [
+        7,
+        1,
+        7
+      ],
+      "to": [
+        9,
+        5,
+        9
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            0.5,
+            1.25,
+            1.0,
+            2.25
+          ],
+          "texture": "#wood"
+        },
+        "east": {
+          "uv": [
+            0.0,
+            1.25,
+            0.5,
+            2.25
+          ],
+          "texture": "#wood"
+        },
+        "south": {
+          "uv": [
+            1.5,
+            1.25,
+            2.0,
+            2.25
+          ],
+          "texture": "#wood"
+        },
+        "west": {
+          "uv": [
+            1.0,
+            1.25,
+            1.5,
+            2.25
+          ],
+          "texture": "#wood"
+        },
+        "up": {
+          "uv": [
+            1.0,
+            0.5,
+            0.5,
+            0.0
+          ],
+          "texture": "#wood"
+        },
+        "down": {
+          "uv": [
+            1.5,
+            0.0,
+            1.0,
+            0.5
+          ],
+          "texture": "#wood"
+        }
+      }
+    },
+    {
+      "from": [
+        2,
+        0,
+        2
+      ],
+      "to": [
+        14,
+        1,
+        14
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            3.0,
+            11.0,
+            6.0,
+            11.25
+          ],
+          "texture": "#wood"
+        },
+        "east": {
+          "uv": [
+            0.0,
+            11.0,
+            3.0,
+            11.25
+          ],
+          "texture": "#wood"
+        },
+        "south": {
+          "uv": [
+            9.0,
+            11.0,
+            12.0,
+            11.25
+          ],
+          "texture": "#wood"
+        },
+        "west": {
+          "uv": [
+            6.0,
+            11.0,
+            9.0,
+            11.25
+          ],
+          "texture": "#wood"
+        },
+        "up": {
+          "uv": [
+            6.0,
+            11.0,
+            3.0,
+            8.0
+          ],
+          "texture": "#wood"
+        },
+        "down": {
+          "uv": [
+            9.0,
+            8.0,
+            6.0,
+            11.0
+          ],
+          "texture": "#wood"
+        }
+      }
+    }
+  ],
+  "ambientocclusion": true
+}

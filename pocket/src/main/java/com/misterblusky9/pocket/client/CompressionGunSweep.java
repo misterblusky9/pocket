@@ -41,11 +41,13 @@ final class CompressionGunSweep {
 
     static final float RETRACT_TICKS = 4.0F;
 
-    private static final ResourceLocation BODY = geometry("item");
-    private static final ResourceLocation COG = geometry("cog");
+    record Geometry(ResourceLocation body, ResourceLocation cog, float cell) {
+        float frontWidth() {
+            return this.cell * 3.0F / 16.0F;
+        }
+    }
 
-    private static final float CELL = 0.5F;
-    private static final float FRONT_WIDTH = CELL * 3.0F / 16.0F;
+    static final Geometry GUN = new Geometry(geometry("item"), geometry("cog"), 0.5F);
     private static final float FACE_OFFSET = 0.0018F;
 
     private static final float SEALED_STRAIN = 0.55F;
@@ -67,11 +69,13 @@ final class CompressionGunSweep {
         }
     }
 
-    private static final int MAX_MESHES = 2;
-    private static final Map<BakedModel, Meshes> MESHES =
+    private record MeshKey(Geometry geometry, BakedModel body) {}
+
+    private static final int MAX_MESHES = 4;
+    private static final Map<MeshKey, Meshes> MESHES =
             new LinkedHashMap<>(4, 0.75F, true) {
                 @Override
-                protected boolean removeEldestEntry(Map.Entry<BakedModel, Meshes> eldest) {
+                protected boolean removeEldestEntry(Map.Entry<MeshKey, Meshes> eldest) {
                     if (size() <= MAX_MESHES) return false;
                     if (eldest.getValue() != null) eldest.getValue().close();
                     return true;
@@ -86,10 +90,15 @@ final class CompressionGunSweep {
     }
 
     static float advanceSource(float front, boolean spooling, float ticksUsing, float delta) {
-        if (!spooling) return Math.max(0.0F, front - delta * FRONT_WIDTH / RETRACT_TICKS);
+        return advanceSource(GUN, front, spooling, ticksUsing, delta);
+    }
+
+    static float advanceSource(Geometry geometry, float front, boolean spooling, float ticksUsing, float delta) {
+        float frontWidth = geometry.frontWidth();
+        if (!spooling) return Math.max(0.0F, front - delta * frontWidth / RETRACT_TICKS);
         if (ticksUsing <= CompressionGunItem.SOURCE_TICKS) return 0.0F;
-        return Math.min(FRONT_WIDTH,
-                (ticksUsing - CompressionGunItem.SOURCE_TICKS) * FRONT_WIDTH / CompressionGunItem.SOURCE_IGNITE_TICKS);
+        return Math.min(frontWidth,
+                (ticksUsing - CompressionGunItem.SOURCE_TICKS) * frontWidth / CompressionGunItem.SOURCE_IGNITE_TICKS);
     }
 
     static float advance(
@@ -99,11 +108,22 @@ final class CompressionGunSweep {
             float ticksUsing,
             float delta
     ) {
+        return advance(GUN, body, front, spooling, ticksUsing, delta);
+    }
+
+    static float advance(
+            Geometry geometry,
+            BakedModel body,
+            float front,
+            boolean spooling,
+            float ticksUsing,
+            float delta
+    ) {
         if (!spooling && front <= 0.0F) return 0.0F;
-        Meshes meshes = meshes(body);
+        Meshes meshes = meshes(geometry, body);
         if (meshes == null) return 0.0F;
 
-        float full = meshes.radius() + FRONT_WIDTH;
+        float full = meshes.radius() + geometry.frontWidth();
         if (!spooling) return Math.max(0.0F, front - delta * full / RETRACT_TICKS);
         if (ticksUsing <= CompressionGunItem.SWEEP_START_TICKS) return 0.0F;
         return Math.min(full, CompressionGunItem.sweepProgress(ticksUsing) * meshes.radius());
@@ -120,13 +140,29 @@ final class CompressionGunSweep {
             MultiBufferSource buffers,
             Consumer<PoseStack> spinCog
     ) {
-        if (!(source > 0.0F || front > 0.0F) || !inHand(transformType)) return;
+        if (!inHand(transformType)) return;
+        render(GUN, body, source, front, growing, renderTicks, ms, buffers, spinCog);
+    }
+
+    static void render(
+            Geometry geometry,
+            BakedModel body,
+            float source,
+            float front,
+            boolean growing,
+            float renderTicks,
+            PoseStack ms,
+            MultiBufferSource buffers,
+            Consumer<PoseStack> spinCog
+    ) {
+        if (!(source > 0.0F || front > 0.0F)) return;
 
         ShaderInstance shader = PocketShaders.compressionField();
         if (shader == null) return;
 
-        Meshes meshes = meshes(body);
+        Meshes meshes = meshes(geometry, body);
         if (meshes == null) return;
+        float frontWidth = geometry.frontWidth();
 
         if (buffers instanceof MultiBufferSource.BufferSource batched) batched.endBatch();
 
@@ -134,7 +170,7 @@ final class CompressionGunSweep {
         float[] frontColour = growing ? GROW_FRONT : SHRINK_FRONT;
 
         set(shader, "FaceOffset", FACE_OFFSET);
-        set(shader, "FrontWidth", FRONT_WIDTH);
+        set(shader, "FrontWidth", frontWidth);
         set(shader, "PulseRadius", -1000.0F);
         set(shader, "PulseWidth", 1.0F);
         set(shader, "PulseCell", 1.0F);
@@ -199,18 +235,19 @@ final class CompressionGunSweep {
         if (uniform != null) uniform.set(value);
     }
 
-    private static Meshes meshes(BakedModel body) {
-        if (MESHES.containsKey(body)) return MESHES.get(body);
+    private static Meshes meshes(Geometry geometry, BakedModel body) {
+        MeshKey key = new MeshKey(geometry, body);
+        if (MESHES.containsKey(key)) return MESHES.get(key);
 
-        Meshes built = build();
-        MESHES.put(body, built);
+        Meshes built = build(geometry);
+        MESHES.put(key, built);
         return built;
     }
 
-    private static Meshes build() {
-        List<Cell> bodyCells = cells(elements(BODY));
+    private static Meshes build(Geometry geometry) {
+        List<Cell> bodyCells = cells(elements(geometry.body()), geometry.cell());
         if (bodyCells.isEmpty()) return null;
-        List<Cell> cogCells = cells(elements(COG));
+        List<Cell> cogCells = cells(elements(geometry.cog()), geometry.cell());
 
         Source source = source(cogCells);
         float radius = 0.0F;
@@ -316,7 +353,7 @@ final class CompressionGunSweep {
         }
     }
 
-    private static List<Cell> cells(List<BlockElement> elements) {
+    private static List<Cell> cells(List<BlockElement> elements, float cell) {
         List<Cell> cells = new ArrayList<>();
         for (BlockElement element : elements) {
             Frame frame = frame(element);
@@ -327,7 +364,7 @@ final class CompressionGunSweep {
             int[] counts = new int[3];
             float[] step = new float[3];
             for (int axis = 0; axis < 3; axis++) {
-                counts[axis] = Math.max(1, Math.round(size[axis] / CELL));
+                counts[axis] = Math.max(1, Math.round(size[axis] / cell));
                 step[axis] = size[axis] / counts[axis];
             }
 

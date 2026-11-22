@@ -32,9 +32,9 @@ public final class PortraitMirror {
         event.getDispatcher().register(Commands.literal("pymportrait").executes(context -> {
             final ClientSubLevel aimed = aimed();
             held = new WeakReference<>(aimed);
-            context.getSource().sendSystemMessage(Component.literal(aimed == null
-                    ? "Portrait cleared"
-                    : "Portrait holding " + aimed.getUniqueId() + " (" + Portrait.span(aimed) + " blocks across)"));
+            context.getSource().sendSystemMessage(aimed == null
+                    ? Component.translatable("pym.portrait.cleared")
+                    : Component.translatable("pym.portrait.holding", aimed.getUniqueId().toString(), String.valueOf(Portrait.span(aimed))));
             return aimed == null ? 0 : 1;
         }));
     }

@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.scale.ScaleDetents;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.item.PersonalCompressors;
 import com.misterblusky9.pocket.item.ScaleSelectingItem;
@@ -49,16 +50,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
-import java.util.stream.DoubleStream;
-import java.util.stream.IntStream;
 
 public final class ScaleSelectionScreen extends Screen {
-    private static final double BOARD_MIN = 1.0D / 32.0D;
-    private static final double BOARD_MAX = 8.0D;
-    private static final double[] EXTENDED_STOPS = {1.0D / 64.0D, 16.0D};
-    private static final double[] FINE_STOPS = {
-            1.0D / 10.0D, 1.0D / 5.0D, 1.0D / 3.0D, 2.0D / 3.0D, 3.0D / 4.0D,
-            1.25D, 1.5D, 1.75D, 2.25D, 2.5D, 2.75D, 3.0D, 3.25D, 3.5D, 3.75D};
+    private static final double BOARD_MIN = ScaleDetents.BOARD_MIN;
+    private static final double BOARD_MAX = ScaleDetents.BOARD_MAX;
 
     private static final int BODY_WIDTH = 224;
     private static final int SCALE_LABEL_LEFT = 87;
@@ -216,23 +211,8 @@ public final class ScaleSelectionScreen extends Screen {
 
     private void applyRange(ScaleBounds range) {
         this.range = range;
-        this.stops = DoubleStream.concat(
-                        IntStream.rangeClosed(-10, -1).mapToDouble(exponent -> Math.pow(2.0D, exponent)),
-                        IntStream.rangeClosed(1, (int) BOARD_MAX).asDoubleStream())
-                .filter(stop -> stop >= BOARD_MIN - ScaleBounds.EPSILON && stop <= BOARD_MAX + ScaleBounds.EPSILON)
-                .filter(this.range::contains)
-                .toArray();
-        double[] seen = this.stops;
-        this.detents = DoubleStream.concat(DoubleStream.of(seen), DoubleStream.of(FINE_STOPS)
-                        .filter(stop -> stop >= BOARD_MIN - ScaleBounds.EPSILON && stop <= BOARD_MAX + ScaleBounds.EPSILON)
-                        .filter(this.range::contains)
-                        .filter(stop -> DoubleStream.of(seen).noneMatch(other -> ScaleBounds.same(stop, other))))
-                .sorted()
-                .toArray();
-        this.extendedDetents = DoubleStream.concat(DoubleStream.of(this.detents), DoubleStream.of(EXTENDED_STOPS)
-                        .filter(this.range::contains))
-                .sorted()
-                .toArray();
+        this.stops = ScaleDetents.stops(range);
+        this.extendedDetents = ScaleDetents.of(range);
         this.detents = this.extendedDetents;
         this.fieldDetents = this.detents;
     }

@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.network;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.build.BuildSites;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWeldSync;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldGeometry;
@@ -8,6 +9,7 @@ import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.item.ModItems;
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.api.Pym;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
@@ -29,6 +31,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 
+import java.util.Set;
 import java.util.UUID;
 
 public record CrossScaleWeldPayload(
@@ -46,7 +49,9 @@ public record CrossScaleWeldPayload(
     public static final Type<CrossScaleWeldPayload> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "cross_scale_weld")
     );
-    private static final double MAX_REACH_SQ = 64.0D;
+    private static final double MIN_REACH = 8.0D;
+    private static final double REACH_SLACK = 1.0D;
+    private static final double FACE_HALF_DIAGONAL = Math.sqrt(0.5D);
 
     public static final StreamCodec<RegistryFriendlyByteBuf, CrossScaleWeldPayload> STREAM_CODEC =
             StreamCodec.of(
@@ -90,7 +95,14 @@ public record CrossScaleWeldPayload(
         ItemStack glue = player.getItemInHand(this.hand);
         if (!glue.is(ModItems.GLUE_GUN.get())) return;
 
-        if (!withinReach(player, this.smallPos) || !withinReach(player, this.bigPos)) return;
+        Vector3d smallFace = WeldGeometry.faceCentre(this.smallPos, this.smallFacing);
+        Vector3d bigFace = new Vector3d(
+                this.bigPos.getX() + this.hitX, this.bigPos.getY() + this.hitY, this.bigPos.getZ() + this.hitZ);
+        if (!withinReach(player, this.smallPos, smallFace, FACE_HALF_DIAGONAL)
+                || !withinReach(player, this.bigPos, bigFace, 0.0D)) {
+            message(player, CrossScaleWelds.Refusal.OUT_OF_RANGE);
+            return;
+        }
 
         CrossScaleWelds.Weld weld = CrossScaleWelds.Weld.resolve(
                 level,
@@ -101,7 +113,10 @@ public record CrossScaleWeldPayload(
                 this.bigFacing,
                 new Vec3(this.hitX, this.hitY, this.hitZ),
                 mode());
-        if (weld == null) return;
+        if (weld == null) {
+            message(player, CrossScaleWelds.Refusal.CANNOT_WELD);
+            return;
+        }
 
         CrossScaleWelds.Refusal refusal = weld.check();
         if (!refusal.allowed()) {
@@ -119,14 +134,24 @@ public record CrossScaleWeldPayload(
             message(player, CrossScaleWelds.Refusal.ALREADY_CONNECTED);
             return;
         }
+        boolean mounting = weld.mounting();
         if (!CrossScaleWelds.componentSettled(container, small.getUniqueId())
-                || (big != null && !CrossScaleWelds.componentSettled(container, big.getUniqueId()))) {
+                || (big != null && !mounting && !CrossScaleWelds.componentSettled(container, big.getUniqueId()))) {
             message(player, CrossScaleWelds.Refusal.SCALE_CHANGING);
             return;
         }
+        if (mounting && CrossScaleWelds.snapshot(container).worldAnchored(small.getUniqueId())) {
+            player.displayClientMessage(Component.translatable("pocket.weld.welded_to_world"), true);
+            return;
+        }
+        Set<UUID> riders = mounting ? CrossScaleWelds.componentIds(container, small.getUniqueId()) : Set.of();
 
         WeldRecord record = weld.toRecord(
                 UUID.randomUUID(), CrossScaleWelds.weldOrientation(weld, this.rotationDegrees));
+        if (mounting && !BuildSites.mount(big, riders, record)) {
+            message(player, CrossScaleWelds.Refusal.CANNOT_WELD);
+            return;
+        }
         WeldStore.get(level).add(record);
         WeldRuntime.markNew(level, record.weldId());
         CrossScaleWeldSync.broadcast(level);
@@ -135,18 +160,22 @@ public record CrossScaleWeldPayload(
         player.awardStat(Stats.ITEM_USED.get(glue.getItem()));
     }
 
-    private static boolean withinReach(ServerPlayer player, BlockPos pos) {
+    private static boolean withinReach(ServerPlayer player, BlockPos pos, Vector3d point, double faceSlack) {
         ServerLevel level = player.serverLevel();
-        Vec3 center = Vec3.atCenterOf(pos);
-        Vector3d world = new Vector3d(center.x, center.y, center.z);
+        Vector3d world = new Vector3d(point);
+        double scale = 1.0D;
         SubLevel subLevel = Sable.HELPER.getContaining(level, pos);
-        if (subLevel != null) subLevel.logicalPose().transformPosition(world);
-        Vec3 playerPos = player.position();
-        double dx = world.x - playerPos.x;
-        double dy = world.y - playerPos.y;
-        double dz = world.z - playerPos.z;
-        double distanceSquared = dx * dx + dy * dy + dz * dz;
-        return Double.isFinite(distanceSquared) && distanceSquared <= MAX_REACH_SQ;
+        if (subLevel != null) {
+            var shown = Hosted.presented(subLevel);
+            (shown != null ? shown : subLevel.logicalPose()).transformPosition(world);
+            double own = Pym.scale().of(subLevel);
+            if (Double.isFinite(own) && own > 0.0D) scale = own;
+        }
+        Vec3 eye = player.getEyePosition();
+        double distance = world.distance(eye.x, eye.y, eye.z);
+        double reach = Math.max(MIN_REACH, player.blockInteractionRange() + REACH_SLACK)
+                + faceSlack * scale;
+        return Double.isFinite(distance) && distance <= reach;
     }
 
     private WeldGeometry.SnapMode mode() {

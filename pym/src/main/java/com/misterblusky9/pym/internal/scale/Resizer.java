@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.scale;
 
+import com.misterblusky9.pym.api.RefusalText;
 import com.misterblusky9.pym.api.ResizeResult;
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pym.api.ScaleDriver;
@@ -29,8 +30,8 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class Resizer {
-    static final String CONNECTED = "Connected sublevel: ";
-    static final String NOT_LOADED = "A connected sublevel is not loaded";
+    static final String CONNECTED = "pym.refusal.connected";
+    static final String NOT_LOADED = "pym.refusal.not_loaded";
 
     public static final double DEFAULT_TICKS = 9.0D;
     private static final double REFERENCE_MASS = 5_000.0D;
@@ -71,7 +72,7 @@ public final class Resizer {
         if (!ScaleBounds.isValid(request.scale())) {
             return ResizePlan.refused(origin, ResizeResult.refused(
                     ResizeResult.Status.INVALID_SCALE,
-                    "Scale " + request.scale() + " must be finite and greater than zero."));
+                    RefusalText.of("pym.refusal.invalid_scale", request.scale())));
         }
         ServerSubLevelContainer container = ServerSubLevelContainer.getContainer(origin.getLevel());
         if (container == null) {
@@ -96,7 +97,7 @@ public final class Resizer {
                 return ResizePlan.refused(origin, member == origin
                         || refusal.status() == ResizeResult.Status.OUT_OF_BOUNDS
                         ? refusal
-                        : ResizeResult.refused(refusal.status(), CONNECTED + refusal.message()));
+                        : ResizeResult.refused(refusal.status(), RefusalText.of(CONNECTED, refusal.message())));
             }
             if (!ScaleBounds.same(from, to)) goals.put(member, to);
             slowest = Math.min(slowest, massSpeed(member));
@@ -222,14 +223,14 @@ public final class Resizer {
     ) {
         if (!ScaleBounds.isValid(to)) {
             return ResizeResult.refused(ResizeResult.Status.INVALID_SCALE,
-                    "Scale " + to + " must be finite and greater than zero.");
+                    RefusalText.of("pym.refusal.invalid_scale", to));
         }
         if (ScaleBounds.same(from, to)) return null;
         ScaleBounds bounds = request.bounds();
         if (!bounds.permits(from, to)) {
             return ResizeResult.refused(ResizeResult.Status.OUT_OF_BOUNDS, to < from
-                    ? "Can't scale below " + ScaleFormat.label(bounds.min())
-                    : "Can't scale above " + ScaleFormat.label(bounds.max()));
+                    ? RefusalText.of("pym.refusal.below", ScaleFormat.label(bounds.min()))
+                    : RefusalText.of("pym.refusal.above", ScaleFormat.label(bounds.max())));
         }
         String shrink = PlotScan.refuseShrink(subLevel, from, to);
         if (shrink != null) return ResizeResult.refused(ResizeResult.Status.BLOCKED, shrink);

@@ -3,8 +3,11 @@ package com.misterblusky9.pocket.client;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.client.ScaleReadout;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelEvents;
+import com.misterblusky9.pocket.block.ModBlocks;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.misterblusky9.pocket.item.CompressionGunItem;
+import com.misterblusky9.pocket.item.CreativePocketCaseItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.item.EmptyBoxItem;
 import com.misterblusky9.pocket.item.HotGlueGunItem;
@@ -18,6 +21,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 
@@ -111,7 +115,7 @@ public final class CompressionHud {
         }
 
         String readout = holdingCase(player) && tooBigToPocket(player, aim)
-                ? "Too big"
+                ? I18n.get("pocket.hud.too_big")
                 : HudScaleText.of(ScaleReadout.value(aim.subLevel()), Pym.scale().of(aim.subLevel()));
         drawCentred(graphics, font, readout, centreX, y, SCALE_COLOUR);
     }
@@ -121,7 +125,7 @@ public final class CompressionHud {
         if (!MoonCompressionFieldRenderer.isSealed()) {
             return Math.round(MoonCompressionFieldRenderer.progress() * 100.0F) + "%";
         }
-        return (MoonCompressionFieldRenderer.isGrowing() ? "Growing" : "Shrinking") + ellipsis();
+        return I18n.get(MoonCompressionFieldRenderer.isGrowing() ? "pocket.hud.growing" : "pocket.hud.shrinking") + ellipsis();
     }
 
     private static String statusOf(UUID id) {
@@ -131,7 +135,7 @@ public final class CompressionHud {
             return Math.round(CompressionFieldRenderer.progress(id) * 100.0F) + "%";
         }
 
-        return (CompressionFieldRenderer.isGrowing(id) ? "Growing" : "Shrinking") + ellipsis();
+        return I18n.get(CompressionFieldRenderer.isGrowing(id) ? "pocket.hud.growing" : "pocket.hud.shrinking") + ellipsis();
     }
 
     private static String ellipsis() {
@@ -152,7 +156,13 @@ public final class CompressionHud {
     }
 
     private static boolean tooBigToPocket(LocalPlayer player, CompressionAim.Aim aim) {
-        return !PocketedSubLevelEvents.fitsPocket(player, Pym.scale().settled(aim.subLevel()));
+        if (holding(player, EmptyBoxItem.class).getItem() instanceof CreativePocketCaseItem) return false;
+        SubLevel target = aim.subLevel();
+        boolean build = BuildMirrors.isStandingHatPart(target)
+                || player.level().getBlockState(target.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
+        return build
+                ? !PocketedSubLevelEvents.fitsPocket(player, PocketCaseItem.POCKETABLE_SCALE)
+                : !PocketedSubLevelEvents.groupFitsPocket(player, target);
     }
 
     private static boolean canScaleMoon(LocalPlayer player) {

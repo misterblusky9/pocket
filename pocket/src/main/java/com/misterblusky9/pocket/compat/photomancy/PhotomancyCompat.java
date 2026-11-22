@@ -1,5 +1,6 @@
 package com.misterblusky9.pocket.compat.photomancy;
 
+import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
 import com.misterblusky9.pocket.compat.simulated.WeldRecord;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
@@ -10,6 +11,7 @@ import dev.rew1nd.sableschematicapi.api.blueprint.SableBlueprintEvent;
 import dev.rew1nd.sableschematicapi.api.blueprint.SableBlueprintEventRegistry;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -37,6 +39,10 @@ public final class PhotomancyCompat implements SableBlueprintEvent {
         SableBlueprintEventRegistry.register(new PhotomancyCompat());
         NeoForge.EVENT_BUS.addListener(EventPriority.LOW, PhotomancyCompat::onLevelTick);
         NeoForge.EVENT_BUS.addListener(PhotomancyCompat::onLevelUnload);
+    }
+
+    public static boolean isHat(SubLevel subLevel) {
+        return subLevel.getLevel().getBlockState(subLevel.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
     }
 
     @Override

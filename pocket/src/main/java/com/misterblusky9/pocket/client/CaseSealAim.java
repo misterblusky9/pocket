@@ -1,6 +1,9 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.block.HatStandBlockEntity;
+import com.misterblusky9.pocket.build.HatSeals;
 import com.misterblusky9.pocket.item.CaseSeal;
+import com.misterblusky9.pocket.item.ModDataComponents;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.item.PocketSeal;
@@ -8,19 +11,30 @@ import com.simibubi.create.content.logistics.box.PackageEntity;
 import dev.simulated_team.simulated.util.SimColors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import org.jetbrains.annotations.Nullable;
 
-public record CaseSealAim(PackageEntity pocketed, @Nullable CaseSeal seal, boolean canSeal, boolean canCut) {
+public record CaseSealAim(@Nullable PackageEntity pocketed, @Nullable CaseSeal seal, boolean canSeal, boolean canCut) {
     public static final int NO_COLOUR = -1;
     private static final int SEALABLE_COLOUR = 0xBFBFBF;
 
     @Nullable
     public static CaseSealAim of(LocalPlayer player) {
+        if (Minecraft.getInstance().hitResult instanceof BlockHitResult hit && holdingTool(player))
+            return of(player, HatSeals.base(player.level(), hit));
         if (!(Minecraft.getInstance().hitResult instanceof EntityHitResult hit)) return null;
         return of(player, hit.getEntity());
+    }
+
+    @Nullable
+    public static CaseSealAim of(LocalPlayer player, @Nullable HatStandBlockEntity stand) {
+        if (stand == null) return null;
+        CaseSeal seal = stand.getActivator().get(ModDataComponents.SEAL.get());
+        return new CaseSealAim(null, seal, seal == null && holdingGlue(player), seal != null && seal.canCut(player));
     }
 
     @Nullable
@@ -50,7 +64,7 @@ public record CaseSealAim(PackageEntity pocketed, @Nullable CaseSeal seal, boole
     }
 
     public String label() {
-        if (this.seal == null) return "Unsealed";
-        return this.canCut ? "Sealed" : "Sealed by: " + this.seal.ownerName();
+        if (this.seal == null) return I18n.get("pocket.hud.unsealed");
+        return this.canCut ? I18n.get("pocket.hud.sealed") : I18n.get("pocket.tooltip.sealed_by", this.seal.ownerName());
     }
 }

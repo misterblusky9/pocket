@@ -42,7 +42,7 @@ public abstract class MergingGlueScaleClientMixin {
         MergingGlueScaleGate.Refusal refusal = MergingGlueScaleGate.check(
                 level, this.firstPos, hit.getBlockPos());
         if (refusal == MergingGlueScaleGate.Refusal.NONE) return;
-        player.displayClientMessage(Component.literal(refusal.message()), true);
+        player.displayClientMessage(Component.translatable(refusal.message()), true);
         cir.setReturnValue(true);
     }
     @Inject(method = "clientTick", at = @At("TAIL"), remap = false)

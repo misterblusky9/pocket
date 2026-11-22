@@ -97,6 +97,21 @@ public record CompressionSyncPayload(
         sendBegin(subLevel, null, originLocalPos, acquireTicks, true, growing, 0);
     }
 
+    public static void sendSourcedBegin(
+            ServerSubLevel subLevel,
+            UUID sourceId,
+            BlockPos hitLocalPos,
+            int acquireTicks,
+            boolean growing
+    ) {
+        if (subLevel == null || subLevel.getUniqueId() == null) return;
+        if (!(subLevel.getLevel() instanceof ServerLevel level)) return;
+
+        PacketDistributor.sendToPlayersInDimension(level, new CompressionSyncPayload(
+                subLevel.getUniqueId(), sourceId, hitLocalPos, acquireTicks, true, false, false, growing, 0
+        ));
+    }
+
     public static void sendPulse(ServerSubLevel subLevel, UUID holder) {
         if (subLevel == null || subLevel.getUniqueId() == null) return;
         if (!(subLevel.getLevel() instanceof ServerLevel level)) return;

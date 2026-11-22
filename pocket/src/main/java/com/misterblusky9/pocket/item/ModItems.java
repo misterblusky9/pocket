@@ -4,11 +4,22 @@ import com.misterblusky9.pocket.PocketSized;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.simibubi.create.content.equipment.armor.AllArmorMaterials;
 import com.simibubi.create.content.equipment.armor.BacktankItem;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ArmorMaterial;
+import java.util.EnumMap;
+import java.util.List;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.ArmorMaterials;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.StandingAndWallBlockItem;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Rarity;
+import net.minecraft.world.level.block.Block;
+import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -17,11 +28,15 @@ public final class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(PocketSized.MOD_ID);
 
     public static final DeferredItem<PocketCaseItem> POCKETED_SUBLEVEL = ITEMS.register(
-            "pocketed_sublevel", () -> new PocketCaseItem(new Item.Properties().stacksTo(1))
+            "pocketed_sublevel", () -> new PocketCaseItem(new Item.Properties().stacksTo(1).fireResistant())
     );
 
     public static final DeferredItem<EmptyBoxItem> EMPTY_BOX = ITEMS.register(
             "empty_box", () -> new EmptyBoxItem(new Item.Properties().stacksTo(16))
+    );
+
+    public static final DeferredItem<CreativePocketCaseItem> CREATIVE_POCKET_CASE = ITEMS.register(
+            "creative_pocket_case", () -> new CreativePocketCaseItem(new Item.Properties().stacksTo(16).rarity(Rarity.EPIC))
     );
 
     public static final DeferredItem<EmptyBoxItem> DISPLAY_BOTTLE = ITEMS.register(
@@ -150,6 +165,44 @@ public final class ModItems {
                     ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "subspace_harness"),
                     SUBSPACE_HARNESS_PLACEABLE)
     );
+
+    public static final DeferredItem<HatStandItem> HAT_STAND = ITEMS.register(
+            "hat_stand", () -> new HatStandItem(ModBlocks.HAT_STAND.get(), new Item.Properties()));
+
+    public static final DeferredItem<HatStandItem> TALL_HAT_STAND = ITEMS.register(
+            "tall_hat_stand", () -> new HatStandItem(ModBlocks.TALL_HAT_STAND.get(), new Item.Properties()));
+
+    public static final DeferredItem<StandingAndWallBlockItem> DUMMY_HEAD = ITEMS.register(
+            "dummy_head", () -> new StandingAndWallBlockItem(ModBlocks.DUMMY_HEAD.get(), ModBlocks.DUMMY_WALL_HEAD.get(),
+                    new Item.Properties(), Direction.DOWN));
+
+    public static final DeferredRegister<ArmorMaterial> ARMOR_MATERIALS =
+            DeferredRegister.create(Registries.ARMOR_MATERIAL, PocketSized.MOD_ID);
+
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> SKULL_CAP_MATERIAL = ARMOR_MATERIALS.register(
+            "skull_cap", () -> {
+                ArmorMaterial leather = ArmorMaterials.LEATHER.value();
+                EnumMap<ArmorItem.Type, Integer> defense = new EnumMap<>(ArmorItem.Type.class);
+                for (ArmorItem.Type type : ArmorItem.Type.values()) defense.put(type, 0);
+                return new ArmorMaterial(defense, leather.enchantmentValue(), leather.equipSound(),
+                        leather.repairIngredient(),
+                        List.of(new ArmorMaterial.Layer(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "skull_cap"))),
+                        0.0F, 0.0F);
+            });
+
+    public static final DeferredItem<ArmorItem> SKULL_CAP = ITEMS.register(
+            "skull_cap", () -> new ArmorItem(SKULL_CAP_MATERIAL, ArmorItem.Type.HELMET,
+                    new Item.Properties().stacksTo(1)) {
+                @Override
+                public ItemAttributeModifiers getDefaultAttributeModifiers() {
+                    return ItemAttributeModifiers.EMPTY;
+                }
+            });
+
+    static {
+        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());
+        ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hat_sleeve"), SKULL_CAP.getId());
+    }
 
     private ModItems() {}
 }

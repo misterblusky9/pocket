@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.scale;
 
+import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.internal.network.ScaleNetwork;
 import com.misterblusky9.pym.internal.physics.PlotShapeCache;
 import com.misterblusky9.pym.internal.physics.ScalePhysicsTransitions;
@@ -19,7 +20,7 @@ public final class SplitInheritance {
     }
 
     public static double adoptLive(ServerSubLevel child, ServerSubLevel parent) {
-        ScaleRecord ramp = ScaleState.recordOf(parent.getUniqueId());
+        ScaleRecord ramp = Detached.isDetached(parent) ? null : ScaleState.recordOf(parent.getUniqueId());
         double scale = ScaleState.getServerScale(parent);
         adopt(child, parent, scale, ramp, ramp == null ? null : ramp.pivot(), ScalePhysicsTransitions.modeOf(parent));
         return scale;

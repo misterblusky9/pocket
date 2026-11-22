@@ -58,7 +58,7 @@ public abstract class GoggleCompressorStatusMixin {
     ) {
         if (!tooltip.isEmpty()) tooltip.add(CommonComponents.EMPTY);
 
-        CreateLang.builder().text(" Portable Subspace Compressor")
+        CreateLang.builder().add(Component.translatable("pocket.goggles.compressor"))
                 .style(ChatFormatting.GOLD).forGoggles(tooltip);
 
         UUID id = sub.getUniqueId();
@@ -66,17 +66,17 @@ public abstract class GoggleCompressorStatusMixin {
             if (!CompressionFieldRenderer.isSealed(id)) {
                 int percent = Math.max(0, Math.min(100,
                         Math.round(CompressionFieldRenderer.progress(id) * 100.0F)));
-                CreateLang.builder().text("Acquiring hull: " + percent + "%")
+                CreateLang.builder().add(Component.translatable("pocket.goggles.acquiring", percent))
                         .style(ChatFormatting.AQUA).forGoggles(tooltip, 1);
             } else {
-                CreateLang.builder().text(CompressionFieldRenderer.isGrowing(id) ? "Growing..." : "Shrinking...")
+                CreateLang.builder().add(Component.translatable(CompressionFieldRenderer.isGrowing(id) ? "pocket.goggles.growing" : "pocket.goggles.shrinking"))
                         .style(ChatFormatting.AQUA).forGoggles(tooltip, 1);
             }
         } else {
             BlockEntity blockEntity = sub.getLevel().getBlockEntity(hit.getBlockPos());
             boolean noPower = blockEntity instanceof PortableSubspaceCompressorBlockEntity compressor
                     && Math.abs(compressor.getSpeed()) < 1.0F;
-            CreateLang.builder().text(noPower ? "Idle: no rotational power" : "Idle")
+            CreateLang.builder().add(Component.translatable(noPower ? "pocket.goggles.idle.no_power" : "pocket.goggles.idle"))
                     .style(ChatFormatting.GRAY).forGoggles(tooltip, 1);
         }
     }

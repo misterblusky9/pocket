@@ -4,6 +4,7 @@ import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.scale.ResizeFeedback;
 import com.misterblusky9.pym.api.PlotContents;
 import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pym.api.RefusalText;
 import com.misterblusky9.pym.api.ScaleBounds;
 
 import com.misterblusky9.pocket.PocketSized;
@@ -182,7 +183,7 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
 
             int blocks = contents.blocks();
             if (blocks > Pym.resize().shrunkBlockLimit()) {
-                setJamMessage("Hard limit exceeded: " + blocks + " blocks");
+                setJamMessage(RefusalText.of("pocket.message.hard_limit_exceeded", blocks));
                 releaseField();
                 clearAcquisition();
                 return;
@@ -283,8 +284,8 @@ public final class PortableSubspaceCompressorBlockEntity extends KineticBlockEnt
 
     @Override
     public String transitionRefusedMessage() {
-        if (!this.operational) return "Compressor needs rotation";
-        if (!this.sealed) return "Compressor is not sealed";
+        if (!this.operational) return "pocket.message.compressor_needs_rotation";
+        if (!this.sealed) return "pocket.message.compressor_not_sealed";
         return null;
     }
 

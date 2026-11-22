@@ -1,15 +1,19 @@
 package com.misterblusky9.pocket.block;
 
 import com.misterblusky9.pocket.PocketSized;
+import com.misterblusky9.pocket.build.PocketDummyBlock;
 import com.simibubi.create.content.decoration.encasing.CasingBlock;
 import com.simibubi.create.foundation.data.SharedProperties;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SkullBlock;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.WallSkullBlock;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -82,6 +86,14 @@ public final class ModBlocks {
                     () -> new CasingBlock(BlockBehaviour.Properties.ofFullCopy(SharedProperties.stone()).sound(SoundType.WOOD))
             );
 
+    public static final DeferredHolder<Block, SkullBlock> DUMMY_HEAD =
+            BLOCKS.register("dummy_head", () -> new SkullBlock(DummyHead.TYPE,
+                    BlockBehaviour.Properties.of().strength(1.0F).pushReaction(PushReaction.DESTROY)));
+
+    public static final DeferredHolder<Block, WallSkullBlock> DUMMY_WALL_HEAD =
+            BLOCKS.register("dummy_wall_head", () -> new WallSkullBlock(DummyHead.TYPE,
+                    BlockBehaviour.Properties.of().strength(1.0F).lootFrom(DUMMY_HEAD).pushReaction(PushReaction.DESTROY)));
+
     static {
         BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "diagram_tile"), BLUEPRINT_CASING.getId());
         BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "blueprint_tile"), BLUEPRINT_CASING.getId());
@@ -124,6 +136,24 @@ public final class ModBlocks {
             BLOCKS.register("blueprint_encased_large_cogwheel",
                     () -> new BlueprintEncasedCogwheelBlock(
                             BlockBehaviour.Properties.ofFullCopy(com.simibubi.create.AllBlocks.ANDESITE_ENCASED_LARGE_COGWHEEL.get()), true));
+
+    public static final DeferredHolder<Block, HatStandBlock> HAT_STAND =
+            BLOCKS.register("hat_stand", () -> new HatStandBlock(
+                    BlockBehaviour.Properties.ofFullCopy(Blocks.OAK_PLANKS).noOcclusion()));
+
+    public static final DeferredHolder<Block, TallHatStandBlock> TALL_HAT_STAND =
+            BLOCKS.register("tall_hat_stand", () -> new TallHatStandBlock(
+                    BlockBehaviour.Properties.ofFullCopy(Blocks.OAK_PLANKS).noOcclusion()));
+
+    public static final DeferredHolder<Block, PocketDummyBlock> POCKET_DUMMY =
+            BLOCKS.register("pocket_dummy", () -> new PocketDummyBlock(
+                    BlockBehaviour.Properties.ofFullCopy(Blocks.OAK_PLANKS).strength(-1.0F, 3600000.0F)
+                            .noOcclusion().pushReaction(PushReaction.BLOCK)));
+
+    static {
+        BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());
+        BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_head_tile"), POCKET_DUMMY.getId());
+    }
 
     private ModBlocks() {}
 }

@@ -353,6 +353,8 @@ public final class CompressionGunItem extends Item implements CustomArmPoseItem,
             TooltipFlag flag
     ) {
         tooltip.add(Component.translatable("pocket.tooltip.levitite",
-                CompressionGunTank.amount(stack), CompressionGunTank.capacity(stack)).withStyle(ChatFormatting.GRAY));
+                        CompressionGunTank.isInfinite(stack) ? "∞" : CompressionGunTank.amount(stack),
+                        CompressionGunTank.isInfinite(stack) ? "∞" : CompressionGunTank.capacity(stack))
+                .withStyle(ChatFormatting.GRAY));
     }
 }

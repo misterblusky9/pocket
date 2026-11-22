@@ -5,6 +5,7 @@ import com.misterblusky9.pym.api.spi.Participation;
 import com.misterblusky9.pym.api.spi.ResizeFollower;
 import com.misterblusky9.pym.api.spi.ResizePolicy;
 import com.misterblusky9.pym.api.spi.ScaleCoupling;
+import com.misterblusky9.pym.api.spi.SchematicListener;
 import com.misterblusky9.pym.internal.extension.PymExtensions;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.world.entity.Entity;
@@ -33,6 +34,10 @@ public final class Extensions {
 
     public void register(ResizeFollower follower) {
         PymExtensions.register(follower);
+    }
+
+    public void register(SchematicListener listener) {
+        PymExtensions.register(listener);
     }
 
     public void coupling(ScaleCoupling coupling) {

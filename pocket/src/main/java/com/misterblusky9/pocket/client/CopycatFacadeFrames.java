@@ -1,9 +1,11 @@
 package com.misterblusky9.pocket.client;
 
 import com.misterblusky9.pocket.block.FacadeTiling;
+import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.mixin.create.VirtualRenderWorldAccessor;
 import com.misterblusky9.pocket.mixin.create.WrappedBlockAndTintGetterAccessor;
 import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pocket.scale.CompressionStage;
 import com.misterblusky9.pym.api.ScaleBounds;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
@@ -18,8 +20,11 @@ import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.joml.Vector3d;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -113,18 +118,24 @@ public final class CopycatFacadeFrames {
         Set<Long> live = new HashSet<>();
         Set<UUID> liveIds = new HashSet<>();
         Set<UUID> gone = new HashSet<>();
+        Set<ClientSubLevel> mirrors = Set.copyOf(BuildMirrors.open());
+        List<ClientSubLevel> clients = new ArrayList<>(mirrors);
         for (SubLevel subLevel : container.getAllSubLevels()) {
-            if (!(subLevel instanceof ClientSubLevel client) || client.isRemoved()) continue;
+            if (subLevel instanceof ClientSubLevel client && !client.isRemoved()) clients.add(client);
+        }
+        for (ClientSubLevel client : clients) {
             ChunkPos chunk = client.getPlot().getChunkMin();
             long plot = plotKey(chunk.getMinBlockX(), chunk.getMinBlockZ());
             live.add(plot);
             liveIds.add(client.getUniqueId());
 
-            double scale = ScaleBounds.clampValid(Pym.scale().of(client));
+            boolean build = build(level, client, mirrors);
+            double scale = build ? CompressionStage.SIXTEENTH.scale() : ScaleBounds.clampValid(Pym.scale().of(client));
             int[] offset = OFFSETS.get(client.getUniqueId());
             Craft known = CRAFTS.get(plot);
             boolean fresh = known == null || !known.id().equals(client.getUniqueId());
-            boolean rescaled = !fresh && Pym.scale().isSettled(client) && !ScaleBounds.same(known.scale(), scale);
+            boolean rescaled = !fresh && (build || Pym.scale().isSettled(client))
+                    && !ScaleBounds.same(known.scale(), scale);
             boolean realigned = !fresh && !Arrays.equals(known.offset(), offset);
             if (!fresh && !rescaled && !realigned) continue;
 
@@ -144,6 +155,17 @@ public final class CopycatFacadeFrames {
         SECTIONS.keySet().retainAll(live);
         gone.removeAll(liveIds);
         OFFSETS.keySet().removeAll(gone);
+    }
+
+    public static double tilingScale(ClientSubLevel client) {
+        var level = Minecraft.getInstance().level;
+        if (level != null && build(level, client, BuildMirrors.open())) return CompressionStage.SIXTEENTH.scale();
+        return Pym.scale().of(client);
+    }
+
+    private static boolean build(BlockAndTintGetter level, ClientSubLevel client, Collection<ClientSubLevel> mirrors) {
+        return mirrors.contains(client)
+                || level.getBlockState(client.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
     }
 
     public static void blockChanged(BlockPos pos) {

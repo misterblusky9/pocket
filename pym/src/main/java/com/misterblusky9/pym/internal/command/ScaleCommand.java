@@ -1,5 +1,6 @@
 package com.misterblusky9.pym.internal.command;
 
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.api.PlotContents;
 import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ResizeRequest;
@@ -9,6 +10,7 @@ import com.misterblusky9.pym.api.ScaleFormat;
 import com.misterblusky9.pym.internal.PymMod;
 import com.misterblusky9.pym.internal.debug.PymTrace;
 import com.misterblusky9.pym.internal.network.DebugPayload;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
@@ -23,6 +25,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.HitResult;
@@ -63,10 +66,67 @@ public final class ScaleCommand {
                                 .then(Commands.literal("entity")
                                         .then(Commands.argument("targets", EntityArgument.entities())
                                                 .executes(ScaleCommand::entityInfo))))
+                        .then(Commands.literal("hosted")
+                                .then(Commands.literal("status").executes(ScaleCommand::hostedStatus))
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> BoolArgumentType.getBool(context, "enabled")
+                                                ? hostedOn(context) : hostedOff(context))))
+                        .then(Commands.literal("gamerule")
+                                .then(Commands.literal("setspawnscale")
+                                        .executes(ScaleCommand::spawnScaleQuery)
+                                        .then(Commands.literal("false").executes(context -> spawnScale(context, 0.0D)))
+                                        .then(Commands.argument("scaleFactor", DoubleArgumentType.doubleArg())
+                                                .executes(context -> spawnScale(context,
+                                                        DoubleArgumentType.getDouble(context, "scaleFactor"))))))
                         .then(Commands.literal("debug")
-                                .then(Commands.literal("on").executes(context -> debug(context, true)))
-                                .then(Commands.literal("off").executes(context -> debug(context, false))))
+                                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                                        .executes(context -> debug(context, BoolArgumentType.getBool(context, "enabled")))))
         );
+    }
+
+    private static int hostedOn(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerSubLevel hat = Hosted.worn(source.getPlayerOrException());
+        if (hat == null) {
+            source.sendFailure(Component.translatable("pym.command.hosted.wear_hat"));
+            return 0;
+        }
+        if (Hosted.isRoot(hat)) {
+            source.sendFailure(Component.translatable("pym.command.hosted.already"));
+            return 0;
+        }
+        ServerSubLevel root = Hosted.host(hat);
+        if (root == null) {
+            source.sendFailure(Component.translatable("pym.command.hosted.failed"));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.translatable("pym.command.hosted.on", String.valueOf(Hosted.site(root))), false);
+        return 1;
+    }
+
+    private static int hostedOff(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerSubLevel hat = Hosted.worn(source.getPlayerOrException());
+        if (hat == null || !Hosted.isRoot(hat) || Hosted.unhost(hat) == null) {
+            source.sendFailure(Component.translatable("pym.command.hosted.none"));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.translatable("pym.command.hosted.off"), false);
+        return 1;
+    }
+
+    private static int hostedStatus(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerSubLevel hat = Hosted.worn(source.getPlayerOrException());
+        if (hat == null || !Hosted.isRoot(hat)) {
+            source.sendSuccess(() -> Component.translatable("pym.command.hosted.not_hosted"), false);
+            return 1;
+        }
+        double drift = hat.logicalPose().position().distance(Hosted.site(hat));
+        int members = Hosted.members(hat).size();
+        source.sendSuccess(() -> Component.translatable("pym.command.hosted.status",
+                String.format(java.util.Locale.ROOT, "%.4f", drift), members), false);
+        return 1;
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> subLevelScaleBranch() {
@@ -144,7 +204,7 @@ public final class ScaleCommand {
                 .sorted(Comparator.comparing(subLevel -> subLevel.getUniqueId().toString()))
                 .toList();
         if (subLevels.isEmpty()) {
-            source.sendFailure(Component.literal(selected ? "No sublevels found." : "Look at or stand on a sublevel."));
+            source.sendFailure(Component.translatable(selected ? "pym.command.no_sublevels" : "pym.command.look_at_sublevel"));
             return 0;
         }
 
@@ -157,7 +217,7 @@ public final class ScaleCommand {
         int accepted = 0;
         int refused = 0;
         int skipped = 0;
-        String firstRefusal = null;
+        Component firstRefusal = null;
         for (ServerSubLevel subLevel : subLevels) {
             UUID id = subLevel.getUniqueId();
             if (!ScaleBounds.same(Pym.scale().target(subLevel), originalTargets.get(id))) {
@@ -171,26 +231,29 @@ public final class ScaleCommand {
             ResizeResult result = request.submit();
             if (!result.accepted()) {
                 refused++;
-                if (firstRefusal == null) firstRefusal = result.describe();
+                if (firstRefusal == null) firstRefusal = result.describeComponent();
                 continue;
             }
             accepted++;
             if (subLevels.size() == 1) {
-                source.sendSuccess(() -> Component.literal("Scaling sublevel " + ScaleFormat.label(current) + " -> "
-                        + ScaleFormat.label(result.scale()) + (ticks < 0 ? "" : " over " + ticks + " ticks")), true);
+                source.sendSuccess(() -> ticks < 0
+                        ? Component.translatable("pym.command.scaling.single", ScaleFormat.label(current), ScaleFormat.label(result.scale()))
+                        : Component.translatable("pym.command.scaling.single.ticks", ScaleFormat.label(current), ScaleFormat.label(result.scale()), ticks), true);
             }
         }
 
         if (subLevels.size() > 1 && accepted > 0) {
             int count = accepted;
             int alreadyAffected = skipped;
-            source.sendSuccess(() -> Component.literal("Scaling " + count + " sublevel" + (count == 1 ? "" : "s")
-                    + (ticks < 0 ? "" : " over " + ticks + " ticks")
-                    + (alreadyAffected == 0 ? "" : "; " + alreadyAffected + " already affected")), true);
+            source.sendSuccess(() -> {
+                MutableComponent line = Component.translatable(count == 1 ? "pym.command.scaling.one" : "pym.command.scaling.many", count);
+                if (ticks >= 0) line.append(Component.translatable("pym.command.scaling.over_ticks", ticks));
+                if (alreadyAffected != 0) line.append(Component.translatable("pym.command.scaling.already_affected", alreadyAffected));
+                return line;
+            }, true);
         }
         if (refused > 0) {
-            source.sendFailure(Component.literal("Resize refused for " + refused + " sublevel" + (refused == 1 ? "" : "s")
-                    + ": " + firstRefusal));
+            source.sendFailure(Component.translatable(refused == 1 ? "pym.command.refused.one" : "pym.command.refused.many", refused, firstRefusal));
         }
         return accepted;
     }
@@ -227,19 +290,18 @@ public final class ScaleCommand {
 
         int successCount = changed;
         if (changed > 0) {
-            source.sendSuccess(() -> Component.literal(
-                    "Scaled " + successCount + " entit" + (successCount == 1 ? "y" : "ies")
-                            + " through Pym" + (duration == 0 ? " immediately" : " over " + duration + " ticks")), true);
+            source.sendSuccess(() -> duration == 0
+                    ? Component.translatable(successCount == 1 ? "pym.command.scaled.one.immediately" : "pym.command.scaled.many.immediately", successCount)
+                    : Component.translatable(successCount == 1 ? "pym.command.scaled.one.ticks" : "pym.command.scaled.many.ticks", successCount, duration), true);
         }
         if (unsupported > 0) {
             int count = unsupported;
-            source.sendFailure(Component.literal(count + " target(s) cannot be scaled by this Pym installation. "
-                    + (Pym.entities().pehkuiPresent()
-                    ? "Pehkui is present but Pym's Pehkui backend is unavailable."
-                    : "Install Pehkui for general entity/player scaling; without it Pym only scales static furniture entities.")));
+            source.sendFailure(Component.translatable(Pym.entities().pehkuiPresent()
+                    ? "pym.command.unsupported.backend"
+                    : "pym.command.unsupported.no_pehkui", count));
         }
         if (invalid > 0) {
-            source.sendFailure(Component.literal(invalid + " target(s) produced a non-positive or non-finite scale."));
+            source.sendFailure(Component.translatable("pym.command.invalid", invalid));
         }
         return changed;
     }
@@ -248,7 +310,7 @@ public final class ScaleCommand {
         CommandSourceStack source = context.getSource();
         ServerSubLevel subLevel = targetSubLevel(source.getPlayerOrException());
         if (subLevel == null) {
-            source.sendFailure(Component.literal("Look at or stand on a sublevel."));
+            source.sendFailure(Component.translatable("pym.command.look_at_sublevel"));
             return 0;
         }
         return sendSubLevelInfo(source, List.of(subLevel), false);
@@ -268,20 +330,27 @@ public final class ScaleCommand {
             if (subLevel == null || subLevel.isRemoved()) continue;
             PlotContents contents = Pym.resize().contents(subLevel);
             int coupled = Pym.connections().coupled(subLevel).size() - 1;
-            String prefix = named
-                    ? "Sublevel " + (subLevel.getName() == null ? subLevel.getUniqueId() : subLevel.getName()) + "\n"
-                    : "";
-            source.sendSuccess(() -> Component.literal(
-                    prefix + "Scale " + ScaleFormat.label(Pym.scale().of(subLevel))
-                            + ", settled " + ScaleFormat.label(Pym.scale().settled(subLevel))
-                            + ", target " + ScaleFormat.label(Pym.scale().target(subLevel))
-                            + "\n" + contents.blocks() + " blocks, " + contents.blockEntities() + " block entities"
-                            + (contents.hasNoShrinkBlock() ? ", holds no-shrink block " + contents.noShrink() : "")
-                            + "\nCoupled to " + Math.max(0, coupled) + " other sublevel(s)"
-                            + (Pym.connections().isJoinedToAnother(subLevel) ? ", joined to another" : "")), false);
+            source.sendSuccess(() -> {
+                MutableComponent info = Component.empty();
+                if (named) {
+                    info.append(Component.translatable("pym.command.info.name",
+                            String.valueOf(subLevel.getName() == null ? subLevel.getUniqueId() : subLevel.getName()))).append("\n");
+                }
+                info.append(Component.translatable("pym.command.info.scale",
+                        ScaleFormat.label(Pym.scale().of(subLevel)),
+                        ScaleFormat.label(Pym.scale().settled(subLevel)),
+                        ScaleFormat.label(Pym.scale().target(subLevel)))).append("\n");
+                info.append(Component.translatable("pym.command.info.contents", contents.blocks(), contents.blockEntities()));
+                if (contents.hasNoShrinkBlock()) {
+                    info.append(Component.translatable("pym.command.info.no_shrink", String.valueOf(contents.noShrink())));
+                }
+                info.append("\n").append(Component.translatable("pym.command.info.coupled", Math.max(0, coupled)));
+                if (Pym.connections().isJoinedToAnother(subLevel)) info.append(Component.translatable("pym.command.info.joined"));
+                return info;
+            }, false);
             count++;
         }
-        if (count == 0) source.sendFailure(Component.literal("No sublevels found."));
+        if (count == 0) source.sendFailure(Component.translatable("pym.command.no_sublevels"));
         return count;
     }
 
@@ -290,24 +359,45 @@ public final class ScaleCommand {
         int count = 0;
         for (Entity entity : EntityArgument.getEntities(context, "targets")) {
             var backend = Pym.entities().backend(entity);
-            StringBuilder text = new StringBuilder()
-                    .append(entity.getName().getString())
-                    .append("\nPym backend: ").append(backend)
-                    .append("\nScale: ").append(ScaleFormat.label(Pym.entities().scaleOf(entity)))
-                    .append(", target ").append(ScaleFormat.label(Pym.entities().target(entity)));
-            source.sendSuccess(() -> Component.literal(text.toString()), false);
+            MutableComponent text = Component.empty()
+                    .append(entity.getName())
+                    .append("\n").append(Component.translatable("pym.command.info.backend", String.valueOf(backend)))
+                    .append("\n").append(Component.translatable("pym.command.info.entity_scale",
+                            ScaleFormat.label(Pym.entities().scaleOf(entity)),
+                            ScaleFormat.label(Pym.entities().target(entity))));
+            source.sendSuccess(() -> text, false);
             count++;
         }
         return count;
+    }
+
+    private static int spawnScaleQuery(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        double scale = SpawnScale.get(source.getServer());
+        source.sendSuccess(() -> scale > 0.0D
+                ? Component.translatable("pym.command.spawnscale.query", ScaleFormat.label(scale))
+                : Component.translatable("pym.command.spawnscale.query.off"), false);
+        return 1;
+    }
+
+    private static int spawnScale(CommandContext<CommandSourceStack> context, double scale) {
+        CommandSourceStack source = context.getSource();
+        if (scale != 0.0D && !ScaleBounds.isValid(scale)) {
+            source.sendFailure(Component.translatable("pym.command.invalid", 1));
+            return 0;
+        }
+        SpawnScale.set(source.getServer(), scale);
+        source.sendSuccess(() -> scale > 0.0D
+                ? Component.translatable("pym.command.spawnscale.set", ScaleFormat.label(scale))
+                : Component.translatable("pym.command.spawnscale.off"), true);
+        return 1;
     }
 
     private static int debug(CommandContext<CommandSourceStack> context, boolean on) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         PymTrace.setEnabled(on);
         PacketDistributor.sendToPlayer(player, new DebugPayload(on));
-        context.getSource().sendSuccess(() -> Component.literal(
-                on ? "Pym debug on: collider outlines for you, scale logging for the server"
-                   : "Pym debug off"), true);
+        context.getSource().sendSuccess(() -> Component.translatable(on ? "pym.command.debug.on" : "pym.command.debug.off"), true);
         return 1;
     }
 

@@ -39,7 +39,7 @@ public final class PocketSizedClient {
 
     public PocketSizedClient(IEventBus modBus) {
         modBus.addListener((net.neoforged.neoforge.client.event.ModelEvent.BakingCompleted event) ->
-                PocketedSubLevelItemRenderer.invalidateMeshes());
+                { PocketedSubLevelItemRenderer.invalidateMeshes(); CreativeCasePortal.invalidate(); });
         modBus.addListener((FMLClientSetupEvent event) -> event.enqueueWork(PunchyCompat::apply));
         modBus.addListener((FMLClientSetupEvent event) ->
                 event.enqueueWork(() -> PonderIndex.addPlugin(new PocketPonderPlugin())));
@@ -56,13 +56,23 @@ public final class PocketSizedClient {
         modBus.addListener(BlueprintEncasingClient::registerVisuals);
         modBus.addListener(PocketPackageModels::register);
         modBus.addListener(PocketItemTooltips::register);
+        modBus.addListener((net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) -> event.register(
+                com.misterblusky9.pocket.item.ModMenus.LOST_AND_FOUND.get(), LostAndFoundScreen::new));
         modBus.addListener(PocketItemProperties::register);
+        modBus.addListener((net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent event) ->
+                event.registerItem(new com.simibubi.create.content.equipment.armor.CardboardArmorStealthOverlay(),
+                        com.misterblusky9.pocket.item.ModItems.SKULL_CAP.get()));
         if (ModList.get().isLoaded("curios")) modBus.addListener(CuriosCompressorRenderer::register);
+        if (com.misterblusky9.pocket.compat.WornHats.ACCESSORIES) modBus.addListener(com.misterblusky9.pocket.compat.accessories.AccessoriesRenderers::register);
         modBus.addListener(TheMoonPackageRenderer::register);
         modBus.addListener(PocketShaders::register);
         modBus.addListener(HotGlueParticle::register);
+        modBus.addListener(SpinIndicatorParticle::register);
         modBus.addListener(PortableSubspaceCompressorRenderer::register);
         modBus.addListener(StaticSubspaceCompressorRenderer::register);
+        modBus.addListener(HatStandRenderer::register);
+        modBus.addListener(HatStandRenderer::registerDummyHead);
+        modBus.addListener(HatRendering::addLayers);
         modBus.addListener(SwitchBearingRenderer::register);
         modBus.addListener(SwitchBearingRenderer::registerVisual);
         modBus.addListener(HelmBearingRenderer::register);
@@ -81,6 +91,7 @@ public final class PocketSizedClient {
         modBus.addListener(CopycatFacadeModel::registerColours);
         NeoForge.EVENT_BUS.addListener(CompressionFieldRenderer::render);
         NeoForge.EVENT_BUS.addListener(CompressionBeamRenderer::render);
+        NeoForge.EVENT_BUS.addListener(HatFirstPersonRenderer::render);
         java.util.function.BooleanSupplier colliderWand = () -> {
             var player = Minecraft.getInstance().player;
             return player != null && (player.getMainHandItem().getItem() instanceof ColliderWandItem
@@ -89,9 +100,19 @@ public final class PocketSizedClient {
         DebugOverlay.showCollidersWhile(colliderWand);
         DebugOverlay.showPlayerLodWhile(colliderWand);
         NeoForge.EVENT_BUS.addListener(SwitchBearingOutlineRenderer::render);
+        NeoForge.EVENT_BUS.addListener(HatFacePick::render);        NeoForge.EVENT_BUS.addListener(HatFacePick::suppressVanilla);
+        NeoForge.EVENT_BUS.addListener(HatStandOutline::render);
+        NeoForge.EVENT_BUS.addListener(HatStandNameTooltip::onTooltip);
+        NeoForge.EVENT_BUS.addListener(HatSchematics::onUse);
+        com.misterblusky9.pocket.compat.simulated.CrossScaleWelds.setClientHatResolver(BuildMirrors::sameBuild);
+        com.misterblusky9.pym.api.Hosted.wornBy(BuildMirrors::wornBy);
+        com.misterblusky9.pym.api.client.Mirrors.pickable(BuildMirrors::seatable);
+        NeoForge.EVENT_BUS.addListener(BuildMirrors::tick);
+        NeoForge.EVENT_BUS.addListener(BuildMirrors::clear);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassIndicator::render);
         NeoForge.EVENT_BUS.addListener(WeldFaceRenderer::render);
         NeoForge.EVENT_BUS.addListener(CopycatFacadeFrames::tick);
+        NeoForge.EVENT_BUS.addListener(FacadeSkin::tick);
         CompressionGunRenderHandler.INSTANCE.registerListeners(NeoForge.EVENT_BUS);
         HotGlueGunRenderHandler.INSTANCE.registerListeners(NeoForge.EVENT_BUS);
         NeoForge.EVENT_BUS.addListener(
@@ -103,7 +124,11 @@ public final class PocketSizedClient {
                 }
         );
         NeoForge.EVENT_BUS.addListener(ScaleSelectionInput::onInteraction);
+        NeoForge.EVENT_BUS.addListener(HatStandWrenchInput::onInteraction);
+        NeoForge.EVENT_BUS.addListener(HatStandWrenchInput::onClientTick);
+        NeoForge.EVENT_BUS.addListener(DummyHeadHaunting::onClientTick);
         NeoForge.EVENT_BUS.addListener(FacadeAlignmentInput::onInteraction);
+        NeoForge.EVENT_BUS.addListener(FacadeAlignmentInput::onScroll);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onClientTick);
         NeoForge.EVENT_BUS.addListener(PersonalCompressorKey::onClientTick);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onScroll);
@@ -111,6 +136,23 @@ public final class PocketSizedClient {
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onComputeFov);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onTurn);
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onRenderHand);
+        NeoForge.EVENT_BUS.addListener(MagnifyingGlassFocus::render);
+        NeoForge.EVENT_BUS.addListener(MagnifyingGlassLens::onWorldStage);
+        modBus.addListener((net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent event) ->
+                event.registerReloadListener(new net.minecraft.server.packs.resources.SimplePreparableReloadListener<Void>() {
+                    @Override
+                    protected Void prepare(net.minecraft.server.packs.resources.ResourceManager manager,
+                                           net.minecraft.util.profiling.ProfilerFiller profiler) {
+                        return null;
+                    }
+
+                    @Override
+                    protected void apply(Void ignored, net.minecraft.server.packs.resources.ResourceManager manager,
+                                         net.minecraft.util.profiling.ProfilerFiller profiler) {
+                        MagnifyingGlassFocus.reset();
+                        MagnifyingGlassLens.reset();
+                    }
+                }));
         NeoForge.EVENT_BUS.addListener(MagnifyingGlassZoom::onMovementInput);
         NeoForge.EVENT_BUS.addListener(ScaleToolModifierClient::onClientTick);
 

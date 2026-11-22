@@ -9,6 +9,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
@@ -21,6 +22,9 @@ import java.util.UUID;
 
 public final class PocketedSubLevelSavedData extends SavedData {
     public static final String FILE_ID = "pocket_pocketed_sublevels";
+    private static final String EPOCH = "pocket_hat_epoch";
+    private static final String CARRIER = "pocket_carrier";
+    private static final String MODIFIED = "pocket_modified";
 
     private final Map<UUID, CompoundTag> entries = new HashMap<>();
     private final Set<UUID> deployed = new HashSet<>();
@@ -82,7 +86,9 @@ public final class PocketedSubLevelSavedData extends SavedData {
     }
 
     public void put(UUID token, CompoundTag subLevelTag) {
-        this.entries.put(token, subLevelTag.copy());
+        CompoundTag stored = subLevelTag.copy();
+        stored.putLong(MODIFIED, System.currentTimeMillis());
+        this.entries.put(token, stored);
         this.setDirty();
         PocketTrace.debug(
                 "[PocketStore] PUT dimension={} token={} entries={} dirty=true",
@@ -140,6 +146,19 @@ public final class PocketedSubLevelSavedData extends SavedData {
         return tag == null ? null : tag.copy();
     }
 
+    public @org.jetbrains.annotations.Nullable CompoundTag peek(UUID token) {
+        return this.entries.get(token);
+    }
+
+    public boolean edit(UUID token, java.util.function.Consumer<CompoundTag> change) {
+        CompoundTag tag = this.entries.get(token);
+        if (tag == null) return false;
+        change.accept(tag);
+        tag.putLong(MODIFIED, System.currentTimeMillis());
+        this.setDirty();
+        return true;
+    }
+
     public void remove(UUID token) {
         if (this.entries.remove(token) != null) {
             this.setDirty();
@@ -151,6 +170,45 @@ public final class PocketedSubLevelSavedData extends SavedData {
 
     public boolean contains(UUID token) {
         return this.entries.containsKey(token);
+    }
+
+    public void remember(UUID token, ItemStack carrier, HolderLookup.Provider registries) {
+        CompoundTag tag = this.entries.get(token);
+        if (tag == null || carrier.isEmpty()) return;
+        Tag saved = carrier.save(registries);
+        if (saved.equals(tag.get(CARRIER))) return;
+        tag.put(CARRIER, saved);
+        this.setDirty();
+    }
+
+    public ItemStack carrier(UUID token, HolderLookup.Provider registries) {
+        CompoundTag tag = this.entries.get(token);
+        return tag == null || !tag.contains(CARRIER, Tag.TAG_COMPOUND) ? ItemStack.EMPTY
+                : ItemStack.parseOptional(registries, tag.getCompound(CARRIER));
+    }
+
+    public long modified(UUID token) {
+        CompoundTag tag = this.entries.get(token);
+        return tag == null ? 0L : tag.getLong(MODIFIED);
+    }
+
+    public Set<UUID> tokens() {
+        return Set.copyOf(this.entries.keySet());
+    }
+
+    public int epoch(UUID token) {
+        CompoundTag tag = this.entries.get(token);
+        return tag == null ? 0 : tag.getInt(EPOCH);
+    }
+
+    public int claim(UUID token) {
+        CompoundTag tag = this.entries.get(token);
+        if (tag == null) return 0;
+        int epoch = tag.getInt(EPOCH) + 1;
+        tag.putInt(EPOCH, epoch);
+        tag.putLong(MODIFIED, System.currentTimeMillis());
+        this.setDirty();
+        return epoch;
     }
 
     public void markDeployed(UUID token) {

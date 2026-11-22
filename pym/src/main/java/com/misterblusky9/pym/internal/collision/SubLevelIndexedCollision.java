@@ -110,6 +110,10 @@ public final class SubLevelIndexedCollision {
         }
     }
 
+    public static Entity prober() {
+        return PROBER.get();
+    }
+
     public static <T> T probing(Entity entity, Supplier<T> action) {
         Entity previous = PROBER.get();
         PROBER.set(entity);

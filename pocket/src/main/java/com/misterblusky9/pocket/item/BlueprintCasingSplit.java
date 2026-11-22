@@ -41,7 +41,7 @@ final class BlueprintCasingSplit {
                 || !player.canInteractWithBlock(clicked, 1.0D)
                 || Sable.HELPER.getContaining(level, clicked) != source) return;
         if (!Pym.scale().isSettled(source)) {
-            refuse(player, "Cannot cut while resizing");
+            refuse(player, "pocket.cut.resizing");
             return;
         }
 
@@ -51,7 +51,7 @@ final class BlueprintCasingSplit {
         List<BlockPos> moved = new ArrayList<>();
         boolean kept = gather(source, axis, plane, positive, moved);
         if (!kept || moved.isEmpty()) {
-            refuse(player, "Nothing to cut here");
+            refuse(player, "pocket.cut.nothing_here");
             return;
         }
 
@@ -61,7 +61,7 @@ final class BlueprintCasingSplit {
             if (anchor == null || level.getBlockState(anchor).isAir()
                     || Sable.HELPER.getContaining(level, anchor) != source
                     || (anchor.get(axis) >= plane) == positive) {
-                refuse(player, "Cut conflicting welds first");
+                refuse(player, "pocket.cut.conflicting_welds");
                 return;
             }
         }
@@ -115,8 +115,8 @@ final class BlueprintCasingSplit {
         return kept;
     }
 
-    private static void refuse(Player player, String message) {
-        player.displayClientMessage(Component.literal(message), true);
+    private static void refuse(Player player, String key) {
+        player.displayClientMessage(Component.translatable(key), true);
     }
 
     private BlueprintCasingSplit() {}

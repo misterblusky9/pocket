@@ -21,6 +21,7 @@ public final class RapierBridge {
     private static final Class<?> RAPIER_3D;
     private static final Method CREATE_VOXEL_COLLIDER_ENTRY;
     private static final Method REMOVE_CONSTRAINT;
+    private static final Method ADD_FIXED_CONSTRAINT;
     private static final Method ADD_CHUNK;
     private static final Method REMOVE_CHUNK;
     private static final Method CHANGE_BLOCK;
@@ -39,6 +40,7 @@ public final class RapierBridge {
             RAPIER_3D = Class.forName("dev.ryanhcode.sable.physics.impl.rapier.Rapier3D");
             CREATE_VOXEL_COLLIDER_ENTRY = find(RAPIER_3D, "createVoxelColliderEntry", 5);
             REMOVE_CONSTRAINT = RAPIER_3D.getMethod("removeConstraint", long.class, long.class);
+            ADD_FIXED_CONSTRAINT = find(RAPIER_3D, "addFixedConstraint", 13);
             ADD_CHUNK = find(RAPIER_3D, "addChunk", 7);
             REMOVE_CHUNK = find(RAPIER_3D, "removeChunk", 5);
             CHANGE_BLOCK = find(RAPIER_3D, "changeBlock", 5);
@@ -90,6 +92,15 @@ public final class RapierBridge {
                 && sceneHandle(subLevel.getLevel()) != NO_SCENE;
     }
 
+    public static long pinToWorld(ServerSubLevel subLevel, Vector3dc world, Vector3dc local) {
+        try {
+            return (long) ADD_FIXED_CONSTRAINT.invoke(null, sceneHandle(subLevel.getLevel()), NO_BODY, bodyId(subLevel),
+                    world.x(), world.y(), world.z(), local.x(), local.y(), local.z(), 0.0D, 0.0D, 0.0D, 1.0D);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to pin sub-level to the world", exception);
+        }
+    }
+
     public static void removeConstraint(long sceneHandle, long constraintHandle) {
         try {
             REMOVE_CONSTRAINT.invoke(null, sceneHandle, constraintHandle);
@@ -105,7 +116,8 @@ public final class RapierBridge {
                     "volume=" + volume, "boxes=" + shape.faces().size(), "material=" + shape.material());
             ColliderMaterial material = shape.material();
             Object collider = CREATE_VOXEL_COLLIDER_ENTRY.invoke(
-                    null, material.friction(), volume, material.restitution(), false, null);
+                    null, material.friction(), volume, material.restitution(), false,
+                    material.callback() ? ScaledBlockCallbacks.INSTANCE : null);
             PymTrace.exit("Rapier3D.createVoxelColliderEntry");
 
             addBoxes(collider, shape);

@@ -15,7 +15,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 public final class PocketNetwork {
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("23");
+        PayloadRegistrar registrar = event.registrar("28");
         registrar.playToClient(
                 CompressionSyncPayload.TYPE,
                 CompressionSyncPayload.STREAM_CODEC,
@@ -91,6 +91,15 @@ public final class PocketNetwork {
         registrar.playToServer(
                 HotGluePunchPayload.TYPE,
                 HotGluePunchPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
+                PocketKnifeAssemblePayload.TYPE,
+                PocketKnifeAssemblePayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
                     if (context.player() instanceof ServerPlayer player) {
                         payload.handle(player);
@@ -186,6 +195,15 @@ public final class PocketNetwork {
                 )
         );
         registrar.playToServer(
+                HatStandWrenchPayload.TYPE,
+                HatStandWrenchPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
                 FacadeAlignmentPayload.TYPE,
                 FacadeAlignmentPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> {
@@ -200,6 +218,73 @@ public final class PocketNetwork {
                 (payload, context) -> context.enqueueWork(
                         () -> com.misterblusky9.pocket.client.CopycatFacadeFrames.acceptAlignment(
                                 payload.craft(), payload.offset())
+                )
+        );
+        registrar.playToServer(
+                LostAndFoundSearchPayload.TYPE,
+                LostAndFoundSearchPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) payload.handle(player);
+                })
+        );
+        registrar.playToServer(
+                CaseClonePayload.TYPE,
+                CaseClonePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) payload.handle(player);
+                })
+        );
+        registrar.playToServer(
+                CaseCloneDiscardPayload.TYPE,
+                CaseCloneDiscardPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) CaseClonePayload.discard(player, payload.token());
+                })
+        );
+        registrar.playToClient(
+                CaseClonedPayload.TYPE,
+                CaseClonedPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.CaseCloning.accept(payload.stack())
+                )
+        );
+        registrar.playToServer(
+                HatCasePlacePayload.TYPE,
+                HatCasePlacePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToServer(
+                BuildMirrorRequestPayload.TYPE,
+                BuildMirrorRequestPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    if (context.player() instanceof ServerPlayer player) {
+                        payload.handle(player);
+                    }
+                })
+        );
+        registrar.playToClient(
+                BuildMirrorPayload.TYPE,
+                BuildMirrorPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.BuildMirrors.accept(payload)
+                )
+        );
+        registrar.playToClient(
+                HatNativeContraptionsPayload.TYPE,
+                HatNativeContraptionsPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        com.misterblusky9.pocket.client.HatNativeContraptionRender.accept(
+                                payload.token(), payload.states()))
+        );
+        registrar.playToClient(
+                BuildRiderPosesPayload.TYPE,
+                BuildRiderPosesPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> com.misterblusky9.pocket.client.BuildMirrors.acceptPoses(payload)
                 )
         );
     }

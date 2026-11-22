@@ -1,0 +1,24 @@
+{
+  "parent": "pocket:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:goat_horn"
+    },
+    "title": {
+      "text": "Honey, I Shrunk the Kid",
+      "italic": true
+    },
+    "description": {
+      "text": "Shrink a baby goat"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "criteria": {
+    "kid": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

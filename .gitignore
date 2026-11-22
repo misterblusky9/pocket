@@ -1,5 +1,7 @@
 .gradle/
-build/
+/build/
+/pocket/build/
+/pym/build/
 run/
 run-data/
 runs/
@@ -16,3 +18,7 @@ Minecraft-Model-Auto-Sync/
 .bb-sync-*
 pocket/src/debug/
 *.patch
+pocket/src/gametest/
+pym/src/createtest/
+pym/src/gametest/java/com/misterblusky9/pym/gametest/DetachedGameTests.java
+pym/src/gametest/java/com/misterblusky9/pym/gametest/HostedGameTests.java

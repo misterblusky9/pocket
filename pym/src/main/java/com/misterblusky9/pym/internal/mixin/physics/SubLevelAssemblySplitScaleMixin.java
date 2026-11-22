@@ -1,5 +1,7 @@
 package com.misterblusky9.pym.internal.mixin.physics;
 
+import com.misterblusky9.pym.api.Hosted;
+import dev.ryanhcode.sable.Sable;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.misterblusky9.pym.internal.scale.SplitInheritance;
@@ -21,8 +23,10 @@ public abstract class SubLevelAssemblySplitScaleMixin {
             Operation<ServerSubLevel> original
     ) {
         SplitInheritance.Source source = SplitInheritance.capture(level, anchor);
+        ServerSubLevel hosted = Hosted.rootOf(Sable.HELPER.getContaining(level, anchor));
         ServerSubLevel child = original.call(level, anchor, blocks, bounds);
         SplitInheritance.adoptOrphan(source, child);
+        if (hosted != null && child != null) Hosted.adopt(hosted, child);
         return child;
     }
 }

@@ -51,10 +51,9 @@ public final class DeviceRanges {
     private static final Map<Device, ModConfigSpec.DoubleValue> MAX = new EnumMap<>(Device.class);
     private static final ModConfigSpec.EnumValue<PvpScalingMode> PVP_SCALING_MODE;
     private static final ModConfigSpec.BooleanValue ALLOW_PVP_SCALING_TOGGLE;
-    private static final ModConfigSpec.BooleanValue CREATIVE_POCKETS_ANYTHING;
     private static final ModConfigSpec.IntValue KNIFE_MAX_BLOCKS;
-    private static final ModConfigSpec.IntValue KNIFE_MAX_MOVED_BLOCKS;
     private static final ModConfigSpec.DoubleValue TANK_BONUS_PER_CAPACITY_LEVEL;
+    private static final ModConfigSpec.DoubleValue HAT_SEAT_MIN_WEARER_RATIO;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -83,25 +82,22 @@ public final class DeviceRanges {
                 .define("allowPlayersToToggleInPsc", true);
         builder.pop();
 
-        builder.push("pocketing");
-        CREATIVE_POCKETS_ANYTHING = builder.comment(
-                "Whether creative players may pocket sublevels of any size. Pocketed scale is still stored at 1/16 (0.0625) at most.")
-                .define("creativePocketsAnything", false);
-        builder.pop();
-
         builder.push("pocketKnife");
         KNIFE_MAX_BLOCKS = builder.comment(
                 "Largest sublevel, in blocks, the Pocket Knife may cut. 0 means no limit.")
                 .defineInRange("maxBlocks", 32_768, 0, Integer.MAX_VALUE);
-        KNIFE_MAX_MOVED_BLOCKS = builder.comment(
-                "Most blocks one Pocket Knife cut may split off. 0 means no limit.")
-                .defineInRange("maxMovedBlocks", 16_384, 0, Integer.MAX_VALUE);
         builder.pop();
 
         builder.push("levititeTanks");
         TANK_BONUS_PER_CAPACITY_LEVEL = builder.comment(
                 "Fraction of the base levitite tank added per level of Create's Capacity enchantment, on Compression Guns and the Personal Subspace Compressor.")
                 .defineInRange("bonusPerCapacityLevel", 1.0D / 3.0D, 0.0D, 100.0D);
+        builder.pop();
+
+        builder.push("hatSeats");
+        HAT_SEAT_MIN_WEARER_RATIO = builder.comment(
+                "Smallest a hat's wearer may be relative to anyone riding a seat on that hat. 0.25 means a rider may be at most 4x the wearer's size. 0 means no limit.")
+                .defineInRange("minWearerToRiderScale", 0.25D, 0.0D, 1.0D);
         builder.pop();
 
         SPEC = builder.build();
@@ -119,20 +115,27 @@ public final class DeviceRanges {
         return !SPEC.isLoaded() || ALLOW_PVP_SCALING_TOGGLE.get();
     }
 
-    public static boolean creativePocketsAnything() {
-        return SPEC.isLoaded() && CREATIVE_POCKETS_ANYTHING.get();
-    }
-
     public static int knifeMaxBlocks() {
         return SPEC.isLoaded() ? KNIFE_MAX_BLOCKS.get() : 32_768;
     }
 
     public static int knifeMaxMovedBlocks() {
-        return SPEC.isLoaded() ? KNIFE_MAX_MOVED_BLOCKS.get() : 16_384;
+        int range;
+        try {
+            range = dev.simulated_team.simulated.service.SimConfigService.INSTANCE.server().assembly.honeyGlueRange.get();
+        } catch (RuntimeException e) {
+            range = 48;
+        }
+        long side = Math.max(1, range);
+        return (int) Math.min(Integer.MAX_VALUE, side * side * side);
     }
 
     public static double tankBonusPerCapacityLevel() {
         return SPEC.isLoaded() ? TANK_BONUS_PER_CAPACITY_LEVEL.get() : 1.0D / 3.0D;
+    }
+
+    public static double hatSeatMinWearerRatio() {
+        return SPEC.isLoaded() ? HAT_SEAT_MIN_WEARER_RATIO.get() : 0.25D;
     }
 
     public static ScaleBounds of(Device device) {

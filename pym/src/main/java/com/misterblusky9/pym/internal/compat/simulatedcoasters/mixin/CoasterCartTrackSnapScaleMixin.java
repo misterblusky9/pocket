@@ -41,6 +41,15 @@ public abstract class CoasterCartTrackSnapScaleMixin {
                     + "Ldev/ryanhcode/sable/neoforge/event/ForgeSablePrePhysicsTickEvent;)V";
 
     @Unique
+    private static final String PYM$PRE_TICK_CART =
+            "lambda$onPrePhysicsTick$0("
+                    + "Ldev/ryanhcode/sable/sublevel/system/SubLevelPhysicsSystem;"
+                    + "Lnet/minecraft/server/level/ServerLevel;"
+                    + "Ldev/silvergold/simulatedcoasters/track/graph/CoasterPathGraph;"
+                    + "JZLjava/util/List;D"
+                    + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;)V";
+
+    @Unique
     private static final String PYM$APPLY =
             "applySnap("
                     + "Ldev/ryanhcode/sable/sublevel/ServerSubLevel;"
@@ -59,7 +68,7 @@ public abstract class CoasterCartTrackSnapScaleMixin {
                     + "Ljava/util/List;)Z";
 
     @ModifyConstant(
-            method = PYM$PRE_TICK,
+            method = {PYM$PRE_TICK, PYM$PRE_TICK_CART},
             constant = @Constant(doubleValue = 0.0484D),
             remap = false,
             require = 2

@@ -1,0 +1,23 @@
+{
+  "parent": "pocket:root",
+  "display": {
+    "icon": {
+      "id": "pocket:hat_stand"
+    },
+    "title": {
+      "text": "Hats™"
+    },
+    "description": {
+      "text": "Place headwear on a Hat Stand and begin a new Hat"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "worn": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}
