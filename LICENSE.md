@@ -20,6 +20,7 @@ Exceptions to the asset license above:
 
 - Personal Subspace Compressor base texture: [GPS by Futureazoo](https://github.com/Futureazoo/TextureRepository/blob/master/futureazoo/items/tech/gps.png), used under their [original license](https://github.com/Futureazoo/TextureRepository/blob/master/README.md) and modified for my needs.
 
+- Dummy Head texture: Created by Reijvi of Minecraft Reimagined, used with permission. All rights remain with the original creator.
 ---
 
 ## Build Workflows (MIT)
