@@ -34,6 +34,8 @@ public final class WeldRuntime {
     private static final Map<ResourceKey<Level>, Map<UUID, PhysicsConstraintHandle>> LIVE =
             new HashMap<>();
     private static final Map<ResourceKey<Level>, Map<UUID, PhysicsConstraintHandle>> ASSIST = new HashMap<>();
+    private static final Map<ResourceKey<Level>, Map<UUID, PhysicsConstraintHandle>> PARKED = new HashMap<>();
+    private static final Map<ResourceKey<Level>, Set<UUID>> UNLOADED = new HashMap<>();
 
     private static final Map<ResourceKey<Level>, Map<UUID, Settle>> SETTLING = new HashMap<>();
     private static final Map<ResourceKey<Level>, Map<BodyPair, PhysicsConstraintHandle>> NO_CONTACT = new HashMap<>();
@@ -46,6 +48,10 @@ public final class WeldRuntime {
                 LIVE.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
         Map<UUID, PhysicsConstraintHandle> assist =
                 ASSIST.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
+        Map<UUID, PhysicsConstraintHandle> parked =
+                PARKED.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
+        Set<UUID> unloaded =
+                UNLOADED.computeIfAbsent(level.dimension(), ignored -> new HashSet<>());
         Map<UUID, Settle> settling =
                 SETTLING.computeIfAbsent(level.dimension(), ignored -> new HashMap<>());
         Map<BodyPair, PhysicsConstraintHandle> noContact =
@@ -60,6 +66,8 @@ public final class WeldRuntime {
                 live.clear();
             }
             releaseAll(assist);
+            releaseAll(parked);
+            unloaded.clear();
             settling.clear();
             newWelds.clear();
             releaseAll(noContact);
@@ -76,6 +84,21 @@ public final class WeldRuntime {
             if (small == null || !record.worldAnchored() && big == null) {
                 wanted.add(record.weldId());
                 release(live.remove(record.weldId()));
+                release(assist.remove(record.weldId()));
+                if (small != null && !record.worldAnchored()
+                        && unloaded.contains(record.bigSubLevel())
+                        && container.getSubLevel(record.bigSubLevel()) == null
+                        && !Hosted.isHosted(small)) {
+                    PhysicsConstraintHandle hold = parked.get(record.weldId());
+                    if (hold == null || !hold.isValid()) {
+                        release(hold);
+                        PhysicsConstraintHandle created = park(container, record, small);
+                        if (created != null) parked.put(record.weldId(), created);
+                        else parked.remove(record.weldId());
+                    }
+                } else {
+                    release(parked.remove(record.weldId()));
+                }
                 settling.remove(record.weldId());
                 newWelds.remove(record.weldId());
                 continue;
@@ -93,6 +116,8 @@ public final class WeldRuntime {
                 if (fixed == null || !fixed.isValid()) {
                     release(live.remove(record.weldId()));
                     if (createHosted(live, container, record, small, big)) {
+                        release(parked.remove(record.weldId()));
+                        unloaded.remove(record.bigSubLevel());
                         Hosted.jointAttached(small);
                         Hosted.jointAttached(big);
                         if (newWelds.remove(record.weldId())) finishEffect(level, record);
@@ -114,7 +139,10 @@ public final class WeldRuntime {
             double age = level.getGameTime() - settle.startTick();
             PhysicsConstraintHandle existing = live.get(record.weldId());
 
-            if (age > SETTLE_TICKS && existing != null && existing.isValid()) continue;
+            if (age > SETTLE_TICKS && existing != null && existing.isValid()) {
+                release(parked.remove(record.weldId()));
+                continue;
+            }
 
             double progress = Mth.clamp(
                     Math.pow(age / SETTLE_TICKS, SETTLE_CURVE), 0.0D, 1.0D);
@@ -130,7 +158,10 @@ public final class WeldRuntime {
             if (!create(live, container, record, small, big, anchor, orientation)) {
                 settling.remove(record.weldId());
                 continue;
-            } else if (progress >= 1.0D && newWelds.remove(record.weldId())) {
+            }
+            release(parked.remove(record.weldId()));
+            unloaded.remove(record.bigSubLevel());
+            if (progress >= 1.0D && newWelds.remove(record.weldId())) {
                 finishEffect(level, record);
             }
         }
@@ -142,6 +173,19 @@ public final class WeldRuntime {
             release(entry.getValue());
             iterator.remove();
         }
+        Iterator<Map.Entry<UUID, PhysicsConstraintHandle>> parkedIterator = parked.entrySet().iterator();
+        while (parkedIterator.hasNext()) {
+            Map.Entry<UUID, PhysicsConstraintHandle> entry = parkedIterator.next();
+            if (wanted.contains(entry.getKey())) continue;
+            release(entry.getValue());
+            parkedIterator.remove();
+        }
+        Set<UUID> endpoints = new HashSet<>();
+        for (WeldRecord record : store.all()) {
+            endpoints.add(record.smallSubLevel());
+            if (!record.worldAnchored()) endpoints.add(record.bigSubLevel());
+        }
+        unloaded.retainAll(endpoints);
         settling.keySet().retainAll(wanted);
         newWelds.retainAll(wanted);
         syncComponentContacts(container, noContact);
@@ -153,6 +197,11 @@ public final class WeldRuntime {
         return level.getBlockState(record.smallPos()).isAir()
                 || (!record.worldAnchored() || level.isLoaded(record.bigPos()))
                 && level.getBlockState(record.bigPos()).isAir();
+    }
+
+    public static void markUnloaded(ServerLevel level, UUID subLevelId) {
+        if (level == null || subLevelId == null) return;
+        UNLOADED.computeIfAbsent(level.dimension(), ignored -> new HashSet<>()).add(subLevelId);
     }
 
     public static void markNew(ServerLevel level, UUID weldId) {
@@ -223,6 +272,26 @@ public final class WeldRuntime {
             if (handle == null || !handle.isValid()) return null;
             handle.setContactsEnabled(false);
             return handle;
+        } catch (IllegalArgumentException | IllegalStateException rejected) {
+            return null;
+        }
+    }
+
+    private static PhysicsConstraintHandle park(
+            ServerSubLevelContainer container,
+            WeldRecord record,
+            ServerSubLevel small
+    ) {
+        Vector3d anchor = small.logicalPose().transformPosition(record.anchorFor(true));
+        if (!finite(anchor)) return null;
+        Quaterniond orientation = new Quaterniond(small.logicalPose().orientation()).invert().normalize();
+        try {
+            PhysicsConstraintHandle hold = container.physicsSystem().getPipeline().addConstraint(
+                    small, null,
+                    new FixedConstraintConfiguration(record.anchorFor(true), anchor, orientation));
+            if (hold == null || !hold.isValid()) return null;
+            hold.setContactsEnabled(true);
+            return hold;
         } catch (IllegalArgumentException | IllegalStateException rejected) {
             return null;
         }
@@ -405,6 +474,9 @@ public final class WeldRuntime {
         }
         Map<UUID, PhysicsConstraintHandle> assist = ASSIST.remove(level.dimension());
         if (assist != null) releaseAll(assist);
+        Map<UUID, PhysicsConstraintHandle> parked = PARKED.remove(level.dimension());
+        if (parked != null) releaseAll(parked);
+        UNLOADED.remove(level.dimension());
         SETTLING.remove(level.dimension());
         NEW_WELDS.remove(level.dimension());
         Map<BodyPair, PhysicsConstraintHandle> noContact = NO_CONTACT.remove(level.dimension());
@@ -415,6 +487,9 @@ public final class WeldRuntime {
         if (weldId == null) return;
         for (Map<UUID, Settle> settling : SETTLING.values()) settling.remove(weldId);
         for (Set<UUID> newWelds : NEW_WELDS.values()) newWelds.remove(weldId);
+        for (Map<UUID, PhysicsConstraintHandle> parked : PARKED.values()) {
+            release(parked.remove(weldId));
+        }
         for (Map<UUID, PhysicsConstraintHandle> live : LIVE.values()) {
             PhysicsConstraintHandle handle = live.remove(weldId);
             if (handle != null) release(handle);
@@ -456,6 +531,7 @@ public final class WeldRuntime {
             if (small == null || (!record.worldAnchored() && big == null)) continue;
             if (create(live, container, record, small, big,
                     record.anchorFor(false), record.orientation())) {
+                release(PARKED.computeIfAbsent(level.dimension(), ignored -> new HashMap<>()).remove(id));
                 settling.put(id, new Settle(level.getGameTime() - (long) SETTLE_TICKS - 1L,
                         record.anchorFor(false), new Quaterniond(record.orientation())));
             }

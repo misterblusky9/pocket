@@ -50,15 +50,23 @@
     "MonsterSpawnLightMixin",
     "create.ControlledContraptionEntityControllerPosAccessor",
     "sable.SubLevelAssemblyWeldMoveMixin",
-    "simulated.SlimeWeldDisassemblyMixin"
+    "simulated.PhysicsAssemblerHostedHatMixin",
+    "simulated.SlimeWeldDisassemblyMixin",
+    "create.SkullCapCardboardStealthMixin",
+    "create.CardboardBoxEyeHeightMixin"
   ],
   "client": [
     "client.HatItemRenderMixin",
+    "create.ZapperItemFacadePreviewMixin",
+    "create.ZapperScreenFacadePreviewMixin",
     "client.DepotHatRenderMixin",
     "client.HeldCaseMixin",
     "client.HatWornRenderMixin",
+    "create.CardboardArmorHatDisguiseMixin",
+    "client.HatDisguiseShadowMixin",
     "client.HatHeadLayerMixin",
     "client.HatSkinLayerMixin",
+    "client.PinheadCameraMixin",
     "client.SchematicQuillSubLevelMixin",
     "client.SchematicHandlerCaseMixin",
     "create.VirtualRenderWorldAccessor",
@@ -92,7 +100,8 @@
     "client.HatFacePlaceMixin",
     "client.HatNameColourMixin",
     "client.FacadeSkinCompileMixin",
-    "simulated.HoneyGlueWearOutlinesMixin"
+    "simulated.HoneyGlueWearOutlinesMixin",
+    "client.MagnifyingGlassHandPostMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -164,8 +164,9 @@ public final class HatSchematics {
         standPos = stand.getBlockPos();
         rotation = Rotation.NONE;
         mirror = Mirror.NONE;
-        anchor = BuildSites.scaffoldOrigin(hat, head, stand.getOffset())
+        BlockPos centered = BuildSites.scaffoldOrigin(hat, head, stand.getOffset())
                 .offset(head / 2 - size.getX() / 2, head - 1, head / 2 - size.getZ() / 2);
+        anchor = PocketCaseItem.rememberedHatAnchor(hat, head, stand.getOffset(), stack, centered);
         stamp(stack);
         SchematicHandler handler = CreateClient.SCHEMATIC_HANDLER;
         if (handler.isActive()) handler.loadSettings(stack);

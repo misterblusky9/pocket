@@ -22,6 +22,7 @@ import org.joml.Vector3d;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -128,10 +129,9 @@ public final class CopycatFacadeFrames {
             live.add(plot);
             liveIds.add(client.getUniqueId());
 
-            boolean build = mirrors.contains(client)
-                    || level.getBlockState(client.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
+            boolean build = build(level, client, mirrors);
             double scale = build ? CompressionStage.SIXTEENTH.scale() : ScaleBounds.clampValid(Pym.scale().of(client));
-            int[] offset = build ? null : OFFSETS.get(client.getUniqueId());
+            int[] offset = OFFSETS.get(client.getUniqueId());
             Craft known = CRAFTS.get(plot);
             boolean fresh = known == null || !known.id().equals(client.getUniqueId());
             boolean rescaled = !fresh && (build || Pym.scale().isSettled(client))
@@ -155,6 +155,17 @@ public final class CopycatFacadeFrames {
         SECTIONS.keySet().retainAll(live);
         gone.removeAll(liveIds);
         OFFSETS.keySet().removeAll(gone);
+    }
+
+    public static double tilingScale(ClientSubLevel client) {
+        var level = Minecraft.getInstance().level;
+        if (level != null && build(level, client, BuildMirrors.open())) return CompressionStage.SIXTEENTH.scale();
+        return Pym.scale().of(client);
+    }
+
+    private static boolean build(BlockAndTintGetter level, ClientSubLevel client, Collection<ClientSubLevel> mirrors) {
+        return mirrors.contains(client)
+                || level.getBlockState(client.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
     }
 
     public static void blockChanged(BlockPos pos) {

@@ -63,6 +63,16 @@ neoForge {
             ]
         }
 
+        client3 {
+            client()
+            sourceSet = sourceSets.debug
+            gameDirectory = rootProject.file("runs/client3")
+
+            programArguments = [
+                    "--username", "Player3"
+            ]
+        }
+
         server {
             server()
             sourceSet = sourceSets.debug
@@ -148,8 +158,8 @@ dependencies {
     runtimeOnly "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
     implementation "com.tterrag.registrate:Registrate:${registrate_version}"
 
-    implementation "maven.modrinth:oWaK0Q19:w7zlLnea"
-    aeronauticsBundle "maven.modrinth:oWaK0Q19:w7zlLnea"
+    implementation "maven.modrinth:oWaK0Q19:demX2roU"
+    aeronauticsBundle "maven.modrinth:oWaK0Q19:demX2roU"
     compileOnly fileTree(dir: layout.buildDirectory.dir('simulated'), include: '*.jar')
             .builtBy('extractSimulated')
 

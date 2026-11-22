@@ -63,6 +63,10 @@ public final class PocketPymIntegration {
 
         CrossScaleWelds.invalidate(subLevel.getLevel());
         CompressionSessions.releaseSubLevel(subLevel);
+        if (event.reason() == SubLevelRemovalReason.UNLOADED
+                && subLevel.getLevel() instanceof ServerLevel serverLevel) {
+            WeldRuntime.markUnloaded(serverLevel, id);
+        }
         if (event.reason() == SubLevelRemovalReason.REMOVED) releaseWelds(subLevel, id);
 
     }

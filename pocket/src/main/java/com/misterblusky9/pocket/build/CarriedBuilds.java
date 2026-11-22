@@ -1,25 +1,43 @@
 package com.misterblusky9.pocket.build;
 
 import com.misterblusky9.pocket.advancement.HatAdvancements;
+import com.misterblusky9.pocket.block.FacadeAlignment;
+import com.misterblusky9.pocket.block.HatStandBlockEntity.NameEgg;
+import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.compat.WornHats;
 import com.misterblusky9.pocket.item.PocketCaseItem;
+import com.misterblusky9.pocket.item.PocketContainer;
 import com.misterblusky9.pocket.network.BuildMirrorPayload;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelSavedData;
 import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.api.Hosted;
+import com.misterblusky9.pym.api.Pym;
+import com.misterblusky9.pocket.config.DeviceRanges;
+import net.minecraft.network.chat.Component;
+import dev.ryanhcode.sable.Sable;
+import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
 import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerListener;
 import net.minecraft.world.item.ItemStack;
+import com.simibubi.create.content.contraptions.actors.seat.SeatBlock;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.common.util.TriState;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.entity.EntityMountEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEquipmentChangeEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -39,12 +57,15 @@ import java.util.function.Consumer;
 
 public final class CarriedBuilds {
     private static final int HOTBAR = 9;
+    private static final double POP_SPEED = 6.0D;
+    private static final double POP_TUMBLE = 4.0D;
 
     private static final class Live {
         ServerSubLevel hat;
         final Set<UUID> riders = new HashSet<>();
         int kept;
         ItemStack stack = ItemStack.EMPTY;
+        @Nullable ServerPlayer wearer;
 
         Live(ServerSubLevel hat) {
             this.hat = hat;
@@ -56,16 +77,24 @@ public final class CarriedBuilds {
     private static int now;
 
     public static void keep(ServerLevel level, UUID token, BlockPos near, ItemStack stack, Consumer<ServerSubLevel> pose) {
-        keep(level, token, near, stack, pose, () -> {});
-    }
-
-    private static void keep(ServerPlayer player, UUID token, ItemStack stack, Consumer<ServerSubLevel> pose) {
-        keep(player.serverLevel(), token, player.blockPosition(), stack, pose,
-                () -> player.containerMenu.broadcastChanges());
+        keep(level, token, near, stack, pose, () -> {}, null);
     }
 
     public static void keep(ServerLevel level, UUID token, BlockPos near, ItemStack stack, Consumer<ServerSubLevel> pose,
                             Runnable stamped) {
+        keep(level, token, near, stack, pose, stamped, null);
+    }
+
+    private static void keep(ServerPlayer player, UUID token, ItemStack stack, Consumer<ServerSubLevel> pose,
+                             @Nullable ServerPlayer wearer) {
+        keep(player.serverLevel(), token, player.blockPosition(), stack, pose,
+                () -> player.containerMenu.broadcastChanges(), wearer);
+    }
+
+    private static void keep(ServerLevel level, UUID token, BlockPos near, ItemStack stack, Consumer<ServerSubLevel> pose,
+                             Runnable stamped, @Nullable ServerPlayer wearer) {
+        if (stack.getItem() instanceof PocketCaseItem
+                && PocketContainer.of(stack) == PocketContainer.CREATIVE_POCKET_CASE) return;
         boolean hat = !(stack.getItem() instanceof PocketCaseItem);
         if (BuildSites.live(token) != null) {
             if (hat) BuildHostBlockEntity.strip(stack);
@@ -98,14 +127,23 @@ public final class CarriedBuilds {
         }
         live.kept = now;
         live.stack = stack;
+        if (live.wearer != null && wearer == null) unseat(live.hat);
+        live.wearer = wearer;
         if (Hosted.isRoot(live.hat)) {
-            Pose3d physical = new Pose3d(live.hat.logicalPose());
+            Pose3d current = new Pose3d(live.hat.logicalPose());
             pose.accept(live.hat);
-            Hosted.present(live.hat, live.hat.logicalPose());
-            live.hat.logicalPose().set(physical);
+            Pose3d shown = new Pose3d(live.hat.logicalPose());
+            live.hat.logicalPose().set(current);
+            Hosted.present(live.hat, shown);
         } else {
             pose.accept(live.hat);
             if (hat && BuildSites.hasBuild(live.hat)) BuildSites.tryHost(token, live.hat);
+        }
+        if (wearer != null) {
+            for (ServerSubLevel part : parts(live.hat)) {
+                HatSeats.unseat(part, rider -> tooBig(rider, wearer));
+                HatSeats.follow(part);
+            }
         }
         BuildSites.watch(token, live.hat, level, near);
         if (Hosted.isRoot(live.hat)) BuildSites.publishHosted(token, live.hat, live.riders);
@@ -122,6 +160,30 @@ public final class CarriedBuilds {
         return false;
     }
 
+    public static boolean belongsToHat(@Nullable dev.ryanhcode.sable.sublevel.SubLevel subLevel) {
+        if (!(subLevel instanceof ServerSubLevel at)) return false;
+        Set<ServerSubLevel> seen = new HashSet<>();
+        while (at != null && seen.add(at)) {
+            if (isHat(at) || BuildSites.isAttached(at)) return true;
+            ServerSubLevel root = Hosted.rootOf(at);
+            if (root != null && root != at && (isHat(root) || BuildSites.isAttached(root))) return true;
+            at = Detached.parent(at);
+        }
+        return false;
+    }
+
+    public static boolean isWorn(ServerSubLevel hat) {
+        Live live = live(hat);
+        return live != null && live.wearer != null;
+    }
+
+    public static boolean wornBy(dev.ryanhcode.sable.sublevel.SubLevel subLevel, Entity entity) {
+        if (!(subLevel instanceof ServerSubLevel server)) return false;
+        ServerSubLevel root = Hosted.rootOf(server);
+        Live live = live(root == null ? server : root);
+        return live != null && live.wearer != null && entity.getRootVehicle() == live.wearer.getRootVehicle();
+    }
+
     public static void flush(UUID token) {
         Live live = LIVE.get(token);
         if (live != null && !live.hat.isRemoved()) save(token, live.hat, live.stack);
@@ -136,6 +198,7 @@ public final class CarriedBuilds {
     }
 
     public static void replaced(ServerSubLevel before, ServerSubLevel after) {
+        FacadeAlignment.carry(before, after);
         BuildSites.replaced(before, after);
         for (Live live : LIVE.values()) {
             if (live.hat == before) live.hat = after;
@@ -155,7 +218,7 @@ public final class CarriedBuilds {
             ItemStack headwear = head;
             adoptCreator(player, headwear);
             keep(player, worn, headwear,
-                    hat -> BuildSites.wear(hat.logicalPose(), hat, player, offset, headwear));
+                    hat -> BuildSites.wear(hat.logicalPose(), hat, player, offset, headwear), player);
             if (BuildHostBlockEntity.token(head) == null) worn = null;
         }
         Live wornLive = worn == null ? null : LIVE.get(worn);
@@ -201,7 +264,7 @@ public final class CarriedBuilds {
         adoptCreator(player, stack);
         keep(player, token, stack, hat -> BuildSites.hold(hat,
                 new Vector3d(player.getX(), player.getY() + player.getBbHeight() * 0.5, player.getZ()),
-                new Quaterniond().rotateY(Math.toRadians(180.0 - player.getYRot())), stack));
+                new Quaterniond().rotateY(Math.toRadians(180.0 - player.getYRot())), stack), null);
     }
 
     public static void onEquipmentChange(LivingEquipmentChangeEvent event) {
@@ -215,6 +278,47 @@ public final class CarriedBuilds {
                 && token.equals(BuildHostBlockEntity.token(live.stack));
         if (carried || BuildSites.live(token) != null || !BuildSites.current(level, token, stack))
             BuildHostBlockEntity.strip(stack);
+    }
+
+    public static void onJump(LivingEvent.LivingJumpEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        ItemStack head = player.getItemBySlot(EquipmentSlot.HEAD);
+        if (BuildHostBlockEntity.token(head) == null) {
+            ItemStack cosmetic = WornHats.find(player);
+            if (cosmetic != null) head = cosmetic;
+        }
+        if (NameEgg.of(head) != NameEgg.RHYGUY) return;
+        UUID token = BuildHostBlockEntity.token(head);
+        Live live = LIVE.get(token);
+        if (live == null || live.hat.isRemoved() || live.hat.getLevel() != player.serverLevel()
+                || !BuildSites.hasBuild(live.hat)) return;
+        LIVE.remove(token);
+        HatNativeContraptions.forget(token);
+        unseat(live.hat);
+        ServerSubLevel hat = Hosted.isRoot(live.hat) ? Hosted.unhost(live.hat) : live.hat;
+        if (hat == null) return;
+        HatContraptions.disassemble(hat);
+        for (ServerSubLevel child : Detached.children(hat)) HatContraptions.disassemble(child);
+        PocketCaseItem.rememberHatAnchor(hat, BuildSites.scaffoldOrigin(hat,
+                ModBlocks.HAT_STAND.get().scaffoldSize(), BuildSites.offset(head)));
+        UUID id = hat.getUniqueId();
+        ServerSubLevel popped = BuildSites.slice(token, hat, PocketCaseItem.POCKETABLE_SCALE);
+        ServerSubLevel back = Detached.find(id);
+        if (back != null) {
+            live.hat = back;
+            LIVE.put(token, live);
+            if (popped != null) save(token, back, head);
+        }
+        if (popped == null) return;
+        if (back == null) {
+            BuildHostBlockEntity.strip(head);
+            player.containerMenu.broadcastChanges();
+        }
+        RigidBodyHandle handle = RigidBodyHandle.of(popped);
+        if (handle == null) return;
+        double yaw = Math.toRadians(player.getYHeadRot());
+        handle.addLinearAndAngularVelocity(new Vector3d(0.0D, POP_SPEED, 0.0D),
+                new Vector3d(Math.cos(yaw), 0.0D, Math.sin(yaw)).mul(-POP_TUMBLE));
     }
 
     public static void onServerTick(ServerTickEvent.Post event) {
@@ -239,6 +343,7 @@ public final class CarriedBuilds {
         HatNativeContraptions.forget(token);
         Live live = LIVE.remove(token);
         if (live == null) return;
+        unseat(live.hat);
         ServerSubLevel hat = Hosted.isRoot(live.hat) ? Hosted.unhost(live.hat) : live.hat;
         if (hat == null) return;
         HatContraptions.disassemble(hat);
@@ -256,13 +361,88 @@ public final class CarriedBuilds {
                 PocketCaseItem.refreshIntegrity(saved, hat);
             }
             BuildSites.storeRiders(saved, hat);
+            FacadeAlignment.store(saved, hat);
         });
         UUID held = stack.getItem() instanceof PocketCaseItem
                 ? PocketCaseItem.token(stack) : BuildHostBlockEntity.token(stack);
         if (token.equals(held)) storage.remember(token, stack, hat.getLevel().registryAccess());
     }
 
-    private static List<ServerSubLevel> parts(ServerSubLevel hat) {
+    static void unseat(ServerSubLevel hat) {
+        for (ServerSubLevel part : parts(hat)) HatSeats.unseat(part);
+    }
+
+    public static void onMount(EntityMountEvent event) {
+        if (!event.isMounting() || event.getLevel().isClientSide()) return;
+        if (!seatable(event.getEntityBeingMounted(), event.getEntityMounting())) event.setCanceled(true);
+    }
+
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (!wornAt(event.getLevel(), event.getPos())) return;
+        if (event.getLevel().getBlockState(event.getPos()).getBlock() instanceof SeatBlock
+                && !event.getEntity().isSecondaryUseActive() && DyeColor.getColor(event.getItemStack()) == null) {
+            event.setUseItem(TriState.FALSE);
+            return;
+        }
+        event.setCanceled(true);
+        event.setCancellationResult(InteractionResult.FAIL);
+    }
+
+    public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        if (wornAt(event.getLevel(), event.getPos())) event.setCanceled(true);
+    }
+
+    private static boolean wornAt(Level level, BlockPos pos) {
+        if (level.isClientSide()) return com.misterblusky9.pocket.client.BuildMirrors.wornAt(pos);
+        ServerSubLevel root = pocketed(Sable.HELPER.getContaining(level, pos));
+        return root != null && isWorn(root);
+    }
+
+    private static boolean seatable(Entity vehicle, Entity rider) {
+        ServerSubLevel root = pocketed(Sable.HELPER.getContaining(vehicle));
+        if (root == null || BuildSites.isAttached(root)) return true;
+        Live live = live(root);
+        return live != null && live.wearer != null && !carries(rider, live.wearer) && !tooBig(rider, live.wearer);
+    }
+
+    private static boolean tooBig(Entity rider, Entity wearer) {
+        double ratio = DeviceRanges.hatSeatMinWearerRatio();
+        if (ratio <= 0.0D || Pym.entities().scaleOf(wearer) >= ratio * Pym.entities().scaleOf(rider)) return false;
+        if (rider instanceof Player player) player.displayClientMessage(Component.translatable("pocket.message.seat_too_small"), true);
+        return true;
+    }
+
+    private static boolean carries(Entity rider, Entity wearer) {
+        Set<Entity> seen = new HashSet<>();
+        Entity at = wearer;
+        while (at != null && seen.add(at)) {
+            if (at == rider) return true;
+            Entity vehicle = at.getVehicle();
+            if (vehicle == null) return false;
+            ServerSubLevel root = pocketed(Sable.HELPER.getContaining(vehicle));
+            Live live = root == null ? null : live(root);
+            at = live != null && live.wearer != null ? live.wearer : vehicle;
+        }
+        return false;
+    }
+
+    private static @Nullable ServerSubLevel pocketed(@Nullable dev.ryanhcode.sable.sublevel.SubLevel subLevel) {
+        if (!(subLevel instanceof ServerSubLevel at)) return null;
+        Set<ServerSubLevel> seen = new HashSet<>();
+        while (at != null && seen.add(at)) {
+            if (BuildSites.isAttached(at) || live(at) != null) return at;
+            ServerSubLevel root = Hosted.rootOf(at);
+            at = root != null && root != at ? root : Detached.parent(at);
+        }
+        return null;
+    }
+
+    private static @Nullable Live live(ServerSubLevel hat) {
+        for (Live live : LIVE.values()) if (live.hat == hat) return live;
+        return null;
+    }
+
+    static List<ServerSubLevel> parts(ServerSubLevel hat) {
         List<ServerSubLevel> parts = new java.util.ArrayList<>();
         parts.add(hat);
         parts.addAll(Detached.children(hat));
@@ -284,6 +464,7 @@ public final class CarriedBuilds {
         if (Hosted.isRoot(live.hat)) return BuildSites.mirror(token, live.hat);
         CompoundTag children = BuildSites.mirrorChildren(live.hat.getLevel(), token);
         children.put("native_contraptions", HatNativeContraptions.snapshot(live.hat));
+        FacadeAlignment.stamp(children, live.hat.getUserDataTag());
         return new BuildMirrorPayload(token, Detached.mirrorPlot(live.hat), children);
     }
 

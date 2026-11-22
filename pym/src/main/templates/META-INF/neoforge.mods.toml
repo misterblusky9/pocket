@@ -46,7 +46,7 @@ config="pym.aeroworks.mixins.json"
 config="pym.offroad.mixins.json"
 
 [[mixins]]
-config="pym.tracks.mixins.json"
+config="pym.bits_n_tracks.mixins.json"
 
 [[mixins]]
 config="pym.aero_no_horizon.mixins.json"
@@ -108,28 +108,28 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="simulated"
 type="optional"
-versionRange="[1.3.0,1.4)"
+versionRange="[1.3.3,1.4)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="simulatedcoasters"
 type="optional"
-versionRange="*"
+versionRange="[0.1.6,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="simurail"
 type="optional"
-versionRange="*"
+versionRange="[0.1.0,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="electroenergetics"
 type="optional"
-versionRange="*"
+versionRange="[1.21.1-1.1.4,)"
 ordering="AFTER"
 side="BOTH"
 
@@ -143,7 +143,7 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="aeronautics"
 type="optional"
-versionRange="[1.3.0,1.4)"
+versionRange="[1.3.3,1.4)"
 ordering="AFTER"
 side="BOTH"
 
@@ -157,35 +157,35 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="offroad"
 type="optional"
-versionRange="[1.3.0,1.4)"
+versionRange="[1.3.3,1.4)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="createbigcannons"
 type="optional"
-versionRange="*"
+versionRange="[5.11.7,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="create_submarine"
 type="optional"
-versionRange="*"
+versionRange="[3.4.8,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
 modId="aero_no_horizon"
 type="optional"
-versionRange="*"
+versionRange="[1.0.4,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.${mod_id}]]
-modId="tracks"
+modId="bits_n_tracks"
 type="optional"
-versionRange="*"
+versionRange="[3.0.3,)"
 ordering="AFTER"
 side="BOTH"
 

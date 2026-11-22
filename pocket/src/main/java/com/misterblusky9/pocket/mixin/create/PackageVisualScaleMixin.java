@@ -1,5 +1,7 @@
 package com.misterblusky9.pocket.mixin.create;
 
+import com.misterblusky9.pocket.client.CreativeCasePortal;
+import com.misterblusky9.pocket.item.PocketContainer;
 import com.misterblusky9.pym.api.client.EntityRenderScale;
 import com.simibubi.create.content.logistics.box.PackageEntity;
 import com.simibubi.create.content.logistics.box.PackageVisual;
@@ -25,6 +27,10 @@ public abstract class PackageVisualScaleMixin extends AbstractEntityVisual<Packa
 
     @Inject(method = "animate", at = @At("TAIL"), remap = false)
     private void pocket$scale(float partialTick, CallbackInfo ci) {
+        if (entity.box != null && !entity.box.isEmpty()
+                && PocketContainer.of(entity.box) == PocketContainer.CREATIVE_POCKET_CASE) {
+            instance.pose.translateLocal(0.0F, (float) -CreativeCasePortal.GROUND_DROP, 0.0F);
+        }
         EntityRenderScale.apply(entity, partialTick, Vec3.atLowerCornerOf(renderOrigin()), instance.pose);
     }
 }

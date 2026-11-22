@@ -48,11 +48,13 @@ public final class HatFirstPersonRenderer {
             pose.mulPose(view.invert(new Matrix4f()));
             pose.translate(0.0D, 0.0D * playerScale, 0.0D);
             ItemStack headwear = HatRendering.headwear(player);
-            float scale = (float) (BuildSites.scale(headwear) * playerScale);
             HatStandBlockEntity.NameEgg egg = HatStandBlockEntity.NameEgg.of(headwear);
+            float scale = (float) (BuildSites.scale(headwear) * playerScale) * HatEggs.headScale(egg);
             if (egg == HatStandBlockEntity.NameEgg.UPSIDE_DOWN) pose.mulPose(Axis.ZP.rotationDegrees(180.0F));
             pose.scale(scale, scale, scale);
             Vector3d head = BuildSites.head(mirror, BuildSites.offsetVector(headwear), headwear);
+            if (egg == HatStandBlockEntity.NameEgg.SPIN)
+                HatEggs.spin(pose, HatStandBlockEntity.spinMode(headwear), mirror, head, event.getPartialTick());
             HatRendering.drawHat(BuildHostBlockEntity.token(headwear), mirror, head, egg, headwear.hasFoil(), pose, buffers,
                     event.getPackedLight(), OverlayTexture.NO_OVERLAY, event.getPartialTick());
         } finally {

@@ -27,6 +27,7 @@ import java.util.Set;
 
 public class CopycatFacadeBlock extends CopycatBlock {
     private static final int MAX_CONNECTED = 4096;
+    private static final ThreadLocal<Boolean> SHAPING = ThreadLocal.withInitial(() -> false);
 
     public CopycatFacadeBlock(Properties properties) {
         super(properties);
@@ -118,6 +119,19 @@ public class CopycatFacadeBlock extends CopycatBlock {
         copycat.setConsumedItem(stack);
         if (!player.isCreative()) stack.shrink(1);
         return true;
+    }
+
+    public static void shaping(boolean shaping) {
+        SHAPING.set(shaping);
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moving) {
+        if (SHAPING.get() && !state.is(newState.getBlock())
+                && level.getBlockEntity(pos) instanceof CopycatBlockEntity copycat) {
+            copycat.setConsumedItem(ItemStack.EMPTY);
+        }
+        super.onRemove(state, level, pos, newState, moving);
     }
 
     @Override

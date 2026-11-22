@@ -32,7 +32,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainer;
@@ -41,6 +40,7 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 
 public final class Mirrors {
     private static final Codec<PalettedContainer<BlockState>> BLOCK_STATES = PalettedContainer.codecRW(
@@ -77,6 +78,7 @@ public final class Mirrors {
         LevelLightEngine light = level.getLightEngine();
         BoundingBox3i bounds = null;
         Map<BlockEntity, CompoundTag> loads = new HashMap<>();
+        List<ChunkPos> lit = new ArrayList<>();
         for (String key : chunks.getAllKeys()) {
             long packed = Long.parseLong(key);
             ChunkPos local = new ChunkPos(ChunkPos.getX(packed), ChunkPos.getZ(packed));
@@ -84,6 +86,7 @@ public final class Mirrors {
             PlotChunkHolder holder = PlotChunkHolder.create(level, global, light,
                     chunk(level, global, chunks.getCompound(key), light, loads));
             target.addChunkHolder(local, holder, false);
+            lit.add(global);
             BoundingBox3ic box = holder.getBoundingBox();
             if (box == null) continue;
             BoundingBox3i moved = box.move(global.getMinBlockX(), 0, global.getMinBlockZ(),
@@ -93,9 +96,10 @@ public final class Mirrors {
         target.setBoundingBox(bounds);
         mirror.updateRenderData();
         loads.forEach((blockEntity, data) -> blockEntity.handleUpdateTag(data, level.registryAccess()));
+        lit.forEach(light::propagateLightSources);
         light.runLightUpdates();
+        lit.forEach(level::onChunkLoaded);
         mirror.setFinalized();
-        Portrait.compileNow(mirror);
         VisualizationManager visuals = VisualizationManager.get(level);
         if (visuals != null) entities(mirror).forEach(visuals.entities()::queueRemove);
         return mirror;
@@ -113,13 +117,10 @@ public final class Mirrors {
             sections[index] = new LevelChunkSection(
                     BLOCK_STATES.parse(NbtOps.INSTANCE, section.getCompound("block_states")).getOrThrow(),
                     sections[index].getBiomes());
-            SectionPos sectionPos = SectionPos.of(pos, level.getSectionYFromSectionIndex(index));
-            if (section.contains("BlockLight", Tag.TAG_BYTE_ARRAY))
-                light.queueSectionData(LightLayer.BLOCK, sectionPos, new DataLayer(section.getByteArray("BlockLight")));
-            if (section.contains("SkyLight", Tag.TAG_BYTE_ARRAY))
-                light.queueSectionData(LightLayer.SKY, sectionPos, new DataLayer(section.getByteArray("SkyLight")));
-            light.updateSectionStatus(sectionPos, sections[index].hasOnlyAir());
+            light.updateSectionStatus(SectionPos.of(pos, level.getSectionYFromSectionIndex(index)),
+                    sections[index].hasOnlyAir());
         }
+        chunk.initializeLightSources();
         light.setLightEnabled(pos, true);
         for (Tag entry : tag.getList("block_entities", Tag.TAG_COMPOUND)) {
             CompoundTag data = (CompoundTag) entry;
@@ -188,15 +189,23 @@ public final class Mirrors {
     public static void rules(ClientSubLevel mirror, Rules rules) {
         if (!rules.interact()) PlacedSubLevels.remove(mirror);
         else if (OPEN.contains(mirror)) PlacedSubLevels.add(mirror);
+        PlacedSubLevels.solid(mirror, rules.collide() && OPEN.contains(mirror));
+        PlacedSubLevels.inert(mirror, !rules.interact() && OPEN.contains(mirror));
+    }
+
+    public static void pickable(BiPredicate<SubLevel, BlockState> rule) {
+        PlacedSubLevels.pickable(rule);
     }
 
     public static void close(ClientSubLevel mirror) {
         if (!OPEN.remove(mirror)) return;
         PlacedSubLevels.remove(mirror);
+        PlacedSubLevels.solid(mirror, false);
+        PlacedSubLevels.inert(mirror, false);
         ClientSubLevelContainer container = SubLevelContainer.getContainer(mirror.getLevel());
         LevelLightEngine light = mirror.getLevel().getLightEngine();
         for (PlotChunkHolder holder : mirror.getPlot().getLoadedChunks()) {
-            holder.getChunk().clearAllBlockEntities();
+            if (mirror.getLevel() instanceof ClientLevel level) level.unload(holder.getChunk());
             ChunkPos pos = holder.getPos();
             for (int y = light.getMinLightSection(); y < light.getMaxLightSection(); y++) {
                 light.queueSectionData(LightLayer.BLOCK, SectionPos.of(pos, y), null);

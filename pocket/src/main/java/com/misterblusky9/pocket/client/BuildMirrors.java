@@ -1,7 +1,9 @@
 package com.misterblusky9.pocket.client;
 
+import com.misterblusky9.pocket.block.FacadeAlignment;
 import com.misterblusky9.pocket.build.BuildHostBlockEntity;
 import com.misterblusky9.pocket.build.BuildSites;
+import com.misterblusky9.pocket.build.HatSeats;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.network.BuildMirrorPayload;
 import com.misterblusky9.pocket.network.BuildMirrorRequestPayload;
@@ -19,9 +21,12 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import com.simibubi.create.content.contraptions.actors.seat.SeatBlock;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -43,6 +48,7 @@ public final class BuildMirrors {
     private static final int RETRY_TICKS = 100;
     private static final int BUSY_RETRY_TICKS = 5;
     private static final Map<UUID, ClientSubLevel> MIRRORS = new HashMap<>();
+    private static final Map<UUID, BuildMirrorPayload> CONTENT = new HashMap<>();
     private static final Map<UUID, Long> USED = new HashMap<>();
     private static final Map<UUID, Long> REQUESTED = new HashMap<>();
     private static final Map<UUID, Integer> ASKED_EPOCH = new HashMap<>();
@@ -57,6 +63,7 @@ public final class BuildMirrors {
     private static final Map<UUID, Integer> EPOCHS = new HashMap<>();
     private static final Map<UUID, Long> ACCEPTED = new HashMap<>();
     private static final int SETTLE_TICKS = 20;
+    private static final Rules WORN_RULES = Rules.COSMETIC.collide(true);
 
     public record Rider(ClientSubLevel mirror, Pose3d relative, RiderPlayback playback) {
         public Pose3d at() {
@@ -81,6 +88,15 @@ public final class BuildMirrors {
     public static @Nullable ClientSubLevel get(ItemStack stack) {
         UUID token = token(stack);
         return token != null && current(token, stack) ? get(token) : null;
+    }
+
+    public static @Nullable ClientSubLevel preview(ItemStack stack) {
+        UUID token = token(stack);
+        if (token == null) return null;
+        boolean upToDate = current(token, stack);
+        int held = BuildHostBlockEntity.epoch(stack);
+        int shown = EPOCHS.getOrDefault(token, 0);
+        return upToDate || (held > shown && MIRRORS.containsKey(token)) ? get(token) : null;
     }
 
     public static boolean current(UUID token, ItemStack stack) {
@@ -182,10 +198,18 @@ public final class BuildMirrors {
             place(rider, pose, standing);
             Mirrors.rules(rider.mirror(), Rules.EDITABLE);
         }
+        // Vanilla's client riding tick already positions seat passengers. Repeating
+        // it here after moving the stand mirror can conflict with the regular
+        // rider position update and introduce camera jitter.
         USED.put(token, now);
         HOSTS.put(token, pos.immutable());
         STANDING.add(token);
         SEEN.add(token);
+    }
+
+    private static void seat(UUID token, ClientSubLevel mirror) {
+        HatSeats.follow(mirror);
+        for (Rider rider : riders(token)) HatSeats.follow(rider.mirror());
     }
 
     private static void place(Rider rider, Pose3d hat, boolean smooth) {
@@ -283,6 +307,19 @@ public final class BuildMirrors {
         return null;
     }
 
+    public static boolean seatable(SubLevel part, BlockState state) {
+        if (!(state.getBlock() instanceof SeatBlock)) return false;
+        Player wearer = wearerOf(part);
+        Player player = Minecraft.getInstance().player;
+        return wearer != null && player != null && wearer != player && !player.hasIndirectPassenger(wearer);
+    }
+
+    public static boolean wornBy(SubLevel part, Entity entity) {
+        if (!(part instanceof ClientSubLevel)) return false;
+        Player wearer = wearerOf(part);
+        return wearer != null && entity.getRootVehicle() == wearer.getRootVehicle();
+    }
+
     public static @Nullable ClientSubLevel wornRootOf(SubLevel part) {
         if (part == null) return null;
         for (UUID token : WORN) {
@@ -345,11 +382,34 @@ public final class BuildMirrors {
     public static void accept(BuildMirrorPayload payload) {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) return;
+        UUID token = payload.token();
+        int incomingEpoch = payload.children().getInt(BuildSites.MIRROR_EPOCH);
+        if (incomingEpoch < EPOCHS.getOrDefault(token, 0)) return;
         if (payload.plot().isEmpty()) {
-            MISSING.add(payload.token());
+            MISSING.add(token);
             return;
         }
-        ClientSubLevel old = MIRRORS.remove(payload.token());
+        if (payload.children().contains(FacadeAlignment.MIRROR_KEY, Tag.TAG_INT_ARRAY))
+            CopycatFacadeFrames.acceptAlignment(
+                    payload.children().hasUUID("uuid") ? payload.children().getUUID("uuid") : token,
+                    payload.children().getIntArray(FacadeAlignment.MIRROR_KEY));
+        ClientSubLevel existing = MIRRORS.get(token);
+        BuildMirrorPayload previous = CONTENT.get(token);
+        List<Rider> existingRiders = RIDERS.getOrDefault(token, List.of());
+        boolean ridersComplete = existingRiders.size() == payload.children()
+                .getList("children", Tag.TAG_COMPOUND).size()
+                && existingRiders.stream().noneMatch(rider -> rider.mirror().isRemoved());
+        if (existing != null && !existing.isRemoved() && existing.getLevel() == level
+                && ridersComplete && previous != null && sameContent(previous, payload)) {
+            EPOCHS.put(token, incomingEpoch);
+            USED.put(token, level.getGameTime());
+            ACCEPTED.put(token, level.getGameTime());
+            MISSING.remove(token);
+            REQUESTED.remove(token);
+            ASKED_EPOCH.remove(token);
+            return;
+        }
+        ClientSubLevel old = MIRRORS.remove(token);
         BlockPos host = old != null && STANDING.contains(payload.token()) ? HOSTS.get(payload.token()) : null;
         double[] eased = EASED.get(payload.token());
         if (old != null) {
@@ -369,9 +429,12 @@ public final class BuildMirrors {
             return;
         }
         MISSING.remove(payload.token());
-        MIRRORS.put(payload.token(), mirror);
-        EPOCHS.put(payload.token(), payload.children().getInt(BuildSites.MIRROR_EPOCH));
-        ACCEPTED.put(payload.token(), level.getGameTime());
+        MIRRORS.put(token, mirror);
+        CONTENT.put(token, payload);
+        EPOCHS.put(token, incomingEpoch);
+        ACCEPTED.put(token, level.getGameTime());
+        REQUESTED.remove(token);
+        ASKED_EPOCH.remove(token);
         List<Rider> riders = new ArrayList<>();
         for (Tag entry : payload.children().getList("children", Tag.TAG_COMPOUND)) {
             CompoundTag rider = (CompoundTag) entry;
@@ -390,6 +453,18 @@ public final class BuildMirrors {
             EASED.put(payload.token(), eased);
             standAt(payload.token(), mirror, level, host, eased);
         }
+    }
+
+    private static boolean sameContent(BuildMirrorPayload previous, BuildMirrorPayload incoming) {
+        if (!previous.plot().equals(incoming.plot())) return false;
+        CompoundTag before = previous.children();
+        CompoundTag after = incoming.children();
+        if (before.size() != after.size()) return false;
+        for (String key : before.getAllKeys()) {
+            if (key.equals(BuildSites.MIRROR_EPOCH)) continue;
+            if (!java.util.Objects.equals(before.get(key), after.get(key))) return false;
+        }
+        return true;
     }
 
     private static boolean evict(ClientLevel level, CompoundTag plot) {
@@ -446,8 +521,17 @@ public final class BuildMirrors {
             if (WORN.contains(token)) Mirrors.moveTo(mirror, pose);
             else Mirrors.snapTo(mirror, pose);
             for (Rider rider : riders(token)) place(rider, pose, WORN.contains(token));
+            seat(token, mirror);
+            Mirrors.rules(mirror, WORN_RULES);
+            riders(token).forEach(rider -> Mirrors.rules(rider.mirror(), WORN_RULES));
             worn.add(token);
             wearers.put(token, wearer);
+        }
+        for (UUID token : WORN) {
+            ClientSubLevel mirror = MIRRORS.get(token);
+            if (worn.contains(token) || mirror == null || STANDING.contains(token)) continue;
+            Mirrors.rules(mirror, Rules.COSMETIC);
+            riders(token).forEach(rider -> Mirrors.rules(rider.mirror(), Rules.COSMETIC));
         }
         WORN.clear();
         WORN.addAll(worn);
@@ -462,8 +546,9 @@ public final class BuildMirrors {
                 STANDING.remove(token);
                 EASED.remove(token);
                 HOSTS.remove(token);
-                Mirrors.rules(mirror, Rules.COSMETIC);
-                riders(token).forEach(rider -> Mirrors.rules(rider.mirror(), Rules.COSMETIC));
+                Rules rules = worn.contains(token) ? WORN_RULES : Rules.COSMETIC;
+                Mirrors.rules(mirror, rules);
+                riders(token).forEach(rider -> Mirrors.rules(rider.mirror(), rules));
             }
             if (mirror.isRemoved()) {
                 iterator.remove();
@@ -488,6 +573,7 @@ public final class BuildMirrors {
     }
 
     private static void forget(UUID token) {
+        CONTENT.remove(token);
         ACCEPTED.remove(token);
         USED.remove(token);
         REQUESTED.remove(token);
@@ -511,6 +597,7 @@ public final class BuildMirrors {
     public static void clear(LevelEvent.Unload event) {
         if (!event.getLevel().isClientSide()) return;
         MIRRORS.clear();
+        CONTENT.clear();
         WEARERS.clear();
         EPOCHS.clear();
         ACCEPTED.clear();

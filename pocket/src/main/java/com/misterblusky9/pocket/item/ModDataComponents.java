@@ -40,6 +40,11 @@ public final class ModDataComponents {
                     .persistent(Codec.intRange(0, 2))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> HAT_SPIN =
+            COMPONENTS.registerComponentType("hat_spin", builder -> builder
+                    .persistent(Codec.INT)
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> FIRST_PERSON_RENDERED =
             COMPONENTS.registerComponentType("first_person_rendered", builder -> builder
                     .persistent(Codec.BOOL)

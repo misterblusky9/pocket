@@ -5,7 +5,6 @@ import com.misterblusky9.pym.api.Pym;
 import com.misterblusky9.pym.api.ScaleBounds;
 
 import com.misterblusky9.pocket.PocketSized;
-import com.misterblusky9.pocket.config.DeviceRanges;
 import com.misterblusky9.pocket.block.ModBlocks;
 import com.misterblusky9.pocket.build.BuildHostBlockEntity;
 import com.misterblusky9.pocket.build.BuildSites;
@@ -15,6 +14,7 @@ import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
 import com.misterblusky9.pocket.debug.PocketTrace;
 import com.misterblusky9.pocket.compat.simulated.CrossScaleWelds;
+import com.misterblusky9.pocket.compat.simulated.JointGroups;
 import com.misterblusky9.pocket.scale.CompressionStage;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
@@ -36,8 +36,11 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public final class PocketedSubLevelEvents {
@@ -62,7 +65,9 @@ public final class PocketedSubLevelEvents {
                 ? BuildSites.hostOf(root != null ? root : server) : null;
         boolean build = host != null
                 || event.getLevel().getBlockState(found.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());
-        if (build ? !fitsPocket(player, PocketCaseItem.POCKETABLE_SCALE) : !groupFitsPocket(player, found)) return;
+        if (!held.is(ModItems.CREATIVE_POCKET_CASE.get())
+                && (build ? !fitsPocket(player, PocketCaseItem.POCKETABLE_SCALE)
+                : !groupFitsPocket(player, found))) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
@@ -74,30 +79,53 @@ public final class PocketedSubLevelEvents {
             player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_mounted"), true);
             return;
         }
-        List<ServerSubLevel> welded = host == null ? weldedGroup(serverLevel, player, target) : List.of();
+        List<ServerSubLevel> welded = host == null ? group(serverLevel, player, target) : List.of();
         if (welded == null) return;
         ServerSubLevel subLevel = host == null ? ready(serverLevel, player, target, welded) ? target : null
                 : host.release(player, candidate -> ready(serverLevel, player, candidate, null));
         if (subLevel == null) return;
-        pocket(serverLevel, player, subLevel, held, welded);
+        pocket(serverLevel, player, subLevel, held, welded, host == null);
     }
 
-    private static @Nullable List<ServerSubLevel> weldedGroup(ServerLevel level, Player player, ServerSubLevel root) {
+    private static Set<UUID> reach(ServerSubLevelContainer container, CrossScaleWelds.WeldGraph graph, UUID rootId) {
+        Set<UUID> reached = new LinkedHashSet<>();
+        ArrayDeque<UUID> queue = new ArrayDeque<>();
+        reached.add(rootId);
+        queue.add(rootId);
+        while (!queue.isEmpty()) {
+            UUID id = queue.poll();
+            List<UUID> next = new ArrayList<>();
+            if (graph.isEndpoint(id)) next.addAll(graph.component(id));
+            if (container.getSubLevel(id) instanceof ServerSubLevel sub && !sub.isRemoved()) {
+                for (ServerSubLevel partner : JointGroups.partners(container, sub)) next.add(partner.getUniqueId());
+            }
+            for (UUID found : next) {
+                if (reached.add(found)) queue.add(found);
+            }
+        }
+        return reached;
+    }
+
+    private static @Nullable List<ServerSubLevel> group(ServerLevel level, Player player, ServerSubLevel root) {
         ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         if (container == null) return null;
         CrossScaleWelds.WeldGraph graph = CrossScaleWelds.snapshot(container);
         UUID rootId = root.getUniqueId();
-        if (!graph.isEndpoint(rootId)) return List.of();
-        if (graph.worldAnchored(rootId)) {
-            player.displayClientMessage(Component.translatable("pocket.message.cut_world_welds_before_pocketing"), true);
-            return null;
-        }
-        if (!graph.complete(rootId)) {
-            player.displayClientMessage(Component.translatable("pocket.message.weld_group_unloaded"), true);
-            return null;
+        Set<UUID> reached = reach(container, graph, rootId);
+        if (reached.size() == 1 && !graph.isEndpoint(rootId)) return List.of();
+        for (UUID id : reached) {
+            if (!graph.isEndpoint(id)) continue;
+            if (graph.worldAnchored(id)) {
+                player.displayClientMessage(Component.translatable("pocket.message.cut_world_welds_before_pocketing"), true);
+                return null;
+            }
+            if (!graph.complete(id)) {
+                player.displayClientMessage(Component.translatable("pocket.message.weld_group_unloaded"), true);
+                return null;
+            }
         }
         List<ServerSubLevel> members = new ArrayList<>();
-        for (UUID id : graph.component(rootId)) {
+        for (UUID id : reached) {
             if (id.equals(rootId)) continue;
             if (!(container.getSubLevel(id) instanceof ServerSubLevel member) || member.isRemoved()) {
                 player.displayClientMessage(Component.translatable("pocket.message.weld_group_unloaded"), true);
@@ -149,12 +177,7 @@ public final class PocketedSubLevelEvents {
         return true;
     }
 
-    private static boolean creativePocketsAnything(Player player) {
-        return player != null && player.isCreative() && DeviceRanges.creativePocketsAnything();
-    }
-
     public static boolean fitsPocket(Player player, double scale) {
-        if (creativePocketsAnything(player)) return true;
         double size = player == null ? ScaleBounds.FULL : Pym.entities().scaleOf(player);
         double relative = ScaleBounds.isValid(size) ? size : ScaleBounds.FULL;
         return scale <= (PocketCaseItem.POCKETABLE_SCALE + PICKUP_SCALE_TOLERANCE) * relative;
@@ -166,8 +189,10 @@ public final class PocketedSubLevelEvents {
         UUID rootId = target.getUniqueId();
         if (container == null || rootId == null) return true;
         CrossScaleWelds.WeldGraph graph = CrossScaleWelds.snapshot(container);
-        if (!graph.isEndpoint(rootId)) return true;
-        for (UUID id : graph.component(rootId)) {
+        Set<UUID> group = container instanceof ServerSubLevelContainer server
+                ? reach(server, graph, rootId)
+                : graph.isEndpoint(rootId) ? graph.component(rootId) : Set.of();
+        for (UUID id : group) {
             if (id.equals(rootId)) continue;
             SubLevel member = container.getSubLevel(id);
             if (member == null || member.isRemoved()) continue;
@@ -187,7 +212,8 @@ public final class PocketedSubLevelEvents {
             Player player,
             ServerSubLevel subLevel,
             ItemStack packedInto,
-            List<ServerSubLevel> welded
+            List<ServerSubLevel> welded,
+            boolean grouped
     ) {
         ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         if (container == null) return;
@@ -196,18 +222,16 @@ public final class PocketedSubLevelEvents {
             player.displayClientMessage(Component.translatable(CrossScaleWelds.POCKET_BLOCKED), true);
             return;
         }
-
-        if (Pym.connections().isJoinedToAnother(subLevel)) {
+        for (ServerSubLevel member : welded) {
+            if (member.isRemoved()) return;
+        }
+        if (!grouped && !JointGroups.partners(container, subLevel).isEmpty()) {
             player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_joined"), true);
             return;
         }
-        for (ServerSubLevel member : welded) {
-            if (member.isRemoved()) return;
-            if (Pym.connections().isJoinedToAnother(member)) {
-                player.displayClientMessage(Component.translatable("pocket.message.cannot_pocket_joined"), true);
-                return;
-            }
-        }
+
+        JointGroups.breakRopes(subLevel);
+        for (ServerSubLevel member : welded) JointGroups.breakRopes(member);
 
         SubLevelData serialized = SubLevelSerializer.toData(subLevel, List.of());
         CompoundTag fullTag = serialized.fullTag().copy();
@@ -247,11 +271,10 @@ public final class PocketedSubLevelEvents {
         PocketCaseItem.setWeldedContents(result, fullTag);
         PocketCaseItem.setPackedBy(result, player.getGameProfile().getName());
         double settled = Pym.scale().settled(subLevel);
-        PocketCaseItem.setPocketedScale(result, creativePocketsAnything(player)
-                ? Math.min(settled, PocketCaseItem.POCKETABLE_SCALE)
-                : settled);
+        PocketCaseItem.setPocketedScale(result, settled);
         PocketCaseItem.setFacadeOffset(result, com.misterblusky9.pocket.block.FacadeAlignment.of(subLevel));
         PocketCaseItem.recallCaseTurns(subLevel, result);
+        PocketCaseItem.recallHatAnchor(subLevel, result);
 
         PocketCaseItem.setContainer(result, packedInto.isEmpty()
                 ? new ItemStack(ModItems.EMPTY_BOX.get())

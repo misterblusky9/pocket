@@ -6,8 +6,10 @@ import com.misterblusky9.pocket.compat.simulated.WeldRuntime;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.item.ModItems;
 import com.misterblusky9.pocket.item.PocketCaseItem;
+import com.simibubi.create.AllItems;
 import com.simibubi.create.content.equipment.goggles.GogglesItem;
 import net.minecraft.world.item.BlockItem;
+import com.misterblusky9.pocket.block.FacadeAlignment;
 import net.minecraft.world.level.block.AbstractSkullBlock;
 import com.misterblusky9.pocket.network.BuildMirrorPayload;
 import com.misterblusky9.pocket.pocket.PocketedSubLevelSavedData;
@@ -41,6 +43,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -52,8 +55,10 @@ import org.joml.Vector3dc;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,6 +73,8 @@ public final class BuildSites {
     private static final double GOGGLES_SCALE = 8.2 / GRID_WIDTH;
     private static final double SKULL_SCALE = 9.5 / GRID_WIDTH;
     private static final double HELMET_SCALE = 10.0 / GRID_WIDTH;
+    // Create's cardboard helmet uses the outer armor-model hat cube (11 pixels across).
+    private static final double CARDBOARD_HELMET_SCALE = 11.0 / GRID_WIDTH;
     private static final double NECK_LENGTH = 0.25 * 0.9375;
     private static final double GOGGLES_LIFT_PIXELS = -0.40625;
     private static final double SKULL_LIFT_PIXELS = 0.75;
@@ -194,6 +201,7 @@ public final class BuildSites {
         CompoundTag saved = storage.wasDeployed(token) ? null : storage.getCopy(token);
         if (saved == null || !saved.hasUUID("uuid")) return null;
         ServerSubLevel hat = Detached.open(level, saved.getUUID("uuid"), saved.getCompound("plot"), from);
+        FacadeAlignment.restore(hat, saved);
         if (hat != null && riders) {
             for (Tag entry : saved.getList(CHILDREN, Tag.TAG_COMPOUND)) {
                 CompoundTag rider = (CompoundTag) entry;
@@ -266,13 +274,80 @@ public final class BuildSites {
         storage.remove(token);
     }
 
-    private static void release(ServerLevel level, CompoundTag plot) {
+    public static void release(ServerLevel level, CompoundTag plot) {
         ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         int x = plot.getInt("plot_x");
         int z = plot.getInt("plot_z");
         if (container == null || !Plots.inBounds(container, x, z) || container.getSubLevel(x, z) != null) return;
         container.getOccupancy().clear(container.getIndex(x, z));
         SubLevelOccupancySavedData.getOrLoad(level).setDirty();
+    }
+
+    public static void keepReserved(ServerLevel level, @Nullable CompoundTag held, @Nullable ServerLevel source,
+                                    int sourceX, int sourceZ) {
+        if (held != null && level == source && held.getInt("plot_x") == sourceX && held.getInt("plot_z") == sourceZ)
+            return;
+        if (held != null) release(level, held);
+        if (source != null) reserve(source, sourceX, sourceZ);
+    }
+
+    private static void reserve(ServerLevel level, int x, int z) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container == null || !Plots.inBounds(container, x, z)) return;
+        int index = container.getIndex(x, z);
+        if (container.getOccupancy().get(index)) return;
+        container.getOccupancy().set(index);
+        SubLevelOccupancySavedData.getOrLoad(level).setDirty();
+    }
+
+    public static void onServerStarted(ServerStartedEvent event) {
+        for (ServerLevel level : event.getServer().getAllLevels()) separateSharedPlots(level);
+    }
+
+    private static void separateSharedPlots(ServerLevel level) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container == null) return;
+        PocketedSubLevelSavedData storage = PocketedSubLevelSavedData.getOrLoad(level);
+        List<UUID> tokens = new ArrayList<>(storage.tokens());
+        tokens.sort(Comparator.<UUID>comparingInt(token -> isHatPayload(storage.peek(token)) ? 1 : 0)
+                .thenComparingLong(storage::modified)
+                .thenComparing(UUID::toString));
+        Map<Long, UUID> claimed = new HashMap<>();
+        for (UUID token : tokens) {
+            CompoundTag saved = storage.peek(token);
+            boolean hat = isHatPayload(saved);
+            List<CompoundTag> plots = new ArrayList<>();
+            plots.add(saved.getCompound("plot"));
+            for (Tag entry : saved.getList(CHILDREN, Tag.TAG_COMPOUND)) plots.add(((CompoundTag) entry).getCompound("plot"));
+            List<Integer> shared = new ArrayList<>();
+            for (int i = 0; i < plots.size(); i++) {
+                long key = ChunkPos.asLong(plots.get(i).getInt("plot_x"), plots.get(i).getInt("plot_z"));
+                UUID owner = claimed.get(key);
+                if (owner == null) claimed.put(key, token);
+                else if (!owner.equals(token)) shared.add(i);
+            }
+            if (shared.isEmpty()) continue;
+            if (!hat) {
+                Sable.LOGGER.warn("Stored case {} shares plot storage with another stored build; left in place", token);
+                continue;
+            }
+            storage.edit(token, tag -> {
+                List<CompoundTag> live = new ArrayList<>();
+                live.add(tag.getCompound("plot"));
+                for (Tag entry : tag.getList(CHILDREN, Tag.TAG_COMPOUND)) live.add(((CompoundTag) entry).getCompound("plot"));
+                for (int i : shared) {
+                    int fromX = live.get(i).getInt("plot_x");
+                    int fromZ = live.get(i).getInt("plot_z");
+                    if (!relocate(level, live.get(i))) {
+                        Sable.LOGGER.error("No free plot to separate stored hat {} from plot {}, {}", token, fromX, fromZ);
+                        continue;
+                    }
+                    claimed.put(ChunkPos.asLong(live.get(i).getInt("plot_x"), live.get(i).getInt("plot_z")), token);
+                    Sable.LOGGER.warn("Moved stored hat {} off shared plot {}, {} to {}, {}", token, fromX, fromZ,
+                            live.get(i).getInt("plot_x"), live.get(i).getInt("plot_z"));
+                }
+            });
+        }
     }
 
     public static boolean isHatPayload(CompoundTag saved) {
@@ -336,6 +411,7 @@ public final class BuildSites {
             saved.put("plot", hat.getPlot().save());
             PocketCaseItem.refreshIntegrity(saved, hat);
             saved.put(CHILDREN, riders(hat, false));
+            FacadeAlignment.store(saved, hat);
         })) {
             CompoundTag saved = payload(hat);
             saved.put(CHILDREN, riders(hat, false));
@@ -394,7 +470,7 @@ public final class BuildSites {
     }
 
     static void storeRiders(CompoundTag saved, ServerSubLevel hat) {
-        if (!Detached.children(hat).isEmpty()) saved.put(CHILDREN, riders(hat, false));
+        saved.put(CHILDREN, riders(hat, false));
     }
 
     static void publishHosted(UUID token, ServerSubLevel hat, Set<UUID> known) {
@@ -426,6 +502,7 @@ public final class BuildSites {
         PUBLISHED.remove(token);
         RETRY.remove(token);
         ServerSubLevel live = live(token);
+        if (live != null) CarriedBuilds.unseat(live);
         if (live != null && Hosted.isRoot(live)) live = Hosted.unhost(live);
         if (live != null) {
             HatContraptions.disassemble(live);
@@ -438,45 +515,39 @@ public final class BuildSites {
         Detached.close(site.hat());
     }
 
-    public static void mount(ServerLevel level, ServerSubLevel target, Set<UUID> riders, WeldRecord weld) {
+    public static boolean mount(ServerSubLevel target, Set<UUID> riders, WeldRecord weld) {
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(target.getLevel());
+        if (container == null) return false;
         ServerSubLevel hosted = Hosted.rootOf(target);
-        if (hosted != null) {
-            UUID targetId = target.getUniqueId();
-            if (Hosted.unhost(hosted) == null) return;
-            target = Detached.find(targetId);
-            if (target == null) return;
-        }
-        ServerSubLevel hat = Detached.parent(target) == null ? target : Detached.parent(target);
-        UUID token = token(hat);
-        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
-        if (token == null || container == null) return;
-        List<ServerSubLevel> adopted = new ArrayList<>();
+        if (hosted == null || !isAttached(hosted)) return false;
+        List<ServerSubLevel> bodies = new ArrayList<>();
         for (UUID id : riders) {
-            if (!(container.getSubLevel(id) instanceof ServerSubLevel rider) || rider.isRemoved()) continue;
-            ServerSubLevel child = Detached.adopt(rider);
-            if (child != null) adopted.add(child);
+            if (container.getSubLevel(id) instanceof ServerSubLevel rider && !rider.isRemoved()) bodies.add(rider);
         }
-        ServerSubLevel small = Detached.find(weld.smallSubLevel());
-        if (small != null && adopted.contains(small)) {
-            Pose3d before = new Pose3d(small.logicalPose());
-            Pose3d snapped = new Pose3d(before);
-            snapped.orientation().set(new Quaterniond(target.logicalPose().orientation())
-                    .mul(new Quaterniond(weld.orientation()).invert()));
-            snapped.position().set(0.0D, 0.0D, 0.0D);
-            Vector3d reach = snapped.transformPosition(new Vector3d(weld.anchorFor(true)));
-            snapped.position().set(target.logicalPose().transformPosition(new Vector3d(weld.anchorFor(false))))
-                    .sub(reach);
-            for (ServerSubLevel child : adopted) {
-                child.logicalPose().set(Detached.compose(snapped, Detached.relative(before, child.logicalPose())));
-                child.updateLastPose();
-            }
+        ServerSubLevel small = container.getSubLevel(weld.smallSubLevel()) instanceof ServerSubLevel live ? live : null;
+        if (small == null || !bodies.contains(small)) return false;
+        snap(small, target, weld, bodies);
+        boolean mounted = false;
+        for (ServerSubLevel body : bodies) {
+            boolean adopted = Hosted.adopt(hosted, body);
+            if (body == small) mounted = adopted;
         }
-        for (ServerSubLevel child : adopted) {
-            Detached.attach(child, hat);
-            Detached.rules(child, Rules.EDITABLE);
+        return mounted;
+    }
+
+    private static void snap(ServerSubLevel small, ServerSubLevel target, WeldRecord weld, List<ServerSubLevel> bodies) {
+        Pose3d before = new Pose3d(small.logicalPose());
+        Pose3d snapped = new Pose3d(before);
+        snapped.orientation().set(new Quaterniond(target.logicalPose().orientation())
+                .mul(new Quaterniond(weld.orientation()).invert()));
+        snapped.position().set(0.0D, 0.0D, 0.0D);
+        Vector3d reach = snapped.transformPosition(new Vector3d(weld.anchorFor(true)));
+        snapped.position().set(target.logicalPose().transformPosition(new Vector3d(weld.anchorFor(false))))
+                .sub(reach);
+        for (ServerSubLevel body : bodies) {
+            body.logicalPose().set(Detached.compose(snapped, Detached.relative(before, body.logicalPose())));
+            body.updateLastPose();
         }
-        WeldRuntime.finishEffect(level, weld);
-        announce(token, hat);
     }
 
     public static void prune(ServerLevel level, UUID token, ServerSubLevel hat) {
@@ -572,6 +643,7 @@ public final class BuildSites {
         children.putUUID("uuid", hat.getUniqueId());
         children.putInt(MIRROR_EPOCH, epoch(hat.getLevel(), token));
         children.put("native_contraptions", HatNativeContraptions.snapshot(hat));
+        FacadeAlignment.stamp(children, hat.getUserDataTag());
         return new BuildMirrorPayload(token, Detached.mirrorPlot(hat), children);
     }
 
@@ -586,6 +658,7 @@ public final class BuildSites {
         ListTag riders = saved.getList(CHILDREN, Tag.TAG_COMPOUND).copy();
         riders.addAll(PocketCaseItem.weldedRiders(saved));
         children.put(CHILDREN, riders);
+        FacadeAlignment.stamp(children, saved.getCompound("user_data"));
         return children;
     }
 
@@ -641,18 +714,30 @@ public final class BuildSites {
             if (build == null) return null;
         }
         ServerLevel level = build.getLevel();
+        Map<ServerSubLevel, Pose3d> released = new LinkedHashMap<>();
         for (ServerSubLevel rider : Detached.children(build)) {
-            if (Detached.release(rider) == null) return null;
+            Pose3d relative = Detached.relative(rider);
+            ServerSubLevel free = relative == null ? null : Detached.release(rider);
+            if (free == null) {
+                reattach(released, build);
+                return null;
+            }
+            released.put(free, relative);
         }
         CompoundTag data = payload(build);
-        if (Detached.close(build) == null) return null;
+        if (Detached.close(build) == null) {
+            reattach(released, build);
+            return null;
+        }
         var serialized = dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer.fromData(data);
         ServerSubLevel physical = serialized == null ? null
                 : dev.ryanhcode.sable.sublevel.storage.serialization.SubLevelSerializer.fullyLoad(level, serialized);
         if (physical == null) {
             ServerSubLevel restored = Detached.open(level, data.getUUID("uuid"), data.getCompound("plot"));
+            FacadeAlignment.restore(restored, data);
             Site site = SITES.get(token);
             if (restored != null && site != null) track(token, restored, site.host());
+            if (restored != null) reattach(released, restored);
             return null;
         }
         forget(token);
@@ -667,6 +752,71 @@ public final class BuildSites {
         return physical;
     }
 
+    private static void reattach(Map<ServerSubLevel, Pose3d> released, ServerSubLevel hat) {
+        released.forEach((free, relative) -> {
+            ServerSubLevel child = Detached.adopt(free);
+            if (child == null) return;
+            Detached.attach(child, hat, relative);
+            Detached.rules(child, Rules.EDITABLE);
+        });
+    }
+
+    public static @Nullable ServerSubLevel slice(UUID token, ServerSubLevel build, double scale) {
+        ServerLevel level = build.getLevel();
+        List<ServerSubLevel> riders = new ArrayList<>(Detached.children(build));
+        ServerSubLevel piece = assembleAll(level, build, scale);
+        if (piece == null) return null;
+        PocketCaseItem.copyHatAnchor(build, piece);
+        boolean kept = false;
+        for (ServerSubLevel rider : riders) {
+            if (!blocks(level, rider).isEmpty() && assembleAll(level, rider,
+                    scale * Pym.scale().of(rider) / Math.max(Pym.scale().of(build), 1.0E-9D)) == null) {
+                kept = true;
+                continue;
+            }
+            Detached.discard(rider);
+        }
+        if (kept) return piece;
+        forget(token);
+        Detached.discard(build);
+        PocketedSubLevelSavedData.getOrLoad(level).remove(token);
+        return piece;
+    }
+
+    private static List<BlockPos> blocks(ServerLevel level, ServerSubLevel source) {
+        dev.ryanhcode.sable.companion.math.BoundingBox3ic bounds = source.getPlot().getBoundingBox();
+        List<BlockPos> blocks = new ArrayList<>();
+        if (bounds == null || bounds == dev.ryanhcode.sable.companion.math.BoundingBox3i.EMPTY) return blocks;
+        for (BlockPos pos : BlockPos.betweenClosed(bounds.minX(), bounds.minY(), bounds.minZ(),
+                bounds.maxX(), bounds.maxY(), bounds.maxZ())) {
+            if (!level.getBlockState(pos).isAir()) blocks.add(pos.immutable());
+        }
+        return blocks;
+    }
+
+    private static @Nullable ServerSubLevel assembleAll(ServerLevel level, ServerSubLevel source, double scale) {
+        List<BlockPos> blocks = blocks(level, source);
+        if (blocks.isEmpty()) return null;
+        dev.ryanhcode.sable.companion.math.BoundingBox3ic bounds = source.getPlot().getBoundingBox();
+        ServerSubLevel piece;
+        try {
+            piece = dev.ryanhcode.sable.api.SubLevelAssemblyHelper.assembleBlocks(level, blocks.getFirst(), blocks,
+                    new dev.ryanhcode.sable.companion.math.BoundingBox3i(bounds).expand(1, 1, 1));
+        } catch (RuntimeException exception) {
+            Sable.LOGGER.error("Could not slice build {} into a sublevel", source.getUniqueId(), exception);
+            return null;
+        }
+        if (piece == null) return null;
+        if (!Pym.resize().request(piece).scaleTo(scale).immediate().submit().accepted()) {
+            Sable.LOGGER.error("Could not set sliced build {} to scale {}", piece.getUniqueId(), scale);
+        }
+        piece.updateMergedMassData(1.0F);
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container != null) container.physicsSystem().getPipeline().onStatsChanged(piece);
+        com.misterblusky9.pym.internal.physics.ScaledColliderRebuildQueue.mark(piece);
+        return piece;
+    }
+
     public static void follow(UUID token, ServerSubLevel hat, ServerLevel level, BlockPos host, int[] offset) {
         Vector3d shift = new Vector3d(offset[0], offset[1], offset[2]);
         boolean hosted = Hosted.isRoot(hat);
@@ -676,6 +826,7 @@ public final class BuildSites {
         } else {
             stand(hat.logicalPose(), hat, level, host, shift);
         }
+        for (ServerSubLevel part : CarriedBuilds.parts(hat)) HatSeats.follow(part);
         Vector3d head = head(hat, shift);
         Detached.anchor(hat, BlockPos.containing(head.x, head.y, head.z));
         watch(token, hat, level, host);
@@ -749,6 +900,7 @@ public final class BuildSites {
 
     public static double scale(ItemStack headwear) {
         if (headwear.is(ModItems.SKULL_CAP.get())) return SKULL_CAP_SCALE;
+        if (AllItems.CARDBOARD_HELMET.isIn(headwear)) return CARDBOARD_HELMET_SCALE;
         if (headwear.getItem() instanceof GogglesItem) return GOGGLES_SCALE;
         if (headwear.is(Items.DRAGON_HEAD)) return DRAGON_SCALE;
         if (isSkull(headwear)) return SKULL_SCALE;

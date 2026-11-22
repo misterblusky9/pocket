@@ -24,6 +24,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.phys.AABB;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -39,19 +40,29 @@ public final class HatNativeContraptions {
     private static final Map<UUID, Set<UUID>> KNOWN = new HashMap<>();
     private static final Map<UUID, Integer> RESUME = new HashMap<>();
     private static final Map<UUID, Long> LAST_TICK = new HashMap<>();
+    private static final Map<UUID, Scan> SCANS = new HashMap<>();
+    private static int joins;
 
     private record Found(ServerSubLevel part, AbstractContraptionEntity entity) {}
+
+    private record Scan(int joins, Set<UUID> parts, List<Found> found) {}
+
+    public static void onJoin(EntityJoinLevelEvent event) {
+        if (!event.getLevel().isClientSide() && event.getEntity() instanceof AbstractContraptionEntity) joins++;
+    }
 
     public static void started(UUID token) {
         RESUME.put(token, 40);
         KNOWN.remove(token);
         LAST_TICK.remove(token);
+        SCANS.remove(token);
     }
 
     public static void forget(UUID token) {
         RESUME.remove(token);
         KNOWN.remove(token);
         LAST_TICK.remove(token);
+        SCANS.remove(token);
     }
 
     private static List<ServerSubLevel> parts(ServerSubLevel root) {
@@ -63,10 +74,34 @@ public final class HatNativeContraptions {
     }
 
     private static List<Found> find(ServerSubLevel root) {
+        return ready(scan(root.getLevel(), parts(root)));
+    }
+
+    private static List<Found> find(UUID token, ServerSubLevel root) {
+        List<ServerSubLevel> parts = parts(root);
+        Set<UUID> ids = new HashSet<>();
+        for (ServerSubLevel part : parts) ids.add(part.getUniqueId());
+        Scan scan = SCANS.get(token);
+        if (scan == null || scan.joins() != joins || !scan.parts().equals(ids)) {
+            scan = new Scan(joins, ids, scan(root.getLevel(), parts));
+            SCANS.put(token, scan);
+        }
+        return ready(scan.found());
+    }
+
+    private static List<Found> ready(List<Found> scanned) {
+        List<Found> ready = new ArrayList<>(scanned.size());
+        for (Found found : scanned) {
+            AbstractContraptionEntity entity = found.entity();
+            if (entity.isAlive() && entity.isReadyForRender() && entity.getContraption() != null) ready.add(found);
+        }
+        return ready;
+    }
+
+    private static List<Found> scan(ServerLevel level, List<ServerSubLevel> parts) {
         List<Found> found = new ArrayList<>();
         Set<UUID> seen = new HashSet<>();
-        ServerLevel level = root.getLevel();
-        for (ServerSubLevel part : parts(root)) {
+        for (ServerSubLevel part : parts) {
             AABB area = null;
             for (PlotChunkHolder holder : part.getPlot().getLoadedChunks()) {
                 ChunkPos at = holder.getChunk().getPos();
@@ -77,9 +112,7 @@ public final class HatNativeContraptions {
             if (area == null) continue;
             for (AbstractContraptionEntity entity : level.getEntities(
                     EntityTypeTest.forClass(AbstractContraptionEntity.class), area,
-                    candidate -> candidate.isAlive() && candidate.isReadyForRender()
-                            && candidate.getContraption() != null
-                            && Sable.HELPER.getContaining(candidate) == part)) {
+                    candidate -> candidate.isAlive() && Sable.HELPER.getContaining(candidate) == part)) {
                 if (seen.add(entity.getUUID())) found.add(new Found(part, entity));
             }
         }
@@ -135,17 +168,18 @@ public final class HatNativeContraptions {
             else RESUME.put(token, resume - 1);
         }
 
-        Set<UUID> before = KNOWN.getOrDefault(token, Set.of());
+        Set<UUID> sent = KNOWN.get(token);
+        Set<UUID> before = sent == null ? Set.of() : sent;
         Set<UUID> after = new HashSet<>();
         ListTag entries = new ListTag();
-        for (Found found : find(root)) {
+        for (Found found : find(token, root)) {
             UUID id = found.entity().getUUID();
             after.add(id);
             entries.add(entry(found, !before.contains(id)));
         }
         boolean changed = !after.equals(before);
         KNOWN.put(token, after);
-        if (root.getTrackingPlayers().isEmpty()) return changed;
+        if (root.getTrackingPlayers().isEmpty() || (sent != null && sent.isEmpty() && after.isEmpty())) return changed;
         CompoundTag tag = new CompoundTag();
         tag.put(ENTRIES, entries);
         HatNativeContraptionsPayload payload = new HatNativeContraptionsPayload(token, tag);

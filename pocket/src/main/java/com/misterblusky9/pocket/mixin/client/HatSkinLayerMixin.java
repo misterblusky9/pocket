@@ -34,9 +34,12 @@ public abstract class HatSkinLayerMixin {
                     shift = At.Shift.AFTER))
     private void pocket$flipHead(LivingEntity entity, float yaw, float partialTick, PoseStack pose,
                                  MultiBufferSource buffers, int light, CallbackInfo ci) {
-        if (!(model instanceof HumanoidModel<?> humanoid) || HatEggs.worn(entity) != NameEgg.UPSIDE_DOWN) return;
+        if (!(model instanceof HumanoidModel<?> humanoid)) return;
+        NameEgg egg = HatEggs.worn(entity);
+        if (egg != NameEgg.UPSIDE_DOWN && egg != NameEgg.PINHEAD) return;
         pocket$restoreHead = humanoid.head.storePose();
-        HatEggs.flipInPlace(humanoid.head);
+        if (egg == NameEgg.UPSIDE_DOWN) HatEggs.flipInPlace(humanoid.head);
+        else HatEggs.pinhead(humanoid.head);
         humanoid.hat.copyFrom(humanoid.head);
     }
 

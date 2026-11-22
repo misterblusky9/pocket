@@ -148,9 +148,12 @@ public record CrossScaleWeldPayload(
 
         WeldRecord record = weld.toRecord(
                 UUID.randomUUID(), CrossScaleWelds.weldOrientation(weld, this.rotationDegrees));
+        if (mounting && !BuildSites.mount(big, riders, record)) {
+            message(player, CrossScaleWelds.Refusal.CANNOT_WELD);
+            return;
+        }
         WeldStore.get(level).add(record);
         WeldRuntime.markNew(level, record.weldId());
-        if (mounting) BuildSites.mount(level, big, riders, record);
         CrossScaleWeldSync.broadcast(level);
 
         glue.hurtAndBreak(1, player, LivingEntity.getSlotForHand(this.hand));

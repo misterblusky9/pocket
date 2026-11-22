@@ -112,6 +112,7 @@ public class HostedJointGameTests {
                 root.updateBoundingBox();
                 held = RapierBridge.pinToWorld(root, site, mass);
             }
+            if (hosted) helper.assertTrue(Hosted.adopt(root, arm), "arm was not adopted into the hat");
             Vector3d rootPivot = new Vector3d(root.logicalPose().rotationPoint());
             Vector3d onRoot = new Vector3d(rootPivot).add(2.0D, 0.0D, 0.0D);
             Vector3d armPivot = new Vector3d(arm.logicalPose().rotationPoint());
@@ -127,6 +128,7 @@ public class HostedJointGameTests {
             RotaryConstraintHandle joint = pipeline.addConstraint(root, arm,
                     new RotaryConstraintConfiguration(onRoot, onArm, axis, axis));
             helper.assertTrue(joint != null && joint.isValid(), "hinge was refused");
+            Hosted.jointAttached(arm);
             joint.setMotor(RotaryConstraintHandle.DEFAULT_AXIS, target, 400.0D, 80.0D, false, 0.0D);
             handle[0] = joint;
             points[0] = onRoot;
@@ -177,7 +179,7 @@ public class HostedJointGameTests {
         Vector3d turned = relative.transform(new Vector3d(probe));
         Vector3d cross = new Vector3d(probe).cross(turned);
         double about = Math.atan2(cross.dot(axis), probe.dot(turned));
-        double drift = root.logicalPose().position().distance(rig.hosted() ? Hosted.site(root) : root.logicalPose().position());
+        double drift = rig.hosted() ? Hosted.physical(root).position().distance(Hosted.site(root)) : 0.0D;
         LogUtils.getLogger().info(
                 "JOINTMEASURE {} t={} armPos={} valid={} hingeAngle={} target={} angleError={} offAxisRad={} slipWorld={} slipPlotBlocks={} rootDrift={} armY={}",
                 label, tick, arm.logicalPose().position(), handle.isValid(), String.format("%.4f", about), target,

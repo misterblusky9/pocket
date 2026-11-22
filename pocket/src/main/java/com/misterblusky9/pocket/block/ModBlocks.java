@@ -148,7 +148,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, PocketDummyBlock> POCKET_DUMMY =
             BLOCKS.register("pocket_dummy", () -> new PocketDummyBlock(
                     BlockBehaviour.Properties.ofFullCopy(Blocks.OAK_PLANKS).strength(-1.0F, 3600000.0F)
-                            .pushReaction(PushReaction.BLOCK)));
+                            .noOcclusion().pushReaction(PushReaction.BLOCK)));
 
     static {
         BLOCKS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());

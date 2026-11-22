@@ -20,7 +20,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.common.util.TriState;
+import net.minecraft.world.inventory.ClickAction;
 import net.neoforged.neoforge.event.AnvilUpdateEvent;
+import net.neoforged.neoforge.event.ItemStackedOnOtherEvent;
 import net.neoforged.neoforge.event.entity.player.AnvilRepairEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
@@ -92,6 +94,15 @@ public final class HatStandInteractions {
         event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide));
     }
 
+    public static void onStackedOnOther(ItemStackedOnOtherEvent event) {
+        ItemStack hat = event.getStackedOnItem();
+        if (event.getClickAction() != ClickAction.SECONDARY || !event.getCarriedItem().isEmpty()
+                || HatStandBlockEntity.NameEgg.of(hat) != HatStandBlockEntity.NameEgg.SPIN) return;
+        HatStandBlockEntity.cycleSpin(hat);
+        event.getSlot().setChanged();
+        event.setCanceled(true);
+    }
+
     public static void onAnvilUpdate(AnvilUpdateEvent event) {
         ItemStack hat = event.getLeft();
         ItemStack target = event.getRight();
@@ -116,6 +127,7 @@ public final class HatStandInteractions {
         stripped.remove(ModDataComponents.SKIN_LAYER.get());
         stripped.remove(ModDataComponents.HEADWEAR_LAYER.get());
         stripped.remove(ModDataComponents.FIRST_PERSON_RENDERED.get());
+        stripped.remove(ModDataComponents.HAT_SPIN.get());
         stripped.remove(ModDataComponents.CUSTOM_SPRITE.get());
         if (!player.getInventory().add(stripped)) player.drop(stripped, false);
     }

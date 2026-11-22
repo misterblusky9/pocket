@@ -2,6 +2,7 @@ package com.misterblusky9.pocket.item;
 
 import com.misterblusky9.pym.api.ScaleBounds;
 import com.misterblusky9.pocket.debug.PocketTrace;
+import com.misterblusky9.pocket.compat.simulated.JointGroups;
 import com.misterblusky9.pocket.compat.simulated.WeldTransfer;
 import com.misterblusky9.pocket.compat.simulated.WeldStore;
 import com.misterblusky9.pocket.pocket.DeploymentClearance;
@@ -111,6 +112,8 @@ public class PocketCaseItem extends PackageItem {
     private static final String FACADE_OFFSET_KEY = "pocket_facade_offset";
     private static final String PACKED_BY_KEY = "packed_by";
     private static final String CASE_TURNS_KEY = "pocket_case_quarter_turns";
+    // Bounding-box minimum relative to the source Hat Stand's scaffold origin (in plot blocks).
+    private static final String HAT_ANCHOR_KEY = "pocket_hat_case_anchor";
 
     private static final String CONTAINER_KEY = "pocket_container";
     private static final String WELDED_KEY = "pocket_welded";
@@ -204,25 +207,26 @@ public class PocketCaseItem extends PackageItem {
         return riders;
     }
 
-    private static @Nullable List<ServerSubLevel> restoreWelded(
+    private record MemberPlan(CompoundTag relative, CompoundTag payload, UUID stored, Vec3i delta) {}
+
+    private static @Nullable List<MemberPlan> planMembers(
             ServerLevel serverLevel,
             ServerSubLevelContainer container,
             ServerLevel sourceLevel,
             CompoundTag fullTag,
-            ServerSubLevel root,
             UUID storedRoot,
+            int rootPlotX,
+            int rootPlotZ,
             Vec3i rootDelta,
-            double rootScale,
             UUID token
     ) {
         ListTag entries = fullTag.getList(WELDED_KEY, Tag.TAG_COMPOUND);
         if (entries.isEmpty()) return List.of();
-        java.util.Map<UUID, WeldTransfer.Target> identities = new java.util.HashMap<>();
-        identities.put(storedRoot, new WeldTransfer.Target(root, rootDelta));
-        Pose3d rootPose = new Pose3d(root.logicalPose());
-        rootPose.scale().set(rootScale, rootScale, rootScale);
-        List<ServerSubLevel> restored = new ArrayList<>();
-        List<CompoundTag> payloads = new ArrayList<>();
+        java.util.Set<Integer> taken = new java.util.HashSet<>();
+        taken.add(container.getIndex(rootPlotX, rootPlotZ));
+        java.util.Map<UUID, JointGroups.Target> identities = new java.util.HashMap<>();
+        identities.put(storedRoot, new JointGroups.Target(fullTag.getUUID("uuid"), rootDelta));
+        List<MemberPlan> plans = new ArrayList<>();
 
         for (int i = 0; i < entries.size(); i++) {
             CompoundTag entry = entries.getCompound(i);
@@ -230,8 +234,12 @@ public class PocketCaseItem extends PackageItem {
             CompoundTag plot = payload.getCompound("plot");
             int sourceX = plot.getInt("plot_x");
             int sourceZ = plot.getInt("plot_z");
-            int[] slot = Plots.free(container, sourceX, sourceZ);
-            if (slot == null) return abandonWelded(container, restored, token, "no free plots");
+            int[] slot = Plots.free(container, sourceX, sourceZ, taken);
+            if (slot == null) {
+                PocketTrace.logger().error("[PocketTransfer] welded member plan failed token={} reason=no free plots", token);
+                return null;
+            }
+            taken.add(container.getIndex(slot[0], slot[1]));
             Vec3i delta = Plots.delta(sourceLevel, sourceX, sourceZ, serverLevel, slot[0], slot[1]);
             rebasePlotPayload(payload, sourceLevel, serverLevel, slot[0], slot[1],
                     delta.getX(), delta.getY(), delta.getZ());
@@ -241,8 +249,44 @@ public class PocketCaseItem extends PackageItem {
             payload.putUUID("uuid", fresh);
             payload.remove("linear_velocity");
             payload.remove("angular_velocity");
+            identities.put(stored, new JointGroups.Target(fresh, delta));
+            plans.add(new MemberPlan(entry.getCompound(WELDED_RELATIVE_KEY), payload, stored, delta));
+        }
 
-            Pose3d relative = com.misterblusky9.pym.api.Detached.loadPose(entry.getCompound(WELDED_RELATIVE_KEY));
+        JointGroups.remap(fullTag, identities);
+        for (MemberPlan plan : plans) JointGroups.remap(plan.payload(), identities);
+        return plans;
+    }
+
+    private static @Nullable List<ServerSubLevel> restoreWelded(
+            ServerLevel serverLevel,
+            ServerSubLevelContainer container,
+            CompoundTag fullTag,
+            List<MemberPlan> plans,
+            ServerSubLevel root,
+            UUID storedRoot,
+            Vec3i rootDelta,
+            double rootScale,
+            UUID token
+    ) {
+        if (plans.isEmpty()) return List.of();
+        java.util.Map<UUID, WeldTransfer.Target> identities = new java.util.HashMap<>();
+        identities.put(storedRoot, new WeldTransfer.Target(root, rootDelta));
+        Pose3d rootPose = new Pose3d(root.logicalPose());
+        rootPose.scale().set(rootScale, rootScale, rootScale);
+        List<ServerSubLevel> restored = new ArrayList<>();
+        List<CompoundTag> payloads = new ArrayList<>();
+
+        for (MemberPlan plan : plans) {
+            CompoundTag payload = plan.payload();
+            UUID stored = plan.stored();
+            UUID fresh = payload.getUUID("uuid");
+            Vec3i delta = plan.delta();
+            CompoundTag plot = payload.getCompound("plot");
+            if (!Plots.isFree(container, plot.getInt("plot_x"), plot.getInt("plot_z")))
+                return abandonWelded(container, restored, token, "planned plot taken");
+
+            Pose3d relative = com.misterblusky9.pym.api.Detached.loadPose(plan.relative());
             relative.position().add(rootDelta.getX(), rootDelta.getY(), rootDelta.getZ());
             Pose3d pose = com.misterblusky9.pym.api.Detached.compose(rootPose, relative);
             pose.rotationPoint().set(SableNBTUtils.readPose3d(payload.getCompound("pose")).rotationPoint());
@@ -441,17 +485,6 @@ public class PocketCaseItem extends PackageItem {
     ) {
         if (subLevel == null || fullTag == null) return null;
 
-        if (Pym.connections().isJoinedToAnother(subLevel)) {
-            PocketTrace.debug(
-                    "[PocketTransfer] capture rejected uuid={} reason=joined_to_another_sublevel",
-                    subLevel.getUniqueId());
-            if (feedbackPlayer != null) {
-                feedbackPlayer.displayClientMessage(Component.translatable(
-                        "pocket.case.joined"), true);
-            }
-            return null;
-        }
-
         PayloadStructure structure = measureStructure(subLevel);
         if (structure.blocks() > Pym.resize().shrunkBlockLimit()) {
             PocketTrace.logger().error(
@@ -599,6 +632,53 @@ public class PocketCaseItem extends PackageItem {
         if (userData != null && userData.contains(CASE_TURNS_KEY, Tag.TAG_INT)) {
             setModelQuarterTurns(stack, userData.getInt(CASE_TURNS_KEY));
         }
+    }
+
+    /**
+     * Keep the original grid placement before a stand build is released as a physics sublevel.
+     * Use plot-block coordinates, not the hosted body's hidden physics pose or world position.
+     */
+    public static void rememberHatAnchor(ServerSubLevel build, BlockPos scaffoldOrigin) {
+        var bounds = build.getPlot().getBoundingBox();
+        if (bounds == null || bounds == dev.ryanhcode.sable.companion.math.BoundingBox3i.EMPTY) return;
+        CompoundTag data = build.getUserDataTag() == null ? new CompoundTag() : build.getUserDataTag().copy();
+        data.putIntArray(HAT_ANCHOR_KEY, new int[] {
+                bounds.minX() - scaffoldOrigin.getX(),
+                bounds.minY() - scaffoldOrigin.getY(),
+                bounds.minZ() - scaffoldOrigin.getZ()
+        });
+        build.setUserDataTag(data);
+    }
+
+    public static void copyHatAnchor(ServerSubLevel from, ServerSubLevel to) {
+        CompoundTag source = from.getUserDataTag();
+        if (source == null || !source.contains(HAT_ANCHOR_KEY, Tag.TAG_INT_ARRAY)) return;
+        CompoundTag data = to.getUserDataTag() == null ? new CompoundTag() : to.getUserDataTag().copy();
+        data.putIntArray(HAT_ANCHOR_KEY, source.getIntArray(HAT_ANCHOR_KEY));
+        to.setUserDataTag(data);
+    }
+
+    /** Copy the source stand placement onto the case so client-side preview can access it. */
+    public static void recallHatAnchor(ServerSubLevel build, ItemStack stack) {
+        CompoundTag data = build.getUserDataTag();
+        if (data == null || !data.contains(HAT_ANCHOR_KEY, Tag.TAG_INT_ARRAY)) return;
+        int[] anchor = data.getIntArray(HAT_ANCHOR_KEY);
+        if (anchor.length != 3) return;
+        CompoundTag tag = customTag(stack);
+        if (tag == null) return;
+        tag.putIntArray(HAT_ANCHOR_KEY, anchor);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+    }
+
+    /** No saved anchor means an ordinary pocketed build: keep the normal centered placement. */
+    public static BlockPos rememberedHatAnchor(SubLevel hat, int scaffoldSize, int[] standOffset,
+                                               ItemStack stack, BlockPos fallback) {
+        CompoundTag data = storedTag(stack);
+        if (data == null || !data.contains(HAT_ANCHOR_KEY, Tag.TAG_INT_ARRAY)) return fallback;
+        int[] relative = data.getIntArray(HAT_ANCHOR_KEY);
+        if (relative.length != 3) return fallback;
+        return BuildSites.scaffoldOrigin(hat, scaffoldSize, standOffset)
+                .offset(relative[0], relative[1], relative[2]);
     }
 
     public static void setPackedBy(ItemStack stack, String playerName) {
@@ -901,11 +981,14 @@ public class PocketCaseItem extends PackageItem {
             fail(player, "pocket.case.hat_too_complex.contraption");
             return false;
         }
+        int sourceX = saved.getCompound("plot").getInt("plot_x");
+        int sourceZ = saved.getCompound("plot").getInt("plot_z");
         ServerSubLevel build = com.misterblusky9.pym.api.Detached.open(level, saved.getUUID("uuid"), saved.getCompound("plot"), stored);
         if (build == null) {
             fail(player, "pocket.case.restore_failed_plot");
             return false;
         }
+        CompoundTag held = null;
         net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate template =
                 new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate();
         HatFit fit = null;
@@ -928,16 +1011,20 @@ public class PocketCaseItem extends PackageItem {
                 }
             }
         } finally {
-            com.misterblusky9.pym.api.Detached.discard(build);
+            build.getPlot().kickAllEntities();
+            held = com.misterblusky9.pym.api.Detached.close(build);
         }
         if (fit == null || !fit.inside()) {
+            BuildSites.keepReserved(level, held, stored, sourceX, sourceZ);
             fail(player, "pocket.case.hat_blocked");
             return false;
         }
         if (!fit.overlaps().isEmpty() && !player.isCreative()) {
+            BuildSites.keepReserved(level, held, stored, sourceX, sourceZ);
             fail(player, "pocket.case.hat_overlaps");
             return false;
         }
+        if (held != null) BuildSites.release(level, held);
         template = withoutOverlaps(level, template, fit.overlaps());
         template.placeInWorld(level, anchor, anchor,
                 new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings()
@@ -1262,6 +1349,11 @@ public class PocketCaseItem extends PackageItem {
             fullTag.putUUID("uuid", replacement);
         }
 
+        Vec3i rootDelta = new Vec3i(transfer.deltaBlocksX(), transfer.deltaBlocksY(), transfer.deltaBlocksZ());
+        List<MemberPlan> memberPlans = planMembers(serverLevel, destinationContainer, backend.sourceLevel(),
+                fullTag, storedIdentity, transfer.destinationPlotX(), transfer.destinationPlotZ(), rootDelta, token);
+        if (memberPlans == null) return fail(feedbackPlayer, "pocket.case.no_free_plots");
+
         boolean drainsBeforeLoad = serverLevel.dimensionType().ultraWarm()
                 && fullTag.contains(INTEGRITY_KEY, Tag.TAG_COMPOUND);
         NetherEvaporation.Drained drained = drainsBeforeLoad
@@ -1403,10 +1495,8 @@ public class PocketCaseItem extends PackageItem {
             return fail(feedbackPlayer, "pocket.case.init_failed");
         }
 
-        List<ServerSubLevel> welded = restoreWelded(serverLevel, destinationContainer, backend.sourceLevel(),
-                fullTag, restored, storedIdentity,
-                new Vec3i(transfer.deltaBlocksX(), transfer.deltaBlocksY(), transfer.deltaBlocksZ()),
-                pocketedScale, token);
+        List<ServerSubLevel> welded = restoreWelded(serverLevel, destinationContainer,
+                fullTag, memberPlans, restored, storedIdentity, rootDelta, pocketedScale, token);
         if (welded == null) {
             rollbackDestination(serverLevel, destinationContainer, transfer, positioned.uuid(), token,
                     "welded member restore failed", null);
@@ -2266,7 +2356,7 @@ public class PocketCaseItem extends PackageItem {
         } else if (size.length == 3) {
             summary = grouped(size[0]) + "x" + grouped(size[1]) + "x" + grouped(size[2]);
         }
-        String scale = com.misterblusky9.pocket.client.HudScaleText.compact(com.misterblusky9.pocket.scale.CompressionStage.SIXTEENTH.scale());
+        String scale = com.misterblusky9.pocket.client.HudScaleText.compact(pocketedScale(stack));
         tooltip.add((summary == null ? Component.literal(scale)
                 : Component.translatable("pocket.tooltip.size_at_scale", summary, scale))
                 .withStyle(ChatFormatting.DARK_GRAY));

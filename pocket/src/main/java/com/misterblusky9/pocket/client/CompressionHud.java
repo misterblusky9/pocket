@@ -7,6 +7,7 @@ import com.misterblusky9.pocket.block.ModBlocks;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import com.misterblusky9.pocket.compression.EntityCompressionTargeting;
 import com.misterblusky9.pocket.item.CompressionGunItem;
+import com.misterblusky9.pocket.item.CreativePocketCaseItem;
 import com.misterblusky9.pocket.item.CreativeShrinkRayItem;
 import com.misterblusky9.pocket.item.EmptyBoxItem;
 import com.misterblusky9.pocket.item.HotGlueGunItem;
@@ -155,6 +156,7 @@ public final class CompressionHud {
     }
 
     private static boolean tooBigToPocket(LocalPlayer player, CompressionAim.Aim aim) {
+        if (holding(player, EmptyBoxItem.class).getItem() instanceof CreativePocketCaseItem) return false;
         SubLevel target = aim.subLevel();
         boolean build = BuildMirrors.isStandingHatPart(target)
                 || player.level().getBlockState(target.getPlot().getCenterBlock()).is(ModBlocks.POCKET_DUMMY.get());

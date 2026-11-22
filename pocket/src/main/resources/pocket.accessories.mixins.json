@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.misterblusky9.pocket.compat.accessories.mixin",
+  "plugin": "com.misterblusky9.pocket.compat.accessories.AccessoriesMixinPlugin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AccessoriesUseEquipMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

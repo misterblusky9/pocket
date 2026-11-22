@@ -92,6 +92,8 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
     }
 
     private static final double COMPRESSED_SCALE = 1.0D / 16.0D;
+    private static final double CREATIVE_TILT_BASE_DEGREES = 7.0D;
+    private static final double CREATIVE_TILT_MAX_DEGREES = 11.0D;
 
     private static final float WHEEL_MIN_RADIUS = 0.35F;
     private static final float WHEEL_THICKNESS_RATIO = 0.32F;
@@ -143,7 +145,19 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
                 : Minecraft.getInstance().getItemRenderer().getItemModelShaper()
                 .getItemModel(container.item());
 
-        if (container.translucent()) {
+        // Empty creative cases use a custom renderer too; unwrap that model
+        // before drawing it inside this filled PocketCaseItem renderer. Otherwise
+        // PartialItemModelRenderer re-enters this renderer recursively.
+        if (boxModel instanceof CustomRenderedItemModel wrapped) {
+            boxModel = wrapped.getOriginalModel();
+        }
+
+        if (container == PocketContainer.CREATIVE_POCKET_CASE) {
+            // Draw from the one case JSON: cardboard quads normally, portal quads
+            // through RenderType.endPortal(), never as an obsidian texture.
+            CreativeCasePortal.renderShell(stack, poseStack, bufferSource, packedLight, packedOverlay, boxModel);
+            CreativeCasePortal.renderPortal(poseStack, bufferSource, boxModel);
+        } else if (container.translucent()) {
             itemRenderer.render(boxModel, packedLight);
         } else {
             itemRenderer.renderSolid(boxModel, packedLight);
@@ -159,7 +173,7 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
             int packedLight,
             int packedOverlay
     ) {
-        ClientSubLevel mirror = BuildMirrors.get(stack);
+        ClientSubLevel mirror = BuildMirrors.preview(stack);
         if (mirror == null) return;
         BoundingBox3ic bounds = mirror.getPlot().getBoundingBox();
         if (bounds == null) return;
@@ -203,17 +217,49 @@ public final class PocketedSubLevelItemRenderer extends CustomRenderedItemModelR
         boolean sideways = (turns & 1) != 0;
         double footprintX = sideways ? sizeZ : sizeX;
         double footprintZ = sideways ? sizeX : sizeZ;
+        boolean creative = container == PocketContainer.CREATIVE_POCKET_CASE;
+        double spinDiameter = Math.hypot(sizeX, sizeZ);
+        final double hoverAmplitude = 0.0125D;
+        // The creative case's ordinary clearHeight is intentionally unbounded.
+        // Use its visible interior height only for fitting the *item preview*.
+        double previewHeight = creative ? (11.0D / 16.0D - (container.floorY() + 0.5D))
+                : container.clearHeight();
+        double tiltCos = Math.cos(Math.toRadians(CREATIVE_TILT_MAX_DEGREES));
+        double tiltSin = Math.sin(Math.toRadians(CREATIVE_TILT_MAX_DEGREES));
+        double fitHeight = creative ? sizeY * tiltCos + spinDiameter * tiltSin : sizeY;
+        double fitWidth = spinDiameter * tiltCos + sizeY * tiltSin;
         float fit = (float) Math.min(
-                Math.min(COMPRESSED_SCALE, container.clearHeight() / Math.max(1.0D, sizeY)),
-                Math.min(container.clearWidthX() / Math.max(1.0D, footprintX),
-                        container.clearWidthZ() / Math.max(1.0D, footprintZ)));
+                Math.min(COMPRESSED_SCALE,
+                        (previewHeight - (creative ? 2.0D * hoverAmplitude : 0.0D)) / Math.max(1.0D, fitHeight)),
+                Math.min(container.clearWidthX() / Math.max(1.0D, creative ? fitWidth : footprintX),
+                        container.clearWidthZ() / Math.max(1.0D, creative ? fitWidth : footprintZ)));
         Vector3d origin = new Vector3d(
                 (extent[0] + extent[3]) * 0.5D,
-                extent[1],
+                creative ? (extent[1] + extent[4]) * 0.5D : extent[1],
                 (extent[2] + extent[5]) * 0.5D);
 
         poseStack.pushPose();
-        poseStack.translate(container.centreX(), container.floorY(), container.centreZ());
+        double hover = 0.0D;
+        float spinDegrees = 0.0F;
+        float tiltRadians = 0.0F;
+        double tiltHeading = 0.0D;
+        if (creative && Minecraft.getInstance().level != null) {
+            Minecraft mc = Minecraft.getInstance();
+            double time = mc.level.getGameTime() + mc.getTimer().getGameTimeDeltaPartialTick(false);
+            hover = Math.sin(time / 10.0D) * hoverAmplitude;
+            spinDegrees = (float) Math.toDegrees((time / 60.0D) % (2.0D * Math.PI));
+            tiltHeading = time / 143.0D;
+            tiltRadians = (float) Math.toRadians(CREATIVE_TILT_BASE_DEGREES
+                    + (CREATIVE_TILT_MAX_DEGREES - CREATIVE_TILT_BASE_DEGREES) * Math.sin(time / 47.0D));
+        }
+        poseStack.translate(container.centreX(),
+                creative ? container.floorY() + previewHeight * 0.5D + hover : container.floorY(),
+                container.centreZ());
+        if (creative) {
+            poseStack.mulPose(new Quaternionf().rotateAxis(tiltRadians,
+                    (float) Math.cos(tiltHeading), 0.0F, (float) Math.sin(tiltHeading)));
+            poseStack.mulPose(Axis.YP.rotationDegrees(spinDegrees));
+        }
         poseStack.scale(fit, fit, fit);
         if (turns != 0) poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F * turns));
         Portrait.draw(mirror, origin, poseStack, bufferSource, packedLight, packedOverlay);

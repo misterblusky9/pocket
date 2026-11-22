@@ -1,5 +1,7 @@
 .gradle/
-build/
+/build/
+/pocket/build/
+/pym/build/
 run/
 run-data/
 runs/

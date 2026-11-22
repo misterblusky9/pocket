@@ -38,12 +38,23 @@ public final class MagnifyingGlassFocus {
                 width = w;
                 height = h;
             }
-            float scale = (float) MagnifyingGlassZoom.viewerScale(minecraft.player);
-            chain.setUniform("FocusStart", 2.0F * scale);
-            chain.setUniform("FocusEnd", 5.0F * scale);
             Matrix4f projection = event.getProjectionMatrix();
-            chain.setUniform("NearPlane", projection.m32() / (projection.m22() - 1.0F));
-            chain.setUniform("FarPlane", projection.m32() / (projection.m22() + 1.0F));
+            float a = projection.m32() / (projection.m22() - 1.0F);
+            float b = projection.m32() / (projection.m22() + 1.0F);
+            boolean reverseZ = a > b;
+            float near = reverseZ ? b : a;
+            float far = reverseZ ? a : b;
+            if (!Float.isFinite(near) || !Float.isFinite(far)
+                    || near <= 0.0F || far <= near) return;
+
+            float scale = (float) MagnifyingGlassZoom.viewerScale(minecraft.player);
+            float focusStart = Math.max(near * 1.01F, 2.0F * scale);
+            float focusEnd = Math.max(focusStart + near * 0.1F, 5.0F * scale);
+            chain.setUniform("FocusStart", focusStart);
+            chain.setUniform("FocusEnd", focusEnd);
+            chain.setUniform("NearPlane", near);
+            chain.setUniform("FarPlane", far);
+            chain.setUniform("ReverseDepth", reverseZ ? 1.0F : 0.0F);
             chain.setUniform("BlurStrength", strength);
             chain.process(event.getPartialTick().getGameTimeDeltaTicks());
             minecraft.getMainRenderTarget().bindWrite(true);

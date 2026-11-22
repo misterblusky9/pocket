@@ -100,7 +100,7 @@ dependencies {
     compileOnly "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
     compileOnly "dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}"
     compileOnly "com.tterrag.registrate:Registrate:${registrate_version}"
-    aeronauticsBundle "maven.modrinth:oWaK0Q19:w7zlLnea"
+    aeronauticsBundle "maven.modrinth:oWaK0Q19:demX2roU"
     compileOnly fileTree(dir: layout.buildDirectory.dir('simulated'), include: '*.jar')
             .builtBy('extractSimulated')
 }

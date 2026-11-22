@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "A",
+    "B",
+    "S"
+  ],
+  "key": {
+    "A": { "item": "minecraft:amethyst_shard" },
+    "B": { "item": "create:brass_ingot" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "result": {
+    "id": "pocket:magnifying_glass",
+    "count": 1
+  }
+}

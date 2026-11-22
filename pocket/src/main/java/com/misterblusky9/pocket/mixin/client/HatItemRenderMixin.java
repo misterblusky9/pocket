@@ -1,6 +1,7 @@
 package com.misterblusky9.pocket.mixin.client;
 
 import com.misterblusky9.pocket.client.HatRendering;
+import com.misterblusky9.pocket.client.MagnifyingGlassLens;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.ItemRenderer;
@@ -19,6 +20,7 @@ public abstract class HatItemRenderMixin {
     private void pocket$renderHat(ItemStack stack, ItemDisplayContext context, boolean leftHand, PoseStack pose,
                                   MultiBufferSource buffers, int light, int overlay, BakedModel model,
                                   CallbackInfo ci) {
+        MagnifyingGlassLens.capture(stack, context, leftHand, pose, model);
         if (HatRendering.renderItem(stack, context, leftHand, pose, buffers, light, overlay)) ci.cancel();
     }
 }

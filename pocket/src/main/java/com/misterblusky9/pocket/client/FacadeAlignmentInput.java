@@ -8,7 +8,7 @@ import com.simibubi.create.AllItems;
 import com.simibubi.create.AllKeys;
 import com.simibubi.create.content.decoration.copycat.CopycatBlockEntity;
 import dev.ryanhcode.sable.Sable;
-import dev.ryanhcode.sable.sublevel.SubLevel;
+import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -35,8 +35,8 @@ public final class FacadeAlignmentInput {
         if (!(level.getBlockEntity(pos) instanceof CopycatBlockEntity copycat) || !copycat.hasCustomMaterial()) return;
         if (!FacadeAlignment.holds(player.getItemInHand(event.getHand()), copycat.getMaterial().getBlock())) return;
 
-        SubLevel craft = Sable.HELPER.getContaining(level, pos);
-        if (craft == null || !FacadeAlignment.shrunk(Pym.scale().of(craft))) return;
+        if (!(Sable.HELPER.getContaining(level, pos) instanceof ClientSubLevel craft)
+                || !FacadeAlignment.shrunk(CopycatFacadeFrames.tilingScale(craft))) return;
 
         event.setCanceled(true);
         PacketDistributor.sendToServer(new FacadeAlignmentPayload(pos));
@@ -59,9 +59,9 @@ public final class FacadeAlignmentInput {
                 || !(level.getBlockEntity(pos) instanceof CopycatBlockEntity copycat)
                 || !copycat.hasCustomMaterial()) return;
 
-        SubLevel craft = Sable.HELPER.getContaining(level, pos);
-        if (craft == null || !Pym.scale().isSettled(craft)
-                || !FacadeAlignment.shrunk(Pym.scale().of(craft))) return;
+        if (!(Sable.HELPER.getContaining(level, pos) instanceof ClientSubLevel craft)
+                || !Pym.scale().isSettled(craft)
+                || !FacadeAlignment.shrunk(CopycatFacadeFrames.tilingScale(craft))) return;
 
         int step = event.getScrollDeltaY() > 0.0D ? 1 : -1;
         Vec3 eye = craft.logicalPose().transformPositionInverse(player.getEyePosition());

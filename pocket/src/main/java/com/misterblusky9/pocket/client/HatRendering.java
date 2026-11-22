@@ -14,6 +14,8 @@ import java.util.UUID;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import com.simibubi.create.content.equipment.armor.CardboardArmorHandler;
+import net.minecraft.world.entity.player.Player;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import net.minecraft.client.Minecraft;
@@ -64,6 +66,12 @@ public final class HatRendering {
     public static @Nullable ClientSubLevel worn(LivingEntity entity) {
         ItemStack head = headwear(entity);
         return HatStandBlock.isHeadwear(head) ? BuildMirrors.get(head) : null;
+    }
+
+    public static boolean hatDisguised(Player player) {
+        if (!CardboardArmorHandler.testForStealth(player) || !WornHats.isCustomHat(headwear(player))) return false;
+        ClientSubLevel mirror = worn(player);
+        return mirror != null && mirror.getPlot().getBoundingBox() != null;
     }
 
     public static Vector3d head(ClientSubLevel mirror) {
@@ -187,6 +195,9 @@ public final class HatRendering {
         Vector3d frame = headwear ? framedWithHeadwear(mirror, BuildSites.head(mirror, BuildSites.offsetVector(stack)))
                 : centre(mirror);
         pose.pushPose();
+        HatSlotFit.apply(pose, context, leftHand, mirror, head, frame,
+                HatStandBlockEntity.NameEgg.of(stack) == HatStandBlockEntity.NameEgg.UPSIDE_DOWN,
+                headwear ? (float) (1.0 / BuildSites.scale(stack)) : 0.0F);
         ClientHooks.handleCameraTransforms(pose,
                 Minecraft.getInstance().getItemRenderer().getItemModelShaper().getItemModel(Items.PLAYER_HEAD),
                 context, leftHand);
@@ -210,8 +221,11 @@ public final class HatRendering {
         }
         pose.pushPose();
         pullToCamera(pose);
+        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
+        if (context == ItemDisplayContext.GUI && egg == HatStandBlockEntity.NameEgg.SPIN)
+            HatEggs.spin(pose, HatStandBlockEntity.spinMode(stack), mirror, frame, partialTick);
         drawHat(BuildHostBlockEntity.token(stack), mirror, frame, egg, stack.hasFoil(), pose, buffers, light, overlay,
-                Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false));
+                partialTick);
         pose.popPose();
         pose.popPose();
         return true;

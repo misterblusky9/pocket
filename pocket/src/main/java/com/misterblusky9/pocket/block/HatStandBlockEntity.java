@@ -3,10 +3,13 @@ package com.misterblusky9.pocket.block;
 import net.minecraft.network.chat.Component;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import com.misterblusky9.pocket.build.BuildHostBlockEntity;
+import com.misterblusky9.pocket.build.HatSeals;
 import com.misterblusky9.pocket.client.DummyHeadHaunting;
 import com.misterblusky9.pocket.item.ModDataComponents;
 import com.misterblusky9.pocket.item.ModItems;
 import com.simibubi.create.AllItems;
+import com.simibubi.create.content.kinetics.base.IRotate;
+import com.misterblusky9.pocket.particle.SpinIndicatorParticleData;
 import dev.ryanhcode.sable.Sable;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.core.BlockPos;
@@ -48,6 +51,11 @@ public final class HatStandBlockEntity extends BuildHostBlockEntity {
     public static final int LAYER_MODES = 3;
     public static final int LAYER_FLAT = 1;
     public static final int LAYER_REMOVED = 2;
+    public static final int SPIN_MODES = 3;
+    private static final double SPIN_RING_START = 0.75;
+    private static final double SPIN_RING_END = 0.65;
+    private static final int SPIN_RING_LIFE = 10;
+    private static final int SPIN_RING_PARTICLES = 20;
     private @Nullable ResolvableProfile skin;
     private static final Map<Player, HatStandBlockEntity> TURNING = new WeakHashMap<>();
     private static final int TURN_INTERVAL = 4;
@@ -104,6 +112,55 @@ public final class HatStandBlockEntity extends BuildHostBlockEntity {
         if (getHeadwearLayer() == LAYER_REMOVED) getActivator().remove(ModDataComponents.HEADWEAR_LAYER.get());
         else getActivator().set(ModDataComponents.HEADWEAR_LAYER.get(), LAYER_REMOVED);
         sync();
+    }
+
+    public static int spinMode(ItemStack stack) {
+        return Math.floorMod(stack.getOrDefault(ModDataComponents.HAT_SPIN.get(), 0), SPIN_MODES);
+    }
+
+    public static void cycleSpin(ItemStack stack) {
+        int mode = (spinMode(stack) + 1) % SPIN_MODES;
+        if (mode == 0) stack.remove(ModDataComponents.HAT_SPIN.get());
+        else stack.set(ModDataComponents.HAT_SPIN.get(), mode);
+    }
+
+    public boolean spin(Player player) {
+        if (nameEgg() != NameEgg.SPIN || getHat() == null || getActivator().isEmpty()) return false;
+        if (!player.mayBuild() || HatSeals.locks(this, player)) return false;
+        if (level instanceof ServerLevel server) {
+            cycleSpin(getActivator());
+            sync();
+            showSpinAxis(server);
+        }
+        return true;
+    }
+
+    private void showSpinAxis(ServerLevel server) {
+        Vector3d axis = orientation().transform(spinAxis(spinMode(getActivator())));
+        Vec3 centre = Vec3.atLowerCornerOf(worldPosition).add(headCentre());
+        double scale = 1.0;
+        SubLevel parent = Sable.HELPER.getContaining(level, worldPosition);
+        if (parent != null) {
+            parent.logicalPose().orientation().transform(axis);
+            centre = parent.logicalPose().transformPosition(centre);
+            scale = parent.logicalPose().scale().x();
+        }
+        server.sendParticles(new SpinIndicatorParticleData(IRotate.SpeedLevel.SLOW.getColor(),
+                        IRotate.SpeedLevel.MEDIUM.getParticleSpeed(),
+                        (float) (SPIN_RING_START * scale), (float) (SPIN_RING_END * scale), SPIN_RING_LIFE,
+                        dominant(axis)),
+                centre.x, centre.y, centre.z, SPIN_RING_PARTICLES, 0.0, 0.0, 0.0, 1.0);
+    }
+
+    private static Vector3d spinAxis(int mode) {
+        return mode == 0 ? new Vector3d(1.0, 0.0, 0.0) : mode == 1 ? new Vector3d(0.0, 1.0, 0.0) : new Vector3d(0.0, 0.0, 1.0);
+    }
+
+    private static Direction.Axis dominant(Vector3d axis) {
+        double x = Math.abs(axis.x);
+        double y = Math.abs(axis.y);
+        double z = Math.abs(axis.z);
+        return y >= x && y >= z ? Direction.Axis.Y : x >= z ? Direction.Axis.X : Direction.Axis.Z;
     }
 
     public boolean isFirstPersonRendered() {
@@ -375,7 +432,7 @@ public final class HatStandBlockEntity extends BuildHostBlockEntity {
     }
 
     public enum NameEgg implements StringRepresentable {
-        NONE, UPSIDE_DOWN, JEB, HEROBRINE, RAINBOW, VOID, MELONS;
+        NONE, UPSIDE_DOWN, JEB, HEROBRINE, RAINBOW, VOID, MELONS, PINHEAD, SPIN, RHYGUY;
 
         public static final Codec<NameEgg> CODEC = StringRepresentable.fromEnum(NameEgg::values);
         public static final StreamCodec<FriendlyByteBuf, NameEgg> STREAM_CODEC = NeoForgeStreamCodecs.enumCodec(NameEgg.class);
@@ -387,6 +444,9 @@ public final class HatStandBlockEntity extends BuildHostBlockEntity {
                 case "jeb_" -> JEB;
                 case "Herobrine" -> HEROBRINE;
                 case "melons" -> MELONS;
+                case "Rasirious" -> PINHEAD;
+                case "Ender_Skittle" -> SPIN;
+                case "RhyGuy1" -> RHYGUY;
                 default -> name.equals("KEYGEN") ? RAINBOW : name.equalsIgnoreCase("MisterBluSky") ? VOID : NONE;
             };
         }

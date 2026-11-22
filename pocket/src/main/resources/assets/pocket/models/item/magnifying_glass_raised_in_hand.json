@@ -1,5 +1,6 @@
 {
   "format_version": "1.9.0",
+  "render_type": "minecraft:translucent",
   "credit": "Made with Blockbench",
   "textures": {
     "1": "pocket:item/magnifying_glass_lens",

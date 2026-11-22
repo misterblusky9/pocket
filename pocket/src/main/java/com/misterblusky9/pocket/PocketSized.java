@@ -42,6 +42,10 @@ public final class PocketSized {
         com.misterblusky9.pym.api.Hosted.wearables(com.misterblusky9.pocket.build.CarriedBuilds::worn,
                 com.misterblusky9.pocket.build.CarriedBuilds::replaced,
                 com.misterblusky9.pocket.build.CarriedBuilds::openRiders);
+        com.misterblusky9.pym.api.Hosted.tangible(root -> com.misterblusky9.pocket.build.BuildSites.isAttached(root)
+                || com.misterblusky9.pocket.build.CarriedBuilds.isWorn(root));
+        com.misterblusky9.pym.api.Hosted.editable(com.misterblusky9.pocket.build.BuildSites::isAttached);
+        com.misterblusky9.pym.api.Hosted.wornBy(com.misterblusky9.pocket.build.CarriedBuilds::wornBy);
         if (ModList.get().isLoaded("sable_schematic_api")) PhotomancyCompat.register();
         if (ModList.get().isLoaded("curios")) com.misterblusky9.pocket.compat.curios.CuriosHats.register();
         if (com.misterblusky9.pocket.compat.WornHats.ACCESSORIES) com.misterblusky9.pocket.compat.accessories.AccessoriesCompat.register();
@@ -78,13 +82,20 @@ public final class PocketSized {
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onLeftClickBlock);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onRightClickItem);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onStackedOnOther);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onAnvilUpdate);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.block.HatStandInteractions::onAnvilTake);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onLevelSave);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onServerTick);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatNativeContraptions::onJoin);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onServerStarted);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.BuildSites::onServerStopping);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onEquipmentChange);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onMount);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onLeftClickBlock);
+        NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.CarriedBuilds::onJump);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onLeftClickBlock);
         NeoForge.EVENT_BUS.addListener(com.misterblusky9.pocket.build.HatSeals::onBreak);

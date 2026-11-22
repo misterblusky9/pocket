@@ -29,6 +29,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.MAGNIFYING_GLASS.get());
 
                         output.accept(ModItems.EMPTY_BOX.get());
+                        output.accept(ModItems.CREATIVE_POCKET_CASE.get());
                         output.accept(ModItems.DISPLAY_BOTTLE.get());
                         output.accept(ModItems.BRASS_DISPLAY_CASE.get());
                         output.accept(ModItems.BRASS_DISPLAY_PLATE.get());

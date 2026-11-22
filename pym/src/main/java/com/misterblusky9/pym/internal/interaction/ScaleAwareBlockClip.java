@@ -1,6 +1,7 @@
 package com.misterblusky9.pym.internal.interaction;
 
 import com.google.common.collect.Iterables;
+import com.misterblusky9.pym.api.Detached;
 import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.internal.PlacedSubLevels;
 import dev.ryanhcode.sable.ActiveSableCompanion;
@@ -28,6 +29,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.joml.Vector3dc;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.function.Predicate;
 
 public final class ScaleAwareBlockClip {
@@ -123,6 +125,10 @@ public final class ScaleAwareBlockClip {
             if (ignoredPredicate != null && ignoredPredicate.test(subLevel)) {
                 continue;
             }
+            boolean inert = PlacedSubLevels.isInert(subLevel);
+            if (!Hosted.editable(subLevel) || !Detached.rules(subLevel).interact()) {
+                continue;
+            }
 
             Pose3dc shown = Hosted.presented(subLevel);
             if (shown == null && !segmentIntersectsWorldBounds(rayFrom, rayTo, subLevel)) {
@@ -167,6 +173,10 @@ public final class ScaleAwareBlockClip {
             if (candidate.getType() == HitResult.Type.MISS) {
                 continue;
             }
+            if (inert && !PlacedSubLevels.pickable(subLevel,
+                    subLevel.getLevel().getBlockState(candidate.getBlockPos()))) {
+                continue;
+            }
 
             Vector3dc candidateWorldJoml =
                     pose.transformPosition(JOMLConversion.toJOML(candidate.getLocation()));
@@ -186,8 +196,9 @@ public final class ScaleAwareBlockClip {
     }
 
     private static Iterable<SubLevel> candidates(SubLevelContainer container, Level level) {
-        if (PlacedSubLevels.isEmpty()) return Collections.unmodifiableList(container.getAllSubLevels());
-        return Iterables.concat(container.getAllSubLevels(), PlacedSubLevels.in(level));
+        List<SubLevel> inert = PlacedSubLevels.inertIn(level);
+        if (PlacedSubLevels.isEmpty() && inert.isEmpty()) return Collections.unmodifiableList(container.getAllSubLevels());
+        return Iterables.concat(container.getAllSubLevels(), PlacedSubLevels.in(level), inert);
     }
 
     private static boolean segmentIntersectsWorldBounds(

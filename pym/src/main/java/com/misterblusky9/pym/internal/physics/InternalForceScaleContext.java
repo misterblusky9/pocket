@@ -36,6 +36,7 @@ public final class InternalForceScaleContext {
     public static double activeScale(PhysicsPipelineBody body) {
         if (!(body instanceof ServerSubLevel subLevel)) return 1.0D;
         if (PairedForceScale.factorsFor(body) != null) return scaleOf(subLevel);
+        if (SolvedImpulseScale.factorsFor(body) != null) return scaleOf(subLevel);
 
         ArrayDeque<ServerSubLevel> stack = STACK.get();
         if (stack == null || stack.isEmpty() || stack.peek() != subLevel) return 1.0D;
@@ -56,6 +57,8 @@ public final class InternalForceScaleContext {
     public static double[] forceFactors(PhysicsPipelineBody body) {
         double[] paired = PairedForceScale.factorsFor(body);
         if (paired != null) return paired;
+        double[] solved = SolvedImpulseScale.factorsFor(body);
+        if (solved != null) return solved;
         double scale = activeScale(body);
         if (scale == 1.0D || !(body instanceof ServerSubLevel subLevel)) {
             return IDENTITY;

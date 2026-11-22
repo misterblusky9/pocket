@@ -21,6 +21,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.client.event.RenderHighlightEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3d;
@@ -156,20 +157,36 @@ public final class HatFacePick {
         };
     }
 
-    public static void render(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+    private record Outlined(ClientSubLevel mirror, BlockPos cell) {}
+
+    private static @Nullable Outlined outlined() {
         Minecraft minecraft = Minecraft.getInstance();
         ClientLevel level = minecraft.level;
         HitResult aimed = target != null ? target : minecraft.hitResult;
-        if (level == null || minecraft.options.hideGui || !(aimed instanceof BlockHitResult hit)
-                || hit.getType() != HitResult.Type.BLOCK) return;
+        if (level == null || !(aimed instanceof BlockHitResult hit)
+                || hit.getType() != HitResult.Type.BLOCK) return null;
         BlockPos pos = hit.getBlockPos();
         boolean dummy = level.getBlockState(pos).is(ModBlocks.POCKET_DUMMY.get());
         if (!dummy && !level.getBlockState(pos).isAir()
                 || !(Sable.HELPER.getContaining(level, pos) instanceof ClientSubLevel mirror)
-                || BuildMirrors.host(mirror) == null) return;
+                || BuildMirrors.host(mirror) == null) return null;
         BlockPos cell = dummy ? pos.relative(hit.getDirection()) : pos;
-        if (!level.getBlockState(cell).isAir()) return;
+        if (!level.getBlockState(cell).isAir()) return null;
+        return new Outlined(mirror, cell);
+    }
+
+    public static void suppressVanilla(RenderHighlightEvent.Block event) {
+        if (outlined() != null) event.setCanceled(true);
+    }
+
+    public static void render(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) return;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.options.hideGui) return;
+        Outlined outlined = outlined();
+        if (outlined == null) return;
+        ClientSubLevel mirror = outlined.mirror();
+        BlockPos cell = outlined.cell();
         Pose3dc pose = mirror.renderPose(event.getPartialTick().getGameTimeDeltaPartialTick(false));
         Vec3 camera = event.getCamera().getPosition();
         Vec3[] corners = new Vec3[8];

@@ -29,11 +29,16 @@ public final class Plots {
     }
 
     public static int[] free(SubLevelContainer container, int preferX, int preferZ) {
-        if (isFree(container, preferX, preferZ)) return new int[] {preferX, preferZ};
+        return free(container, preferX, preferZ, Set.of());
+    }
+
+    public static int[] free(SubLevelContainer container, int preferX, int preferZ, Set<Integer> taken) {
+        if (isFree(container, preferX, preferZ) && !taken.contains(container.getIndex(preferX, preferZ)))
+            return new int[] {preferX, preferZ};
         int side = 1 << container.getLogSideLength();
         for (int x = 0; x < side; x++) {
             for (int z = 0; z < side; z++) {
-                if (isFree(container, x, z)) return new int[] {x, z};
+                if (isFree(container, x, z) && !taken.contains(container.getIndex(x, z))) return new int[] {x, z};
             }
         }
         return null;

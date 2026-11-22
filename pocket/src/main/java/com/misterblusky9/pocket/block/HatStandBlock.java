@@ -163,6 +163,14 @@ public class HatStandBlock extends BuildHostBlock implements IWrenchable {
     }
 
     @Override
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
+                                               BlockHitResult hit) {
+        if (!player.isShiftKeyDown() && level.getBlockEntity(standPos(state, pos)) instanceof HatStandBlockEntity stand
+                && stand.spin(player)) return InteractionResult.sidedSuccess(level.isClientSide);
+        return super.useWithoutItem(state, level, pos, player, hit);
+    }
+
+    @Override
     public InteractionResult onWrenched(BlockState state, UseOnContext context) {
         return InteractionResult.PASS;
     }

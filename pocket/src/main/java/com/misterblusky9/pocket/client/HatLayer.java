@@ -42,6 +42,8 @@ public final class HatLayer<T extends LivingEntity, M extends EntityModel<T> & H
         HatRendering.pullToCamera(pose);
         Vector3d head = BuildSites.head(mirror, BuildSites.offsetVector(headwear), headwear);
         HatStandBlockEntity.NameEgg egg = HatStandBlockEntity.NameEgg.of(headwear);
+        if (egg == HatStandBlockEntity.NameEgg.SPIN)
+            HatEggs.spin(pose, HatStandBlockEntity.spinMode(headwear), mirror, head, partialTick);
         if (buffers instanceof MultiBufferSource.BufferSource source) source.endBatch();
         HatRendering.drawHat(BuildHostBlockEntity.token(headwear), mirror, head, egg, headwear.hasFoil(), pose, buffers, light,
                 OverlayTexture.NO_OVERLAY, partialTick);

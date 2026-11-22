@@ -124,12 +124,12 @@ public final class CrossScaleWelds {
             boolean firstMount = Detached.isDetached(first) || Hosted.isHosted(first);
             boolean secondMount = Detached.isDetached(second) || Hosted.isHosted(second);
             if (firstMount || secondMount) return null;
-            ServerSubLevel owner = hatOwner(first);
-            boolean sameHat = owner != null && owner == hatOwner(second)
+            if (!level.isClientSide() && (firstMount && !onStand(first) || secondMount && !onStand(second))) return null;
+            ServerSubLevel owner = Hosted.rootOf(first);
+            boolean sameHat = owner != null && owner == Hosted.rootOf(second)
                     || level.isClientSide() && clientSameHat.test(first, second);
             if (first == null && second == null || firstMount && secondMount && !sameHat) return null;
-            if (firstMount && !sameHat && (second == null || !Detached.rules(first).interact())) return null;
-            if (secondMount && !sameHat && (first == null || !Detached.rules(second).interact())) return null;
+            if (firstMount && !sameHat && second == null || secondMount && !sameHat && first == null) return null;
             boolean mount = !sameHat && (firstMount || secondMount);
 
             boolean worldWeld = first == null || second == null;
@@ -608,14 +608,8 @@ public final class CrossScaleWelds {
         return relative.normalize();
     }
 
-    private static ServerSubLevel hatOwner(SubLevel part) {
-        if (!(part instanceof ServerSubLevel server)) return null;
-        ServerSubLevel hosted = Hosted.rootOf(server);
-        if (hosted != null) return hosted;
-        if (!Detached.isOpen(server)) return null;
-        ServerSubLevel root = server;
-        while (Detached.parent(root) != null) root = Detached.parent(root);
-        return root;
+    private static boolean onStand(SubLevel part) {
+        return Hosted.rootOf(part) != null && Hosted.tangible(part);
     }
 
     private static Vector3d worldPosition(SubLevel subLevel, Vec3 position) {

@@ -89,6 +89,14 @@
       "values": [
         0.0
       ]
+    },
+    {
+      "name": "ReverseDepth",
+      "type": "float",
+      "count": 1,
+      "values": [
+        0.0
+      ]
     }
   ]
 }

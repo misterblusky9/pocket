@@ -1,6 +1,8 @@
 package com.misterblusky9.pym.internal.mixin.sable;
 
+import com.misterblusky9.pym.api.Hosted;
 import com.misterblusky9.pym.api.ScaleBounds;
+import dev.ryanhcode.sable.companion.math.Pose3d;
 import dev.ryanhcode.sable.mixinhelpers.entity.entity_riding_sub_level_vehicle.EntityRidingSubLevelVehicleHelper;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.world.entity.Entity;
@@ -32,7 +34,9 @@ public abstract class RiderEyeScaleMixin {
         if (vehicle == null) return;
         if (subLevel == null || subLevel.isRemoved()) return;
 
-        Vector3dc scale = subLevel.logicalPose().scale();
+        Pose3d shown = Hosted.presented(subLevel);
+        Pose3d pose = shown != null ? shown : subLevel.logicalPose();
+        Vector3dc scale = pose.scale();
         double sx = Math.abs(scale.x());
         double sy = Math.abs(scale.y());
         double sz = Math.abs(scale.z());
@@ -42,7 +46,7 @@ public abstract class RiderEyeScaleMixin {
 
         Vec3 eyeOffset = entity.getEyePosition().subtract(entity.position());
         Vec3 attachment = entity.getVehicleAttachmentPoint(vehicle);
-        Vec3 transformedAttachment = subLevel.logicalPose()
+        Vec3 transformedAttachment = pose
                 .transformPosition(position.add(attachment));
 
         Vector3d rotatedEyeFromAttachment = new Vector3d(
@@ -50,7 +54,7 @@ public abstract class RiderEyeScaleMixin {
                 eyeOffset.y - attachment.y,
                 eyeOffset.z - attachment.z
         );
-        subLevel.logicalPose().orientation().transform(rotatedEyeFromAttachment);
+        pose.orientation().transform(rotatedEyeFromAttachment);
 
         cir.setReturnValue(transformedAttachment.add(
                 rotatedEyeFromAttachment.x - eyeOffset.x,

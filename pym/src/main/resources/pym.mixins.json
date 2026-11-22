@@ -10,6 +10,7 @@
     "physics.RapierPhysicsPipelineMixin",
     "physics.RapierKinematicCollisionGateMixin",
     "physics.DegenerateConstraintGuardMixin",
+    "physics.HostedFrameMixin",
     "physics.ConstraintHandleRepointMixin",
     "physics.GenericConstraintHandleScaleMixin",
     "physics.ConstraintHandleSafeRemoveMixin",
@@ -34,6 +35,7 @@
     "collision.PlayerSubLevelEdgeScaleMixin",
     "collision.SubLevelEdgeProbeBoundsMixin",
     "collision.SubLevelStandupClearanceScaleMixin",
+    "collision.SubLevelStandupWornMixin",
     "collision.PlayerCollisionProbeMixin",
     "collision.SubLevelIndexedChangeMixin",
     "entity.ArrowImpactScaleMixin",
@@ -57,12 +59,10 @@
     "sable.DetachedAdoptEntitiesMixin",
     "sable.HostedTrackingMixin",
     "sable.HostedChunkTicketMixin",
-    "sable.HostedProjectionMixin",
-    "sable.HostedEntityLocalMixin",
-    "sable.HostedEntityTrackingMixin",
     "sable.HostedStorageMixin",
     "sable.HostedGhostMixin",
-    "sable.HostedNoSplitMixin"
+    "sable.HostedNoSplitMixin",
+    "sable.HostedBoundsMixin"
   ],
   "client": [
     "client.ClientSubLevelMixin",

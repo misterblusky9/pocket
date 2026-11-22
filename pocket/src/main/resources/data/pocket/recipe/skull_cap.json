@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    { "item": "minecraft:leather_helmet" },
+    { "item": "pocket:pocket_knife" }
+  ],
+  "result": {
+    "id": "pocket:skull_cap",
+    "count": 1
+  }
+}

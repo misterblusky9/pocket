@@ -8,7 +8,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ArmorMaterial;
+import java.util.EnumMap;
 import java.util.List;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ArmorMaterials;
 import net.minecraft.world.item.BlockItem;
@@ -31,6 +33,10 @@ public final class ModItems {
 
     public static final DeferredItem<EmptyBoxItem> EMPTY_BOX = ITEMS.register(
             "empty_box", () -> new EmptyBoxItem(new Item.Properties().stacksTo(16))
+    );
+
+    public static final DeferredItem<CreativePocketCaseItem> CREATIVE_POCKET_CASE = ITEMS.register(
+            "creative_pocket_case", () -> new CreativePocketCaseItem(new Item.Properties().stacksTo(16).rarity(Rarity.EPIC))
     );
 
     public static final DeferredItem<EmptyBoxItem> DISPLAY_BOTTLE = ITEMS.register(
@@ -176,15 +182,22 @@ public final class ModItems {
     public static final DeferredHolder<ArmorMaterial, ArmorMaterial> SKULL_CAP_MATERIAL = ARMOR_MATERIALS.register(
             "skull_cap", () -> {
                 ArmorMaterial leather = ArmorMaterials.LEATHER.value();
-                return new ArmorMaterial(leather.defense(), leather.enchantmentValue(), leather.equipSound(),
+                EnumMap<ArmorItem.Type, Integer> defense = new EnumMap<>(ArmorItem.Type.class);
+                for (ArmorItem.Type type : ArmorItem.Type.values()) defense.put(type, 0);
+                return new ArmorMaterial(defense, leather.enchantmentValue(), leather.equipSound(),
                         leather.repairIngredient(),
                         List.of(new ArmorMaterial.Layer(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "skull_cap"))),
-                        leather.toughness(), leather.knockbackResistance());
+                        0.0F, 0.0F);
             });
 
     public static final DeferredItem<ArmorItem> SKULL_CAP = ITEMS.register(
             "skull_cap", () -> new ArmorItem(SKULL_CAP_MATERIAL, ArmorItem.Type.HELMET,
-                    new Item.Properties().durability(ArmorItem.Type.HELMET.getDurability(5))));
+                    new Item.Properties().stacksTo(1)) {
+                @Override
+                public ItemAttributeModifiers getDefaultAttributeModifiers() {
+                    return ItemAttributeModifiers.EMPTY;
+                }
+            });
 
     static {
         ITEMS.addAlias(ResourceLocation.fromNamespaceAndPath(PocketSized.MOD_ID, "hatters_stand"), HAT_STAND.getId());

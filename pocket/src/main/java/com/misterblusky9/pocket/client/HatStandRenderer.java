@@ -252,7 +252,7 @@ public final class HatStandRenderer implements BlockEntityRenderer<HatStandBlock
         if (egg == HatStandBlockEntity.NameEgg.HEROBRINE) return RenderType.entityTranslucent(HEROBRINE);
         if (egg == HatStandBlockEntity.NameEgg.MELONS) return RenderType.entityTranslucent(TRIP);
         return profile == null || egg == HatStandBlockEntity.NameEgg.UPSIDE_DOWN || egg == HatStandBlockEntity.NameEgg.RAINBOW
-                ? RenderType.entityTranslucent(HEAD)
+                ? RenderType.entityCutoutNoCull(HEAD)
                 : SkullBlockRenderer.getRenderType(SkullBlock.Types.PLAYER, profile);
     }
 

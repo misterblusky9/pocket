@@ -411,12 +411,16 @@ public class BuildHostBlockEntity extends SmartBlockEntity {
             scaffold(server, child, true);
             return null;
         }
+        // Store the build's original position within this stand's grid before the
+        // detached/hosted -> physical conversion discards the stand association.
+        PocketCaseItem.rememberHatAnchor(child, BuildSites.scaffoldOrigin(child, host().scaffoldSize(), offset));
         ServerSubLevel released = BuildSites.releaseToPhysics(hat, child, PocketCaseItem.POCKETABLE_SCALE);
         if (released == null) {
             ServerSubLevel restored = BuildSites.live(hat);
             if (restored != null) scaffold(server, restored, true);
             return null;
         }
+        PocketCaseItem.copyHatAnchor(child, released);
         hat = UUID.randomUUID();
         epoch = 0;
         creator = null;
